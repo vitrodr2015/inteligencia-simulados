@@ -1,0 +1,18 @@
+# Perfil dos testes de integração com MySQL REAL (Testcontainers).
+# Vem depois do application.yml de teste e sobrescreve tudo o que ele define para o H2.
+# A conexão (URL, usuário e senha) vem do contêiner, por @ServiceConnection na AbstractIntegrationTest.
+spring:
+  datasource:
+    # Se o @ServiceConnection falhar, o teste quebra em vez de cair em silêncio no H2.
+    url: jdbc:mysql://conteiner-nao-configurado.invalid:3306/etec
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jpa:
+    defer-datasource-initialization: false
+    hibernate:
+      ddl-auto: validate
+  sql:
+    init:
+      mode: never
