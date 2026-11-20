@@ -1,0 +1,6 @@
+# Copie este arquivo para config/application-local.yml (ignorado pelo Git),
+# troque os valores e rode com SPRING_PROFILES_ACTIVE=local.
+# Os valores abaixo são falsos de propósito; nunca coloque segredo real neste .example.
+DB_PASSWORD: troque-a-senha-do-banco
+JWT_SECRET: troque-este-segredo-por-um-com-no-minimo-32-caracteres
+ADMIN_SENHA: troque-a-senha-do-admin
