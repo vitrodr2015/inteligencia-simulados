@@ -42,13 +42,14 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 - Rotas: o caminho `/api/v1/...` fica explícito em cada controller (`@RequestMapping("/api/v1/materias")`). Um prefixo global por pacote quebraria os controllers falsos dos testes (que já têm `/api/v1`) e deixaria dúvida sobre o que fica fora (actuator, Swagger, `/error`).
 - Swagger: `springdoc-openapi-starter-webmvc-ui` 3.2.0, com versão explícita no `pom.xml` (não é gerida pelo Boot); confirmada com o Boot 4.2.0 subindo a aplicação (`/v3/api-docs` 200 com a Matéria, UI 200). Anotações na interface `MateriaControllerDocs`, que o controller implementa (o controller fica só com a lógica). Documenta só o que o código devolve (200, 201, 204, 400, 404, 409; sem 401, 403 nem 500), verificado no documento gerado. Desligado por padrão (`SWAGGER_ENABLED`; sem ela o `/v3/api-docs` dá 404 no formato padrão). Sem `example` em parâmetros de filtro: o "Try it out" enviaria o valor do exemplo como filtro.
 - Testes (Tarefa 05): o H2 de teste usa nome único por contexto (`jdbc:h2:mem:etec_teste_${random.uuid}`), porque vários `@SpringBootTest` com `create-drop` no mesmo banco em memória se atropelariam. Os testes web usam `@SpringBootTest` com `@AutoConfigureMockMvc` (`org.springframework.boot.webmvc.test.autoconfigure`) e não usam `@Transactional` (limpam com `deleteAll`), para o teste de concorrência (`@RepeatedTest(5)`, 12 DELETE simultâneos) enxergar dados confirmados. O `@WebMvcTest` do `GlobalExceptionHandlerTest` lista os controllers falsos (`controllers = {...}`); sem isso ele carrega o `MateriaController` real e falha por falta do `MateriaService`. O springdoc fica desligado no `application.yml` de teste; os testes do Swagger ligam por propriedade.
-- Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (rascunho v0.7, decisões D1 a D56).
+- Postman: pasta `postman/` na raiz, com uma coleção por recurso (`<recurso>.postman_collection.json`, ver `postman/README.md`). **Todo endpoint novo entra na coleção do recurso na própria tarefa** (parte do "pronto"), gerada a partir de chamadas reais à aplicação no banco local; o relatório das respostas fica em `etec/docs/`. Hoje existe só a coleção da Matéria.
+- Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (rascunho v0.8, decisões D1 a D63).
 
 ## Estado
 
 - Na `main`: esqueleto Spring Boot 4.2.0 / Java 25, CI, Dependabot, `.gitignore` único, configuração com validação de ambiente (PR #4), documentação e estrutura de pacotes (PR #5) e as Actions atualizadas (PRs #1 a #3 do Dependabot, já mergeados).
-- Na `develop`: Tarefa 03 (banco e migrations, PR #6) e Tarefa 04 (camadas e erros padronizados, PR #7).
-- Tarefa 05 (CRUD de Matéria): em PR para a `develop`, ainda sem merge.
+- Na `develop`: Tarefas 03 (banco e migrations, PR #6), 04 (camadas e erros padronizados, PR #7) e 05 (CRUD de Matéria, formato global de datas e Swagger, PR #8).
+- Documentação (contrato v0.8, pasta `postman/` e relatório das chamadas reais à Matéria): em PR para a `develop`, ainda sem merge.
 - `./mvnw verify` passa (119 testes na branch da Tarefa 05), inclusive sem `DB_PASSWORD`/`JWT_SECRET` no ambiente, como no CI.
 - Dependências: `webmvc`, `devtools`, `validation`, `data-jpa`, `flyway` (+ `flyway-mysql`), `mysql-connector-j`, `springdoc-openapi-starter-webmvc-ui` 3.2.0; de teste: `webmvc-test`, `data-jpa-test` e `h2`. Ainda sem segurança nem Testcontainers.
 - Pacotes por domínio com `package-info.java`; as entidades são `Usuario` (migration V1) e `Materia` (migration V2); `shared.exception` tem o `GlobalExceptionHandler` e as exceções de negócio; o único recurso de negócio é a Matéria (`MateriaController`/`MateriaService`, CRUD sob `/api/v1/materias`, sem listagem); ainda não há autenticação.
@@ -60,15 +61,15 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 ## Pendências
 
 - Matéria, fora da Tarefa 05: a listagem `GET /materias` (Módulo 8), qualquer 401/403 e o Spring Security (Módulos 10 e 11) e o 409 do `DELETE` por subtópicos (a tabela `subtopico` ainda não existe; a chave estrangeira vai virar 409).
-- Pontos que ficaram para o contrato (da Tarefa 05):
-  - `Location` relativo (`/api/v1/materias/{id}`) e o corpo do 201 com a matéria completa;
-  - nome: espaços das pontas removidos antes da validação; ausente = "O nome é obrigatório.", vazio, curto ou longo = "O nome deve ter de 2 a 100 caracteres."; decidir se `campos` traz um ou dois textos;
-  - data inválida no corpo sai como `CORPO_ILEGIVEL` genérico, sem dizer qual campo; para o front mostrar o erro no campo, talvez convenha um código próprio;
-  - `PUT` omitindo `descricao` zera a descrição (semântica de PUT);
-  - `disable`/`enable` idempotentes: o segundo pedido não altera `atualizadoEm`;
-  - o 409 do `DELETE` por subtópicos entra quando a tabela existir;
-  - o arredondamento do `DATETIME(3)` e o truncamento em milissegundos na origem;
-  - a unicidade sem distinguir maiúsculas e acentos foi provada só manualmente no MySQL real; a automação é do Módulo 7.
+- Matéria: a unicidade sem distinguir maiúsculas e acentos foi provada só manualmente no MySQL real; a automação é do Módulo 7.
+- Contrato v0.8 (D57 a D63 decididas): pontos em aberto:
+  - D61 (PUT é substituição) contra D13 (gabarito parcial) e D30 (`tempoGastoMs` omitido mantém o valor): as exceções foram registradas na seção 1, mas a escolha é do responsável;
+  - D59 (texto da mensagem não contratual; o front decide pelo `codigo`) contra D60 (mensagem fixa), e todo erro de validação tem o mesmo `codigo` (`VALIDACAO_FALHOU`), então o front não distingue qual regra falhou num campo; talvez convenha um código por campo;
+  - D60: o `codigo` do 400 de data inválida não foi definido (hoje a implementação devolve `CORPO_ILEGIVEL` sem `campos`, e o `DatasJacksonTest` afirma isso; terá de mudar), e a mensagem "use o formato" engana para data inexistente (`2000-02-30` tem formato certo);
+  - D59 não está implementada: o `GlobalExceptionHandler` lista todas as violações de um campo, e a regra é no máximo uma por campo;
+  - D61 nas seções 5 e 6 (não propagada): `PUT /admin/questoes/{id}` sem `gabarito` apaga o gabarito aplicado antes, e `PUT /admin/provas/{id}` sem `fonteUrl` a zera;
+  - D62: não diz se um `PUT` com o mesmo conteúdo altera `atualizadoEm` (hoje não altera);
+  - D57 vale só para `nome`: o `email` (minúsculas) não tem trim definido e a `senha` não pode ser aparada.
 - Tarefa 01: Git Flow (`develop`, `feature/*`, `release/X.Y.Z`); CI cobrindo PR para `develop` e `release/**`; limpar o `pom.xml` (name, description, blocos vazios `licenses`, `developers`, `scm`).
 - Tarefa 00: sabotagem pendente (sessão nova do Claude Code, sem a conversa, pede para continuar; anotar as lacunas). `PassoAPasso.md` é citado no `CLAUDE.md` e na tarefa, mas foi decidido não criar por enquanto.
 - Dúvida a decidir: a tarefa 00 sugere "commit em branch de feature, sim"; o `CLAUDE.md` exige pedido do usuário para commit.
