@@ -48,13 +48,14 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 - Achados da Tarefa 06: (1) a violação de `CHECK` do MySQL (erro 3819) chega como `UncategorizedSQLException`, e não como `DataIntegrityViolationException` (que é a da violação de índice único); o teste do `CHECK` olha a causa raiz. (2) Concorrência no MySQL real: 20 `DELETE` simultâneos dão 1 × 204 e 19 × 404, e 20 `POST` com o mesmo nome dão 1 × 201 e 19 × 409 (`MATERIA_NOME_DUPLICADO`); 15 repetições seguidas sem nenhum 500, então o `try/catch` em volta do `saveAndFlush` já basta e o service não precisou de correção (os testes ficam com `@RepeatedTest(3)`). Limite conhecido: com `POST` simultâneos de mesmo nome, o InnoDB pode abortar uma das transações por deadlock de índice único (erro 1213); não apareceu em 30 execuções, mas depende de tempo e pode aparecer em outra máquina. O Spring o traduz como `CannotAcquireLockException` (um `PessimisticLockingFailureException`), que hoje NÃO é tratada e cairia no 500 genérico. Tratamento previsto, só se aparecer (não implementado): no `MateriaService.criar`, capturar também `CannotAcquireLockException` e, numa nova transação, refazer a checagem do nome: se já existe, 409 `MATERIA_NOME_DUPLICADO`; se não, repetir a criação uma única vez.
 - CI e testes de integração: o workflow não mudou. O `ubuntu-latest` já traz o Docker, o `./mvnw verify` roda as classes `*Test` (o surefire ignora as abstratas) e nada precisa de segredo. Risco conhecido: o limite de pulls anônimos do Docker Hub, que pode derrubar um build de vez em quando. Alternativa SEM segredo, a aplicar só se o CI falhar por isso: trocar a imagem na `AbstractIntegrationTest` pelo espelho público da AWS, `DockerImageName.parse("public.ecr.aws/docker/library/mysql:8.4").asCompatibleSubstituteFor("mysql")` (o `asCompatibleSubstituteFor` é necessário para o Testcontainers aceitar um nome de imagem diferente de `mysql`).
 - Testes (Tarefa 05): o H2 de teste usa nome único por contexto (`jdbc:h2:mem:etec_teste_${random.uuid}`), porque vários `@SpringBootTest` com `create-drop` no mesmo banco em memória se atropelariam. Os testes web usam `@SpringBootTest` com `@AutoConfigureMockMvc` (`org.springframework.boot.webmvc.test.autoconfigure`) e não usam `@Transactional` (limpam com `deleteAll`), para o teste de concorrência (`@RepeatedTest(5)`, 12 DELETE simultâneos) enxergar dados confirmados. O `@WebMvcTest` do `GlobalExceptionHandlerTest` lista os controllers falsos (`controllers = {...}`); sem isso ele carrega o `MateriaController` real e falha por falta do `MateriaService`. O springdoc fica desligado no `application.yml` de teste; os testes do Swagger ligam por propriedade.
-- Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (rascunho v0.7, decisões D1 a D56).
+- Postman: pasta `postman/` na raiz, com uma coleção por recurso (`<recurso>.postman_collection.json`, ver `postman/README.md`). **Todo endpoint novo entra na coleção do recurso na própria tarefa** (parte do "pronto"), gerada a partir de chamadas reais à aplicação no banco local; o relatório das respostas fica em `etec/docs/`. Hoje existe só a coleção da Matéria.
+- Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (rascunho v0.8, decisões D1 a D63).
 
 ## Estado
 
 - Na `main`: esqueleto Spring Boot 4.2.0 / Java 25, CI, Dependabot, `.gitignore` único, configuração com validação de ambiente (PR #4), documentação e estrutura de pacotes (PR #5) e as Actions atualizadas (PRs #1 a #3 do Dependabot, já mergeados).
-- Na `develop`: Tarefa 03 (banco e migrations, PR #6) e Tarefa 04 (camadas e erros padronizados, PR #7).
-- Tarefa 05 (CRUD de Matéria): em PR para a `develop`, ainda sem merge.
+- Na `develop`: Tarefas 03 (banco e migrations, PR #6), 04 (camadas e erros padronizados, PR #7) e 05 (CRUD de Matéria, formato global de datas e Swagger, PR #8).
+- Documentação (contrato v0.8, pasta `postman/` e relatório das chamadas reais à Matéria): em PR para a `develop`, ainda sem merge.
 - `./mvnw verify` passa (119 testes na branch da Tarefa 05), inclusive sem `DB_PASSWORD`/`JWT_SECRET` no ambiente, como no CI.
 - Dependências: `webmvc`, `devtools`, `validation`, `data-jpa`, `flyway` (+ `flyway-mysql`), `mysql-connector-j`, `springdoc-openapi-starter-webmvc-ui` 3.2.0; de teste: `webmvc-test`, `data-jpa-test` e `h2`. Ainda sem segurança nem Testcontainers.
 - Pacotes por domínio com `package-info.java`; as entidades são `Usuario` (migration V1) e `Materia` (migration V2); `shared.exception` tem o `GlobalExceptionHandler` e as exceções de negócio; o único recurso de negócio é a Matéria (`MateriaController`/`MateriaService`, CRUD sob `/api/v1/materias`, sem listagem); ainda não há autenticação.
@@ -67,15 +68,15 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 ## Pendências
 
 - Matéria, fora da Tarefa 05: a listagem `GET /materias` (Módulo 8), qualquer 401/403 e o Spring Security (Módulos 10 e 11) e o 409 do `DELETE` por subtópicos (a tabela `subtopico` ainda não existe; a chave estrangeira vai virar 409).
-- Pontos que ficaram para o contrato (da Tarefa 05):
-  - `Location` relativo (`/api/v1/materias/{id}`) e o corpo do 201 com a matéria completa;
-  - nome: espaços das pontas removidos antes da validação; ausente = "O nome é obrigatório.", vazio, curto ou longo = "O nome deve ter de 2 a 100 caracteres."; decidir se `campos` traz um ou dois textos;
-  - data inválida no corpo sai como `CORPO_ILEGIVEL` genérico, sem dizer qual campo; para o front mostrar o erro no campo, talvez convenha um código próprio;
-  - `PUT` omitindo `descricao` zera a descrição (semântica de PUT);
-  - `disable`/`enable` idempotentes: o segundo pedido não altera `atualizadoEm`;
-  - o 409 do `DELETE` por subtópicos entra quando a tabela existir;
-  - o arredondamento do `DATETIME(3)` e o truncamento em milissegundos na origem;
-  - a unicidade sem distinguir maiúsculas e acentos foi provada só manualmente no MySQL real; a automação é do Módulo 7.
+- Matéria: a unicidade sem distinguir maiúsculas e acentos foi provada só manualmente no MySQL real; a automação é do Módulo 7.
+- Contrato v0.8 (D57 a D63 decididas): pontos em aberto:
+  - D61 (PUT é substituição) contra D13 (gabarito parcial) e D30 (`tempoGastoMs` omitido mantém o valor): as exceções foram registradas na seção 1, mas a escolha é do responsável;
+  - D59 (texto da mensagem não contratual; o front decide pelo `codigo`) contra D60 (mensagem fixa), e todo erro de validação tem o mesmo `codigo` (`VALIDACAO_FALHOU`), então o front não distingue qual regra falhou num campo; talvez convenha um código por campo;
+  - D60: o `codigo` do 400 de data inválida não foi definido (hoje a implementação devolve `CORPO_ILEGIVEL` sem `campos`, e o `DatasJacksonTest` afirma isso; terá de mudar), e a mensagem "use o formato" engana para data inexistente (`2000-02-30` tem formato certo);
+  - D59 não está implementada: o `GlobalExceptionHandler` lista todas as violações de um campo, e a regra é no máximo uma por campo;
+  - D61 nas seções 5 e 6 (não propagada): `PUT /admin/questoes/{id}` sem `gabarito` apaga o gabarito aplicado antes, e `PUT /admin/provas/{id}` sem `fonteUrl` a zera;
+  - D62: não diz se um `PUT` com o mesmo conteúdo altera `atualizadoEm` (hoje não altera);
+  - D57 vale só para `nome`: o `email` (minúsculas) não tem trim definido e a `senha` não pode ser aparada.
 - Tarefa 01: Git Flow (`develop`, `feature/*`, `release/X.Y.Z`); CI cobrindo PR para `develop` e `release/**`; limpar o `pom.xml` (name, description, blocos vazios `licenses`, `developers`, `scm`).
 - Tarefa 00: sabotagem pendente (sessão nova do Claude Code, sem a conversa, pede para continuar; anotar as lacunas). `PassoAPasso.md` é citado no `CLAUDE.md` e na tarefa, mas foi decidido não criar por enquanto.
 - Dúvida a decidir: a tarefa 00 sugere "commit em branch de feature, sim"; o `CLAUDE.md` exige pedido do usuário para commit.

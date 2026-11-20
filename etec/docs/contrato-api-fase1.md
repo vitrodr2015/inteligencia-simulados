@@ -1,20 +1,23 @@
-Contrato da API — Fase 1 (rascunho v0.7)
+Contrato da API — Fase 1 (rascunho v0.8)
 
 Escrito no formato do Módulo 2 do Playbook2. Regra do módulo: o contrato é revisado e aprovado antes de qualquer código; depois de aprovado, qualquer mudança é registrada na seção 10. Substitui, para a fase 1, a lista de alto nível de apis-backend.md.
 
-Estado: decisões D1 a D56 decididas, exceto D22 e D24 (pendências externas).
+Estado: decisões D1 a D63 decididas, exceto D22 e D24 (pendências externas).
 
 1. Convenções gerais (valem para todas as rotas)
 Tema	Decisão
 Base e formato	/api/v1, JSON em UTF-8. Só JSON; nenhum outro formato na fase 1
 Ids	Campo id é um UUID (o id numérico do banco nunca sai). UUID malformado = 400; inexistente = 404
-Data e hora	ISO-8601 em UTC com milissegundos (2026-11-20T15:04:05.123Z)
-Data simples	uuuu-MM-dd, leitura estrita (2000-02-30 = 400)
+Data e hora	ISO-8601 em UTC com exatamente 3 casas de milissegundos, mesmo quando são zero (2026-11-20T15:04:05.123Z e 2026-11-20T15:04:05.000Z). As datas são gravadas e devolvidas com precisão de milissegundos: a aplicação trunca na origem, para o banco não arredondar (D63)
+Data simples	uuuu-MM-dd (aaaa-mm-dd), leitura estrita: data inexistente ou fora do formato (2000-02-30, 2000-2-3) = 400, com campos apontando o campo e a mensagem "Data inválida. Use o formato aaaa-mm-dd."; nunca é corrigida em silêncio (D60)
 Entidade	Nunca sai pela API: DTOs de entrada e de saída. Campos de saída que não são do cliente (id, ativo, status, datas, nota) são ignorados se vierem no corpo. Campo de entrada que não muda depois de criado (materiaId, email, dataNascimento, provaId, numero...): valor igual ao atual é aceito; valor diferente = 400 com codigo CAMPO_IMUTAVEL. Como a comparação é com o valor atual, esse 400 só é avaliado depois da existência (404) (D27, D42, D48)
 Referência no corpo	Se o corpo aponta para um recurso que não existe (ex.: materiaId, provaId em POST /tentativas), responde 400. Se a rota aponta (/materias/{id}), responde 404 (D14)
 Ordem de validação	autenticação e autorização (401/403) → corpo (400) → id (400) → existência (404) → conflito (409) → alteração (D17)
 Autorização antes da existência	Quem não pode recebe 403 até para um id que não existe
-Idempotência	PUT de resposta e de gabarito, disable/enable, publish e finalizar podem ser repetidos com o mesmo resultado. O logout também (D15)
+Idempotência	PUT de resposta e de gabarito, disable/enable, publish e finalizar podem ser repetidos com o mesmo resultado. O logout também (D15). Repetir disable/enable devolve o mesmo resultado e não altera atualizadoEm (D62)
+Nome	Campo nome (de matéria, subtópico, usuário e demais recursos): o servidor remove os espaços das pontas ANTES de validar; nome vazio depois disso = 400 (D57)
+Criação (201)	Location relativo (/api/v1/recurso/{id}) e o corpo traz o recurso completo, não só o id (D58). Exceção: POST /auth/register, que não tem Location (o recurso só existe em /me)
+PUT	É substituição: campo opcional omitido no corpo vira nulo (por exemplo, descricao da matéria) (D61). Exceções, por decisões próprias: PUT /admin/provas/{id}/gabarito, que é parcial (D13), e PUT /tentativas/{id}/respostas/{questaoId}, em que tempoGastoMs omitido mantém o valor salvo (D30). Campos que o servidor controla (ativo, status, datas) nunca mudam por PUT
 Limite de abuso	/auth/* responde 429 com Retry-After ao exceder o limite: 10 requisições por minuto por IP em /auth/* e 5 tentativas de signin por minuto por e-mail, ambos configuráveis por propriedade (D25; números iniciais)
 Cabeçalhos	Respostas com token levam Cache-Control: no-store
 Formatação nos textos	Os textos de questão (enunciado, textoApoio, alternativas[].texto, explicacao) aceitam só as marcas <b>, <u>, <i>, <sup>, <sub> e <br> (D12, D32). Os caracteres <, > e & literais se escrevem &lt;, &gt; e &amp;. Atributos nas tags e tags mal fechadas ou mal aninhadas = 400. O servidor recusa (400) qualquer outra marcação HTML e o front também limpa por segurança. Os limites de tamanho contam caracteres
@@ -25,7 +28,7 @@ Formato de erro (ErrorResponse) — o mesmo em todo status de erro, inclusive 40
 json
 { "dataHora": "2026-11-20T15:04:05.123Z", "status": 409, "erro": "Conflict", "codigo": "MATERIA_NOME_DUPLICADO", "mensagem": "Já existe uma matéria com esse nome." }
 
-O campo codigo é estável (texto em MAIÚSCULAS com sublinhado, por exemplo TENTATIVA_EM_ANDAMENTO); o front decide pelo codigo, nunca pelo texto da mensagem (D33). O campo detalhes (opcional, um objeto) leva dados estruturados de alguns erros (D44): no 409 de tentativa em andamento, { "tentativaId": "..." }; no 409 do publish da prova, { "questoesPendentes": [3, 7] }, com os números das questões pendentes; no 409 de reimportação, { "numerosEmConflito": [4, 9] }. Os valores de codigo são definidos na implementação, um por situação de erro do contrato. Em erros 400 de validação, campos (opcional): [ { "campo": "nome", "mensagem": "deve ter de 2 a 100 caracteres" } ] (decisão D1). O 500 devolve mensagem genérica; a pilha só vai para o log.
+O campo codigo é estável (texto em MAIÚSCULAS com sublinhado, por exemplo TENTATIVA_EM_ANDAMENTO); o front decide pelo codigo, nunca pelo texto da mensagem (D33). O campo detalhes (opcional, um objeto) leva dados estruturados de alguns erros (D44): no 409 de tentativa em andamento, { "tentativaId": "..." }; no 409 do publish da prova, { "questoesPendentes": [3, 7] }, com os números das questões pendentes; no 409 de reimportação, { "numerosEmConflito": [4, 9] }. Os valores de codigo são definidos na implementação, um por situação de erro do contrato. Em erros 400 de validação, campos (opcional): [ { "campo": "nome", "mensagem": "O nome deve ter de 2 a 100 caracteres." } ] (decisão D1), com no máximo uma mensagem por campo. O texto da mensagem não é contratual: o front decide pelo codigo (D59). O 500 devolve mensagem genérica; a pilha só vai para o log.
 
 Lista paginada — parâmetros page (a partir de 0), size (padrão 20, máximo 50, valor maior é reduzido ao máximo) e sort no formato campo,direção (por exemplo sort=nome,desc; só campos da lista de cada recurso; outro campo = 400). page ou size inválidos (negativo, zero ou não numérico) = 400. Página além do fim devolve 200 com lista vazia. O filtro nome é "contém", ignorando maiúsculas e acentos (D29). Resposta:
 
@@ -54,10 +57,10 @@ Campos de Usuário
 
 Campo	Tipo	Regra	Quem preenche
 id	UUID	gerado	saída
-nome	texto	obrigatório, 2 a 100 caracteres, sem espaço nas pontas	entrada e saída
+nome	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 2 a 100 caracteres (vazio = 400, D57)	entrada e saída
 email	texto	obrigatório, formato válido, até 255, único, normalizado em minúsculas	entrada e saída
 senha	texto	obrigatório, 8 a 72 bytes (limite do BCrypt)	só entrada (nunca sai)
-dataNascimento	data	obrigatória, no passado	entrada e saída
+dataNascimento	data	obrigatória, no passado, no formato aaaa-mm-dd (data inválida = 400, D60)	entrada e saída
 aceiteTermosVersao	texto	obrigatório, igual à versão devolvida por GET /termos/vigente; diferente = 400 (D23)	só entrada
 papel	enum	sempre STUDENT no cadastro; o corpo não escolhe	saída
 menor	booleano	calculado: menor de 18 anos. Na fase 1 é só uma marca, não muda comportamento (D24)	saída
@@ -87,29 +90,29 @@ O e-mail anonimizado vira removido-{uuid}@invalid, então o e-mail original pode
 4.1 Matéria
 Campo	Tipo	Regra	Quem preenche
 id	UUID	gerado	saída
-nome	texto	obrigatório, 2 a 100, sem espaço nas pontas, único (ignora maiúsculas e acentos)	entrada e saída
-descricao	texto	opcional, até 255	entrada e saída
+nome	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 2 a 100 caracteres (vazio = 400, D57); único (ignora maiúsculas e acentos)	entrada e saída
+descricao	texto	opcional, até 255; omitida no PUT, vira nula (D61)	entrada e saída
 ativo	booleano	nasce true; só muda por disable/enable. Desativar uma matéria não desativa os subtópicos em cascata	saída
-criadoEm, atualizadoEm	data/hora	UTC	saída
+criadoEm, atualizadoEm	data/hora	UTC, com precisão de milissegundos (D63). atualizadoEm não muda quando disable/enable é repetido (D62)	saída
 Verbo	Rota	Sucesso	Erros
-POST	/materias	201 + Location	400, 401, 403, 409 (nome existe)
+POST	/materias	201 + Location relativo e a matéria completa (D58)	400, 401, 403, 409 (nome existe)
 GET	/materias (filtros nome, ativo; sort: nome, criadoEm; padrão nome). STUDENT só vê ativas; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401
 GET	/materias/{id} (STUDENT: matéria inativa = 404)	200	400, 401, 404
-PUT	/materias/{id} (troca nome e descricao, nunca ativo)	200	400, 401, 403, 404, 409
-PATCH	/materias/{id}/disable e /enable	200, idempotentes	400, 401, 403, 404
+PUT	/materias/{id} (substituição: troca nome e descricao, e a descricao omitida vira nula; nunca altera ativo, D61)	200	400, 401, 403, 404, 409
+PATCH	/materias/{id}/disable e /enable	200, idempotentes: repetir devolve o mesmo resultado e não altera atualizadoEm (D62)	400, 401, 403, 404
 DELETE	/materias/{id}	204	400, 401, 403, 404, 409 (tem subtópicos, ativos ou não)
 4.2 Subtópico
 Campo	Tipo	Regra	Quem preenche
 id	UUID	gerado	saída
 materiaId	UUID	obrigatório na criação, deve existir (senão 400); não muda depois (valor igual ao atual é aceito; diferente = 400, codigo CAMPO_IMUTAVEL, D48); matéria desativada = 409, codigo MATERIA_INATIVA (D54)	entrada e saída
-nome	texto	obrigatório, 2 a 100, único dentro da matéria	entrada e saída
+nome	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 2 a 100 caracteres (vazio = 400, D57); único dentro da matéria	entrada e saída
 ativo, criadoEm, atualizadoEm		como em Matéria	saída
 Verbo	Rota	Sucesso	Erros
-POST	/subtopicos	201 + Location	400, 401, 403, 409 (nome já existe na matéria; ou matéria desativada, codigo MATERIA_INATIVA, D54)
+POST	/subtopicos	201 + Location relativo e o subtópico completo (D58)	400, 401, 403, 409 (nome já existe na matéria; ou matéria desativada, codigo MATERIA_INATIVA, D54)
 GET	/subtopicos (filtros materiaId, nome, ativo; sort: nome, criadoEm). STUDENT só vê subtópicos ativos de matéria ativa; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401
 GET	/subtopicos/{id} (STUDENT: subtópico inativo ou de matéria inativa = 404)	200	400, 401, 404
 PUT	/subtopicos/{id} (só nome)	200	400, 401, 403, 404, 409
-PATCH	/subtopicos/{id}/disable e /enable	200, idempotentes	400, 401, 403, 404
+PATCH	/subtopicos/{id}/disable e /enable	200, idempotentes: repetir devolve o mesmo resultado e não altera atualizadoEm (D62)	400, 401, 403, 404
 DELETE	/subtopicos/{id}	204	400, 401, 403, 404, 409 (tem questões, de qualquer status)
 4.3 Prova
 Campo	Tipo	Regra	Quem preenche
@@ -263,6 +266,13 @@ D53	questaoId na rota que não pertence à tentativa = 404. Letra fora de A a E 
 D54	Criar subtópico em matéria desativada = 409 (codigo MATERIA_INATIVA)	✅ Confirmada
 D55	Corpo de importação acima de 2 MB = 413; mais de 100 questões = 400. Refina D20	✅ Confirmada
 D56	O filtro status de GET /admin/questoes vale para a versão mais recente exibida	✅ Confirmada
+D57	Nome (de matéria e dos demais recursos): o servidor remove os espaços das pontas antes de validar; nome vazio depois disso = 400. O texto "sem espaço nas pontas" deixa de sugerir que isso é obrigação do cliente	✅ Confirmada
+D58	Location é relativo (/api/v1/recurso/{id}) e o 201 devolve o recurso completo	✅ Confirmada
+D59	O campo campos do 400 traz no máximo uma mensagem por campo. O texto da mensagem não é contratual; o front decide pelo codigo	✅ Confirmada
+D60	Data inválida no corpo (por exemplo 2000-02-30 ou 2000-2-3) = 400 com campos apontando o campo e a mensagem "Data inválida. Use o formato aaaa-mm-dd."	✅ Confirmada (a implementação entra junto com o primeiro DTO que tem data de entrada)
+D61	PUT é substituição: campo opcional omitido (descricao) vira nulo	✅ Confirmada
+D62	disable/enable repetido devolve o mesmo resultado e não altera atualizadoEm	✅ Confirmada
+D63	Datas gravadas e devolvidas com precisão de milissegundos; a aplicação trunca na origem para o banco não arredondar	✅ Confirmada
 9. Fora da fase 1 (de propósito)
 
 Pagamento e planos, entitlements como API (na fase 1 é um serviço interno que libera tudo, por podeIniciarTentativa), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
@@ -278,4 +288,4 @@ P3. Questão anulada (externa, D22): conferir como a banca trata a anulada e pre
 
 As pendências técnicas P1 e P4 a P12 foram decididas na v0.6 (D39 a D47). A P9 (catálogo dos valores de codigo) ficou como tarefa de implementação (D44).
 
-Histórico do rascunho: v0.2 — D2 resolvida e correção da referência da seção de mudanças. v0.3 — D1 a D10 confirmadas; D3 muda: nota é a quantidade de acertos; duração da prova da ETEC (180 min) anotada. v0.4 — D11 a D13 confirmadas; novos campos textoApoio e grupoApoio; gabarito opcional no rascunho; nova rota PUT /admin/provas/{id}/gabarito; regra de formatação mínima nos textos (o servidor recusa outras marcações HTML). v0.5 — primeira sabotagem: D14 a D38 (25 respostas); logout anônimo; nova rota GET /termos/vigente; novas rotas PUT e DELETE /admin/provas/{id} e DELETE /admin/questoes/{id}; campo codigo no erro; nova ordem de validação (401/403 antes de 400); <br> na formatação; subseção 3.1 (JWT, proposta) e seção 11 (pendências abertas). v0.6 — D39 a D47 confirmadas (P1 corrigida com os valores do Playbook e P4 a P12 decididas); campo detalhes no ErrorResponse; tokens HS256 com claims definidos e refresh de 24 h; reimportação atualiza titulo, duracaoMinutos e fonteUrl e dá 409 em conflito de questão; numero imutável; filtro de status de questões só RASCUNHO e PUBLICADA; aluno com ativo=false ou status recebe 400; hosts de imagem por propriedade; bootstrap do admin por ambiente; seção 11 reduzida às pendências externas. v0.7 — D48 a D56 decididas; campo de entrada imutável aceita o valor igual ao atual e recusa o diferente com codigo CAMPO_IMUTAVEL (D27 e D42 refinadas); reuso de refresh invalidado revoga todos os refresh do usuário, sem conceito de família (D39 refinada); finalizar dentro da tolerância de 3 s encerra como FINALIZADA (D31 refinada); hash da questão imutável; POST /tentativas devolve a tentativa completa e finalizar devolve o resumo sem itens; questaoId alheio = 404 e letra inválida = 400; subtópico em matéria desativada = 409 (MATERIA_INATIVA); importação acima de 2 MB = 413 e acima de 100 questões = 400 (D20 refinada); filtro status de questões vale para a versão mais recente; linha Estado corrigida.
+Histórico do rascunho: v0.2 — D2 resolvida e correção da referência da seção de mudanças. v0.3 — D1 a D10 confirmadas; D3 muda: nota é a quantidade de acertos; duração da prova da ETEC (180 min) anotada. v0.4 — D11 a D13 confirmadas; novos campos textoApoio e grupoApoio; gabarito opcional no rascunho; nova rota PUT /admin/provas/{id}/gabarito; regra de formatação mínima nos textos (o servidor recusa outras marcações HTML). v0.5 — primeira sabotagem: D14 a D38 (25 respostas); logout anônimo; nova rota GET /termos/vigente; novas rotas PUT e DELETE /admin/provas/{id} e DELETE /admin/questoes/{id}; campo codigo no erro; nova ordem de validação (401/403 antes de 400); <br> na formatação; subseção 3.1 (JWT, proposta) e seção 11 (pendências abertas). v0.6 — D39 a D47 confirmadas (P1 corrigida com os valores do Playbook e P4 a P12 decididas); campo detalhes no ErrorResponse; tokens HS256 com claims definidos e refresh de 24 h; reimportação atualiza titulo, duracaoMinutos e fonteUrl e dá 409 em conflito de questão; numero imutável; filtro de status de questões só RASCUNHO e PUBLICADA; aluno com ativo=false ou status recebe 400; hosts de imagem por propriedade; bootstrap do admin por ambiente; seção 11 reduzida às pendências externas. v0.7 — D48 a D56 decididas; campo de entrada imutável aceita o valor igual ao atual e recusa o diferente com codigo CAMPO_IMUTAVEL (D27 e D42 refinadas); reuso de refresh invalidado revoga todos os refresh do usuário, sem conceito de família (D39 refinada); finalizar dentro da tolerância de 3 s encerra como FINALIZADA (D31 refinada); hash da questão imutável; POST /tentativas devolve a tentativa completa e finalizar devolve o resumo sem itens; questaoId alheio = 404 e letra inválida = 400; subtópico em matéria desativada = 409 (MATERIA_INATIVA); importação acima de 2 MB = 413 e acima de 100 questões = 400 (D20 refinada); filtro status de questões vale para a versão mais recente; linha Estado corrigida. v0.8 — D57 a D63 decididas; o servidor remove os espaços das pontas do nome antes de validar (D57); Location relativo e 201 com o recurso completo (D58); campos com no máximo uma mensagem por campo e texto de mensagem não contratual (D59); data inválida = 400 com campos e mensagem fixa (D60); PUT é substituição, com as exceções registradas na seção 1 (D61); disable/enable repetido não altera atualizadoEm (D62); datas com precisão de milissegundos, truncadas na origem (D63); exemplo de campos atualizado.
