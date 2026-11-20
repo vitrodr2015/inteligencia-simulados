@@ -55,8 +55,8 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 
 - Na `main`: esqueleto Spring Boot 4.2.0 / Java 25, CI, Dependabot, `.gitignore` único, configuração com validação de ambiente (PR #4), documentação e estrutura de pacotes (PR #5) e as Actions atualizadas (PRs #1 a #3 do Dependabot, já mergeados).
 - Na `develop`: Tarefas 03 (banco e migrations, PR #6), 04 (camadas e erros padronizados, PR #7) e 05 (CRUD de Matéria, formato global de datas e Swagger, PR #8).
-- Documentação (contrato v0.8, pasta `postman/` e relatório das chamadas reais à Matéria): em PR para a `develop`, ainda sem merge.
-- `./mvnw verify` passa (119 testes na branch da Tarefa 05), inclusive sem `DB_PASSWORD`/`JWT_SECRET` no ambiente, como no CI.
+- Documentação (contrato v0.8, pasta `postman/` e relatório das chamadas reais à Matéria): mesclada na `develop` (PR #9).
+- `./mvnw verify` passa (153 testes), inclusive sem `DB_PASSWORD`/`JWT_SECRET` no ambiente, como no CI.
 - Dependências: `webmvc`, `devtools`, `validation`, `data-jpa`, `flyway` (+ `flyway-mysql`), `mysql-connector-j`, `springdoc-openapi-starter-webmvc-ui` 3.2.0; de teste: `webmvc-test`, `data-jpa-test` e `h2`. Ainda sem segurança nem Testcontainers.
 - Pacotes por domínio com `package-info.java`; as entidades são `Usuario` (migration V1) e `Materia` (migration V2); `shared.exception` tem o `GlobalExceptionHandler` e as exceções de negócio; o único recurso de negócio é a Matéria (`MateriaController`/`MateriaService`, CRUD sob `/api/v1/materias`, sem listagem); ainda não há autenticação.
 - Existe a branch `develop` (criada a partir da `main`); o ruleset `proteger-main` cobre só a `main`, então a `develop` ainda não está protegida (Tarefa 01).
