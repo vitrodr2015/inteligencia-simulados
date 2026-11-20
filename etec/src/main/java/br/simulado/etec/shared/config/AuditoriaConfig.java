@@ -1,6 +1,7 @@
 package br.simulado.etec.shared.config;
 
 import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Bean;
@@ -16,9 +17,14 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 @EnableJpaAuditing(dateTimeProviderRef = "auditoriaDateTimeProvider")
 public class AuditoriaConfig {
 
+	/**
+	 * Trunca para milissegundos: as colunas são DATETIME(3) e o MySQL ARREDONDA o que passa disso ao
+	 * gravar, enquanto a API TRUNCA ao serializar. Sem isto, o POST devolvia {@code .850} e o GET
+	 * seguinte {@code .851}.
+	 */
 	@Bean
 	public DateTimeProvider auditoriaDateTimeProvider(Clock relogio) {
-		return () -> Optional.of(relogio.instant());
+		return () -> Optional.of(relogio.instant().truncatedTo(ChronoUnit.MILLIS));
 	}
 
 }
