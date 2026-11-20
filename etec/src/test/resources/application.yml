@@ -1,0 +1,16 @@
+# Substitui o application.yml principal nos testes (mesmo nome no classpath).
+# Valores falsos e óbvios; nada aqui é segredo real.
+spring:
+  application:
+    name: etec
+  datasource:
+    url: jdbc:mysql://localhost:3307/etec_teste
+    username: usuario-de-teste
+    password: senha-de-teste-falsa
+
+security:
+  jwt:
+    secret: segredo-de-teste-falso-nao-e-real-0123456789
+    issuer: etec-simulados
+    access-token-expiration: 15m
+    refresh-token-expiration: 24h
