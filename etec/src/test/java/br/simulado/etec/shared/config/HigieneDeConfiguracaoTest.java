@@ -2,13 +2,17 @@ package br.simulado.etec.shared.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
@@ -20,7 +24,9 @@ import org.springframework.core.io.FileSystemResource;
  */
 class HigieneDeConfiguracaoTest {
 
-	private static final Path APPLICATION_YML_REAL = Path.of("src/main/resources/application.yml");
+	private static final Path PASTA_DE_RECURSOS_REAL = Path.of("src/main/resources");
+
+	private static final Path APPLICATION_YML_REAL = PASTA_DE_RECURSOS_REAL.resolve("application.yml");
 
 	private static final List<String> PALAVRAS_SENSIVEIS = List.of("password", "senha", "secret", "token", "api-key",
 			"private");
@@ -41,6 +47,30 @@ class HigieneDeConfiguracaoTest {
 		assertThat(chavesSensiveis(propriedades))
 				.as("o teste precisa enxergar as chaves sensíveis conhecidas, senão passaria vazio")
 				.contains("spring.datasource.password", "security.jwt.secret", "app.admin-bootstrap.senha");
+	}
+
+	@Test
+	void deve_nao_ter_valor_padrao_em_chave_sensivel_quando_varre_todos_os_application_yml_reais() throws IOException {
+		List<Path> arquivos = arquivosDeConfiguracaoReais();
+
+		assertThat(arquivos).as("o application.yml principal precisa estar na varredura").contains(APPLICATION_YML_REAL);
+
+		List<String> todasAsViolacoes = new ArrayList<>();
+		for (Path arquivo : arquivos) {
+			violacoes(carregar(arquivo)).forEach(v -> todasAsViolacoes.add(arquivo.getFileName() + ": " + v));
+		}
+		assertThat(todasAsViolacoes).as("chaves sensíveis com valor padrão ou literal em qualquer perfil").isEmpty();
+	}
+
+	/** application*.yml e application*.yaml reais. Os .example ficam de fora (extensão diferente e outra pasta). */
+	private static List<Path> arquivosDeConfiguracaoReais() throws IOException {
+		try (Stream<Path> arquivos = Files.list(PASTA_DE_RECURSOS_REAL)) {
+			return arquivos
+					.filter(Files::isRegularFile)
+					.filter(a -> a.getFileName().toString().matches("application.*\\.ya?ml"))
+					.sorted()
+					.toList();
+		}
 	}
 
 	@Test
