@@ -90,7 +90,8 @@ Rodar de dentro de `etec/` (no PowerShell/cmd use `mvnw.cmd`):
 
 **Dados**
 - Datas em UTC (`Instant`). Relógio injetável (`Clock`) para testar tempo.
-- Toda tabela com `created_at` e `updated_at`.
+- Toda tabela com `criado_em` e `atualizado_em`.
+- Nomes de tabela no singular e de coluna em snake_case, em português, sem acento (ex.: `data_nascimento`, `criado_em`).
 - Migrations Flyway em `src/main/resources/db/migration`, nome `V{n}__descricao.sql`.
 - **NUNCA** editar uma migration já aplicada; corrige-se com uma nova.
 - `ddl-auto: validate`, `open-in-view: false`. Nunca `ddl-auto: update`.

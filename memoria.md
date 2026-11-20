@@ -28,17 +28,22 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 - Um único `.gitignore`, na raiz, com padrões de segredo (`.env*`, `application-local.*`, `*.pem`, `*.key`...).
 - Configuração: `application.yml` com segredos `${VAR}` sem padrão (`DB_PASSWORD`, `JWT_SECRET`). `ValidacaoDeAmbiente` (listener no `main`) recusa subir sem eles, com `JWT_SECRET` abaixo de 32 caracteres ou com espaço/quebra de linha nas pontas; a mensagem nunca mostra o valor. Teste de higiene lê o `application.yml` real e reprova segredo com valor padrão.
 - Configuração local: copiar `etec/config/application-local.yml.example` para `etec/config/application-local.yml` (ignorado) e rodar com `SPRING_PROFILES_ACTIVE=local`.
+- Banco: collation `utf8mb4_unicode_ci` (charset `utf8mb4`), declarada na própria migration de cada tabela. Motivo: o contrato 4.1 exige nome de matéria único ignorando maiúsculas e acentos, e o D29 define o filtro `nome` como "contém" também sem distinguir maiúsculas e acentos; uma collation `_ci` faz as duas coisas no próprio banco (índice único e `LIKE`). Consequência: o e-mail também é único sem distinguir maiúsculas. O H2 dos testes rápidos não se comporta igual; isso só é provado contra MySQL real (Módulo 7).
+- Banco: nenhum seed em migration (dados de exemplo só no `data.sql` dos testes); tabelas no singular, em português, snake_case, sem acento; colunas de data `criado_em`/`atualizado_em`/`excluido_em` (o `CLAUDE.md` foi alinhado a isso).
+- Banco: `public_id` como `BINARY(16)` (o Hibernate valida sem anotações extras e o índice único fica menor; para ver como UUID no SQL, `BIN_TO_UUID()`). Starter de teste de JPA no Boot 4: `spring-boot-starter-data-jpa-test`.
 - Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (rascunho v0.7, decisões D1 a D56).
 
 ## Estado
 
-- Na `main`: esqueleto Spring Boot 4.2.0 / Java 25, CI, Dependabot, `.gitignore` único e configuração com validação de ambiente (PR #4).
-- `./mvnw verify` passa (19 testes), inclusive sem `DB_PASSWORD`/`JWT_SECRET` no ambiente, como no CI.
-- Dependências atuais: `webmvc`, `devtools`, `webmvc-test`. Nada de banco, segurança ou Testcontainers ainda; os blocos de banco/flyway/jpa do `application.yml` ficam inertes até a Tarefa 03.
-- Há só pacotes vazios (`package-info.java`) por domínio; não há controllers, services nem entidades.
-- Só existe a branch `main` (sem `develop`).
-- MySQL local escuta na porta 3307 (o `application.yml` usa 3307 no URL padrão).
-- Dependabot: PRs #1 (checkout 4→7), #2 (setup-java 4→6) e #3 (upload-artifact 4→7) avaliados como sem impacto no nosso workflow, com CI verde; o passo de upload só roda quando o build falha, então o CI não o exercita.
+- Na `main`: esqueleto Spring Boot 4.2.0 / Java 25, CI, Dependabot, `.gitignore` único, configuração com validação de ambiente (PR #4), documentação e estrutura de pacotes (PR #5) e as Actions atualizadas (PRs #1 a #3 do Dependabot, já mergeados).
+- Tarefa 03 (banco e migrations): em PR para a `develop`, ainda sem merge.
+- `./mvnw verify` passa (23 testes na branch da Tarefa 03), inclusive sem `DB_PASSWORD`/`JWT_SECRET` no ambiente, como no CI.
+- Dependências (Tarefa 03): `webmvc`, `devtools`, `data-jpa`, `flyway` (+ `flyway-mysql`), `mysql-connector-j`; de teste: `webmvc-test`, `data-jpa-test` e `h2`. Ainda sem segurança nem Testcontainers.
+- Pacotes por domínio com `package-info.java`; a única entidade é `Usuario` (tabela `usuario`, migration V1) com `UsuarioRepository`; não há controllers nem services.
+- Existe a branch `develop` (criada a partir da `main`); o ruleset `proteger-main` cobre só a `main`, então a `develop` ainda não está protegida (Tarefa 01).
+- Banco local do projeto: contêiner `mysql-etec` (mysql:8.4, volume `mysql-etec-data`, utf8mb4/`utf8mb4_unicode_ci`) na porta **3308**; o `DB_URL` do `config/application-local.yml` aponta para ela. O `mysql-dev` (porta 3307) é de outro uso e a senha de root dele não é a deste projeto; não mexer nele nem no volume `mysql-dev-data`. O `application.yml` ainda tem 3307 como URL padrão.
+- Precedência de configuração: variável de ambiente do sistema vence o arquivo local. `DB_PASSWORD` e `JWT_SECRET` já existem no Windows desta máquina (possivelmente de outro projeto) e vencem o `application-local.yml`. Não alterar nem remover variáveis do Windows; ao rodar a aplicação ou os testes com o perfil local, removê-las só do processo (`env -u` no Bash, `Remove-Item Env:` no PowerShell).
+- Dependabot: PRs #1 (checkout 4→7), #2 (setup-java 4→6) e #3 (upload-artifact 4→7) mergeados, com CI verde; o passo de upload só roda quando o build falha, então o CI não o exercita.
 
 ## Pendências
 
