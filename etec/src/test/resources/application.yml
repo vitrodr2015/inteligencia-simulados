@@ -5,6 +5,13 @@
 spring:
   application:
     name: etec
+  web:
+    # Mensagens sempre em português, ignorando o Accept-Language do cliente.
+    locale: pt-BR
+    locale-resolver: fixed
+    resources:
+      # API sem arquivos estáticos: rota inexistente vira 404 no formato padrão, em qualquer método.
+      add-mappings: false
   datasource:
     url: jdbc:h2:mem:etec_teste
     username: usuario-de-teste

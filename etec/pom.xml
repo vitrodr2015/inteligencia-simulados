@@ -47,6 +47,12 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Validação e erros padronizados (Tarefa 04) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
 		<!-- Banco e migrations (Tarefa 03) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
