@@ -1,6 +1,13 @@
 spring:
   application:
     name: etec
+  web:
+    # Mensagens sempre em português, ignorando o Accept-Language do cliente.
+    locale: pt-BR
+    locale-resolver: fixed
+    resources:
+      # API sem arquivos estáticos: rota inexistente vira 404 no formato padrão, em qualquer método.
+      add-mappings: false
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3307/etec?createDatabaseIfNotExist=true}
     username: ${DB_USER:root}

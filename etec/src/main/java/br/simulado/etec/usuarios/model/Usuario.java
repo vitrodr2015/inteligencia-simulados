@@ -4,23 +4,28 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 /**
  * Usuário (contrato, seção 3). O {@code id} é interno e nunca sai pela API; o recurso é
- * exposto por {@code publicId}. Datas em UTC ({@link Instant}). A entidade nunca é
- * serializada: a API usa DTOs.
+ * exposto por {@code publicId}. Datas em UTC ({@link Instant}); {@code criadoEm} e
+ * {@code atualizadoEm} vêm da auditoria do Spring Data, com o Clock da aplicação. A entidade
+ * nunca é serializada: a API usa DTOs.
  */
 @Entity
+@EntityListeners(AuditingEntityListener.class)
 @Table(name = "usuario")
 public class Usuario {
 
@@ -51,9 +56,11 @@ public class Usuario {
 	@Column(name = "papel", nullable = false, length = 20)
 	private Papel papel;
 
+	@CreatedDate
 	@Column(name = "criado_em", nullable = false, updatable = false)
 	private Instant criadoEm;
 
+	@LastModifiedDate
 	@Column(name = "atualizado_em", nullable = false)
 	private Instant atualizadoEm;
 
@@ -66,32 +73,13 @@ public class Usuario {
 
 	public Usuario(String nome, String email, String senhaHash, LocalDate dataNascimento,
 			String aceiteTermosVersao, Papel papel) {
+		this.publicId = UUID.randomUUID();
 		this.nome = nome;
 		this.email = email;
 		this.senhaHash = senhaHash;
 		this.dataNascimento = dataNascimento;
 		this.aceiteTermosVersao = aceiteTermosVersao;
 		this.papel = papel;
-	}
-
-	/** Preenche o que a aplicação gera (o banco não tem default). O service pode definir antes, com o Clock. */
-	@PrePersist
-	void aoCriar() {
-		Instant agora = Instant.now();
-		if (publicId == null) {
-			publicId = UUID.randomUUID();
-		}
-		if (criadoEm == null) {
-			criadoEm = agora;
-		}
-		if (atualizadoEm == null) {
-			atualizadoEm = agora;
-		}
-	}
-
-	@PreUpdate
-	void aoAtualizar() {
-		atualizadoEm = Instant.now();
 	}
 
 	public Long getId() {
