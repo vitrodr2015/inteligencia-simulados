@@ -44,7 +44,8 @@ import jakarta.validation.constraints.Size;
  * Prova que todo erro sai no mesmo formato. O controller é falso e vive dentro deste teste; o
  * Clock é fixo, com milissegundos zero, para provar que o dataHora vem dele e mantém as três casas.
  */
-@WebMvcTest
+@WebMvcTest(controllers = { GlobalExceptionHandlerTest.ControllerFalso.class,
+		GlobalExceptionHandlerTest.ControllerFalsoValidado.class })
 @Import({ GlobalExceptionHandlerTest.ControllerFalso.class, GlobalExceptionHandlerTest.ControllerFalsoValidado.class })
 class GlobalExceptionHandlerTest {
 

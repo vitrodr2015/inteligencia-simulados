@@ -13,7 +13,8 @@ spring:
       # API sem arquivos estáticos: rota inexistente vira 404 no formato padrão, em qualquer método.
       add-mappings: false
   datasource:
-    url: jdbc:h2:mem:etec_teste
+    # Nome único por contexto: vários @SpringBootTest com create-drop não podem compartilhar o mesmo banco.
+    url: jdbc:h2:mem:etec_teste_${random.uuid}
     username: usuario-de-teste
     password: senha-de-teste-falsa
   flyway:
@@ -34,3 +35,10 @@ security:
     issuer: etec-simulados
     access-token-expiration: 15m
     refresh-token-expiration: 24h
+
+# Swagger desligado por padrão, como em produção; os testes do Swagger ligam por propriedade.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
