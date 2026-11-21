@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -21,6 +22,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.core.PropertyReferenceException;
+import org.springframework.data.core.TypeInformation;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.validation.annotation.Validated;
@@ -112,6 +115,11 @@ class GlobalExceptionHandlerTest {
 		@GetMapping("/erro")
 		public String erro() {
 			throw new IllegalStateException(TEXTO_SENSIVEL);
+		}
+
+		@GetMapping("/propriedade-inexistente")
+		public String propriedadeInexistente() {
+			throw new PropertyReferenceException("campoSecretoInexistente", TypeInformation.of(String.class), List.of());
 		}
 
 		@GetMapping(path = "/so-json", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -320,6 +328,15 @@ class GlobalExceptionHandlerTest {
 		assertThat(corpo).doesNotContain("SELECT").doesNotContain("senha_hash").doesNotContain("a@b.com")
 				.doesNotContain("br.simulado").doesNotContain("Usuario").doesNotContain("IllegalStateException")
 				.doesNotContain("\tat ").doesNotContain("java.lang");
+	}
+
+	@Test
+	void deve_devolver_400_ordenacao_invalida_sem_vazar_o_nome_quando_o_spring_data_nao_acha_a_propriedade() throws Exception {
+		ResultActions resposta = mockMvc.perform(get("/api/v1/teste/propriedade-inexistente"));
+
+		verificarFormato(resposta, 400, "Bad Request", CodigoErro.ORDENACAO_INVALIDA);
+		String corpo = resposta.andReturn().getResponse().getContentAsString();
+		assertThat(corpo).doesNotContain("campoSecretoInexistente").doesNotContain("PropertyReference");
 	}
 
 	// ----- Clock -----

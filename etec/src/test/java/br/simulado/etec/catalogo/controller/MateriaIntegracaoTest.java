@@ -231,11 +231,11 @@ class MateriaIntegracaoTest extends AbstractMateriaIntegrationTest {
 	}
 
 	@Test
-	void deve_devolver_405_quando_chama_a_listagem_que_ainda_nao_existe() {
-		Response resposta = requisicao().get(BASE);
+	void deve_devolver_405_quando_o_metodo_nao_e_permitido_na_colecao() {
+		Response resposta = requisicao().delete(BASE);
 
 		verificarErro(resposta, 405, "Method Not Allowed", "METODO_NAO_PERMITIDO");
-		assertThat(resposta.header("Allow")).contains("POST");
+		assertThat(resposta.header("Allow")).contains("GET").contains("POST");
 	}
 
 }
