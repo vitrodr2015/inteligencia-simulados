@@ -3,6 +3,8 @@ package br.simulado.etec.catalogo.controller;
 import java.net.URI;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.simulado.etec.catalogo.dto.MateriaRequest;
@@ -20,6 +23,9 @@ import br.simulado.etec.catalogo.dto.MateriaResponse;
 import br.simulado.etec.catalogo.mapper.MateriaMapper;
 import br.simulado.etec.catalogo.model.Materia;
 import br.simulado.etec.catalogo.service.MateriaService;
+import br.simulado.etec.shared.paginacao.ConversorDePaginacao;
+import br.simulado.etec.shared.paginacao.Filtros;
+import br.simulado.etec.shared.paginacao.PaginaResponse;
 import jakarta.validation.Valid;
 
 /** Só HTTP: valida a entrada, chama o service e monta a resposta. A documentação fica em {@link MateriaControllerDocs}. */
@@ -39,6 +45,19 @@ public class MateriaController implements MateriaControllerDocs {
 		Materia criada = servico.criar(dados);
 		URI local = URI.create("/api/v1/materias/" + criada.getPublicId());
 		return ResponseEntity.created(local).body(MateriaMapper.paraResponse(criada));
+	}
+
+	@Override
+	@GetMapping
+	public ResponseEntity<PaginaResponse<MateriaResponse>> listar(@RequestParam(required = false) String nome,
+			@RequestParam(required = false) String ativo, @RequestParam(required = false) String page,
+			@RequestParam(required = false) String size, @RequestParam(required = false) String sort) {
+		// Parâmetros recebidos como texto de propósito: a validação é nossa, e devolve 400 (o resolvedor do
+		// Spring corrigiria page e size inválidos em silêncio).
+		Pageable paginacao = ConversorDePaginacao.converter(page, size, sort, MateriaService.CAMPOS_ORDENAVEIS);
+		Boolean filtroAtivo = Filtros.booleano("ativo", ativo);
+		Page<Materia> pagina = servico.listar(nome, filtroAtivo, paginacao);
+		return ResponseEntity.ok(PaginaResponse.de(pagina, MateriaMapper::paraResponse));
 	}
 
 	@Override

@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.core.MethodParameter;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -75,6 +76,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	}
 
 	// ----- Validação -----
+
+	/**
+	 * Defesa: o conversor de paginação só deixa passar campos da lista do recurso, então esta exceção do
+	 * Spring Data (propriedade inexistente na ordenação) não deveria chegar aqui. Se chegar, é 400, e não 500.
+	 */
+	@ExceptionHandler(PropertyReferenceException.class)
+	ResponseEntity<Object> aoOrdenarPorPropriedadeInexistente(PropertyReferenceException ex) {
+		return resposta(HttpStatus.BAD_REQUEST, CodigoErro.ORDENACAO_INVALIDA, "A ordenação pedida é inválida.", null,
+				null, null);
+	}
 
 	@ExceptionHandler(ConstraintViolationException.class)
 	ResponseEntity<Object> aoViolarRestricoes(ConstraintViolationException ex) {
