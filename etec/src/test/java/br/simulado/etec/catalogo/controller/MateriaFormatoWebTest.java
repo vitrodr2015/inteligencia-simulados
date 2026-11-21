@@ -3,6 +3,7 @@ package br.simulado.etec.catalogo.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -261,6 +262,54 @@ class MateriaFormatoWebTest {
 		assertThat(corpo(comAccept)).isEqualTo("{\"nome\":\"x\"}");
 		assertThat(corpo(semAccept)).isEqualTo("{\"nome\":\"x\"}");
 		semAccept.andExpect(header().string("Content-Type", "application/json"));
+	}
+
+
+	// ----- 404, 405 e 415 também saem em JSON, no formato padrão, mesmo com Accept de XML ou YAML -----
+
+	private static final String JSON_DO_404 = "{\"dataHora\":\"<DATA>\",\"status\":404,\"erro\":\"Not Found\","
+			+ "\"codigo\":\"RECURSO_NAO_ENCONTRADO\",\"mensagem\":\"Recurso não encontrado.\"}";
+
+	private static final String JSON_DO_405 = "{\"dataHora\":\"<DATA>\",\"status\":405,\"erro\":\"Method Not Allowed\","
+			+ "\"codigo\":\"METODO_NAO_PERMITIDO\",\"mensagem\":\"Método HTTP não permitido para este recurso.\"}";
+
+	private static final String JSON_DO_415 = "{\"dataHora\":\"<DATA>\",\"status\":415,"
+			+ "\"erro\":\"Unsupported Media Type\",\"codigo\":\"TIPO_NAO_SUPORTADO\","
+			+ "\"mensagem\":\"Tipo de conteúdo não suportado. Envie o corpo em application/json.\"}";
+
+	private static String semData(String texto) {
+		return texto.replaceAll("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z", "<DATA>");
+	}
+
+	@Test
+	void deve_devolver_404_em_json_no_formato_padrao_para_rota_inexistente_mesmo_com_accept_de_xml_ou_yaml() throws Exception {
+		for (String tipo : List.of("application/xml", "application/yaml", "text/html")) {
+			ResultActions resposta = mockMvc.perform(get("/api/v1/nao-existe").header("Accept", tipo));
+
+			resposta.andExpect(status().isNotFound()).andExpect(header().string("Content-Type", "application/json"));
+			assertThat(semData(corpo(resposta))).as("Accept: %s", tipo).isEqualTo(JSON_DO_404);
+		}
+	}
+
+	@Test
+	void deve_devolver_405_em_json_no_formato_padrao_para_metodo_nao_permitido_mesmo_com_accept_de_xml_ou_yaml() throws Exception {
+		for (String tipo : List.of("application/xml", "application/yaml")) {
+			ResultActions resposta = mockMvc.perform(delete("/api/v1/materias").header("Accept", tipo));
+
+			resposta.andExpect(status().isMethodNotAllowed()).andExpect(header().string("Content-Type", "application/json"));
+			assertThat(semData(corpo(resposta))).as("Accept: %s", tipo).isEqualTo(JSON_DO_405);
+		}
+	}
+
+	@Test
+	void deve_devolver_415_em_json_no_formato_padrao_para_tipo_de_corpo_nao_suportado_mesmo_com_accept_de_xml_ou_yaml() throws Exception {
+		for (String tipo : List.of("application/xml", "application/yaml")) {
+			ResultActions resposta = mockMvc.perform(post("/api/v1/materias").contentType(MediaType.TEXT_PLAIN)
+					.header("Accept", tipo).content("nome=Biologia"));
+
+			resposta.andExpect(status().isUnsupportedMediaType()).andExpect(header().string("Content-Type", "application/json"));
+			assertThat(semData(corpo(resposta))).as("Accept: %s", tipo).isEqualTo(JSON_DO_415);
+		}
 	}
 
 }
