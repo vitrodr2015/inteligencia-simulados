@@ -155,4 +155,16 @@ class MateriaFormatoIntegracaoTest extends AbstractMateriaIntegrationTest {
 		}
 	}
 
+
+	@Test
+	void deve_devolver_404_em_json_no_formato_padrao_para_rota_inexistente_fora_de_api_v1() {
+		for (String tipo : new String[] { "application/json", "application/xml", "application/yaml" }) {
+			Response resposta = requisicao().accept(tipo).get("/nao-existe");
+
+			assertThat(resposta.statusCode()).as(tipo).isEqualTo(404);
+			assertThat(resposta.getHeader("Content-Type")).as(tipo).isEqualTo("application/json");
+			assertThat(mascarar(corpo(resposta))).as(tipo).isEqualTo(JSON_DO_404);
+		}
+	}
+
 }

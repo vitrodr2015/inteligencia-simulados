@@ -93,6 +93,12 @@ class MateriaFormatoWebTest {
 			return new Item("x");
 		}
 
+		/** Lança uma exceção inesperada, para provar o 500 em JSON. */
+		@GetMapping("/explode")
+		public Item explode() {
+			throw new IllegalStateException("detalhe-interno-que-nao-pode-vazar");
+		}
+
 	}
 
 	private static Materia materia(String id, String nome, String descricao, boolean ativo) {
@@ -309,6 +315,31 @@ class MateriaFormatoWebTest {
 
 			resposta.andExpect(status().isUnsupportedMediaType()).andExpect(header().string("Content-Type", "application/json"));
 			assertThat(semData(corpo(resposta))).as("Accept: %s", tipo).isEqualTo(JSON_DO_415);
+		}
+	}
+
+
+	private static final String JSON_DO_500 = "{\"dataHora\":\"<DATA>\",\"status\":500,\"erro\":\"Internal Server Error\","
+			+ "\"codigo\":\"ERRO_INTERNO\",\"mensagem\":\"Ocorreu um erro interno. Tente novamente mais tarde.\"}";
+
+	@Test
+	void deve_devolver_500_em_json_no_formato_padrao_sem_vazar_a_causa_mesmo_com_accept_de_xml_ou_yaml() throws Exception {
+		for (String tipo : List.of("application/xml", "application/yaml", "application/json")) {
+			ResultActions resposta = mockMvc.perform(get("/api/v1/teste-formato/explode").header("Accept", tipo));
+
+			resposta.andExpect(status().isInternalServerError()).andExpect(header().string("Content-Type", "application/json"));
+			assertThat(semData(corpo(resposta))).as("Accept: %s", tipo).isEqualTo(JSON_DO_500);
+			assertThat(corpo(resposta)).doesNotContain("detalhe-interno").doesNotContain("IllegalStateException");
+		}
+	}
+
+	@Test
+	void deve_devolver_404_em_json_no_formato_padrao_para_rota_inexistente_fora_de_api_v1() throws Exception {
+		for (String tipo : List.of("application/json", "application/xml", "application/yaml")) {
+			ResultActions resposta = mockMvc.perform(get("/nao-existe").header("Accept", tipo));
+
+			resposta.andExpect(status().isNotFound()).andExpect(header().string("Content-Type", "application/json"));
+			assertThat(semData(corpo(resposta))).as("Accept: %s", tipo).isEqualTo(JSON_DO_404);
 		}
 	}
 

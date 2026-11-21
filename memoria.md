@@ -79,10 +79,12 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 - Dependabot: PRs #1 (checkout 4→7), #2 (setup-java 4→6) e #3 (upload-artifact 4→7) mergeados, com CI verde; o passo de upload só roda quando o build falha, então o CI não o exercita.
 - Tarefa 06 (testes com banco real): `./mvnw verify` roda 153 testes em ~1 min 17 s (antes da tarefa eram 119 testes em ~25 s); só os rápidos com H2 são 114 testes em ~30 s. Exige o Docker aberto.
 - Tarefa 07 (listagem da Matéria): `GET /api/v1/materias` com paginação, ordenação (`nome` ou `criadoEm`) e filtros (`nome`, `ativo`), mais o componente reutilizável de paginação. `./mvnw verify` roda 274 testes em ~1 min 30 s (213 rápidos em ~35 s e 61 de integração no MySQL real); a coleção do Postman e o relatório das chamadas reais foram atualizados (53 requisições).
-- Tarefa 08 (formato da resposta): ordem dos campos fixa, nulos presentes nos DTOs de resposta, só JSON (conversores de XML e YAML removidos) e o texto exato de uma matéria, de uma lista e dos erros 400, 409 e 406 em testes. `./mvnw clean verify` roda 302 testes em ~1 min 18 s (28 novos: 15 de texto exato na camada web, 9 de texto exato com MySQL real, 3 de conversores e 1 do `/v3/api-docs.yaml`; entre eles, 404, 405 e 415 em JSON no formato padrão mesmo com `Accept` de XML ou YAML).
+- Tarefa 08 (formato da resposta): ordem dos campos fixa, nulos presentes nos DTOs de resposta, só JSON (conversores de XML e YAML removidos) e o texto exato de uma matéria, de uma lista e dos erros 400, 409 e 406 em testes. `./mvnw clean verify` roda 305 testes em ~1 min 18 s (31 novos: 17 de texto exato na camada web, 10 de texto exato com MySQL real, 3 de conversores e 1 do `/v3/api-docs.yaml`; entre eles, 404, 405 e 415 em JSON no formato padrão mesmo com `Accept` de XML ou YAML).
 
 ## Pendências
 
+- Tarefa de Tentativa (D75): precisa de um teste que prove que o JSON do aluno NÃO contém as chaves `gabarito` nem `explicacao` (a chave não existe, não basta ser nula); as questões da tentativa do aluno usam um DTO próprio.
+- Módulo 18 (esteira de deploy): conferir que o Swagger fica ligado só em desenvolvimento e homologação (D71), com `SWAGGER_ENABLED` por ambiente, e desligado em produção.
 - Matéria, fora da Tarefa 05: qualquer 401/403 e o Spring Security (Módulos 10 e 11) e o 409 do `DELETE` por subtópicos (a tabela `subtopico` ainda não existe; a chave estrangeira vai virar 409).
 - Matéria: a unicidade sem distinguir maiúsculas e acentos foi provada só manualmente no MySQL real; a automação é do Módulo 7.
 - Pontos que ficaram para o contrato (da Tarefa 07):
