@@ -4,7 +4,7 @@ Uma coleção por recurso, atualizada **a cada endpoint novo** (parte do "pronto
 
 | Coleção | Recurso |
 |---|---|
-| `materia.postman_collection.json` | Matéria (`/api/v1/materias`): POST, GET, PUT, PATCH disable/enable, DELETE e os erros 400, 404, 405, 409 e 415 |
+| `materia.postman_collection.json` | Matéria (`/api/v1/materias`): POST, GET (por id e listagem paginada, com ordenação e filtros), PUT, PATCH disable/enable, DELETE e os erros 400, 404, 405, 409 e 415 |
 
 ## Como usar
 1. No Postman: `Import` → escolha o arquivo `.postman_collection.json`.

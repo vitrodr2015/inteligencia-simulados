@@ -1,6 +1,6 @@
 # Relatório: chamadas reais às rotas de Matéria
 
-Executado em 2026-11-20 18:11:36 UTC, a partir da `develop` (`84cf59f`). **39 de 39 chamadas conformes** com o esperado.
+Executado em 2026-11-21 20:19:41 UTC, a partir da `develop` (`7c51928`). **53 de 53 chamadas conformes** com o esperado.
 
 ## Ambiente
 
@@ -11,7 +11,7 @@ Executado em 2026-11-20 18:11:36 UTC, a partir da `develop` (`84cf59f`). **39 de
 
 ## Como usar no Postman
 
-**Opção 1 (recomendada): importar a coleção.** `Import` → arquivo `postman/materia.postman_collection.json` (pasta `postman/` na raiz do projeto). As variáveis `materiaId`, `outraMateriaId`, `materiaIdC` e `materiaIdD` são preenchidas sozinhas pelos `POST` (script de teste). Rode a coleção **na ordem** (Collection Runner ou uma a uma): ela cria 4 matérias, exercita cada rota e apaga tudo no fim. Ajuste `baseUrl` se a aplicação não estiver na 8080.
+**Opção 1 (recomendada): importar a coleção.** `Import` → arquivo `materia.postman_collection.json`. As variáveis `materiaId`, `outraMateriaId`, `materiaIdC` e `materiaIdD` são preenchidas sozinhas pelos `POST` (script de teste). Rode a coleção **na ordem** (Collection Runner ou uma a uma): ela cria 4 matérias, exercita cada rota e apaga tudo no fim. Ajuste `baseUrl` se a aplicação não estiver na 8080.
 
 **Opção 2: colar os `curl`.** `Import` → `Raw text` → cole **um** comando por vez. Os comandos usam `{{baseUrl}}` e `{{materiaId}}`: crie essas variáveis no ambiente do Postman e, depois do primeiro `POST`, copie o `id` da resposta para `materiaId`.
 
@@ -32,32 +32,46 @@ Executado em 2026-11-20 18:11:36 UTC, a partir da `develop` (`84cf59f`). **39 de
 | 11 | POST — criar | Descrição com 256 caracteres | 400 | 400 | ✅ |
 | 12 | POST — criar | Corpo ilegível (JSON quebrado) | 400 | 400 | ✅ |
 | 13 | POST — criar | Content-Type não suportado (text/plain) | 415 | 415 | ✅ |
-| 14 | GET — buscar | Buscar por id | 200 | 200 | ✅ |
-| 15 | GET — buscar | Id inexistente | 404 | 404 | ✅ |
-| 16 | GET — buscar | Id malformado (não é UUID) | 400 | 400 | ✅ |
-| 17 | GET — buscar | Listagem (ainda não implementada: Módulo 8) | 405 | 405 | ✅ |
-| 18 | PUT — atualizar | Trocar nome e descrição (ignora o ativo enviado) | 200 | 200 | ✅ |
-| 19 | PUT — atualizar | Descrição omitida: PUT é substituição, vira nula (D61) | 200 | 200 | ✅ |
-| 20 | PUT — atualizar | Nome que pertence a outra matéria | 409 | 409 | ✅ |
-| 21 | PUT — atualizar | Id inexistente | 404 | 404 | ✅ |
-| 22 | PUT — atualizar | Nome inválido (só espaços) | 400 | 400 | ✅ |
-| 23 | PUT — atualizar | Id malformado | 400 | 400 | ✅ |
-| 24 | PATCH — desativar e ativar | Desativar | 200 | 200 | ✅ |
-| 25 | PATCH — desativar e ativar | Desativar de novo (idempotente) | 200 | 200 | ✅ |
-| 26 | PATCH — desativar e ativar | Ativar | 200 | 200 | ✅ |
-| 27 | PATCH — desativar e ativar | Ativar de novo (idempotente) | 200 | 200 | ✅ |
-| 28 | PATCH — desativar e ativar | Desativar id inexistente | 404 | 404 | ✅ |
-| 29 | PATCH — desativar e ativar | Ativar id inexistente | 404 | 404 | ✅ |
-| 30 | PATCH — desativar e ativar | Id malformado | 400 | 400 | ✅ |
-| 31 | DELETE — apagar | Apagar | 204 | 204 | ✅ |
-| 32 | DELETE — apagar | Buscar depois de apagar | 404 | 404 | ✅ |
-| 33 | DELETE — apagar | Apagar de novo | 404 | 404 | ✅ |
-| 34 | DELETE — apagar | Id malformado | 400 | 400 | ✅ |
-| 35 | Outras | Rota inexistente | 404 | 404 | ✅ |
-| 36 | Outras | Rota inexistente em método com corpo (POST) | 404 | 404 | ✅ |
-| 37 | Limpeza | Apagar a matéria Física | 204 | 204 | ✅ |
-| 38 | Limpeza | Apagar a matéria Química | 204 | 204 | ✅ |
-| 39 | Limpeza | Apagar a matéria História | 204 | 204 | ✅ |
+| 14 | GET — listar | Listar todas (padrão: página 0, tamanho 20, nome crescente) | 200 | 200 | ✅ |
+| 15 | GET — listar | Paginar: tamanho 2, página 0, ordenado por nome | 200 | 200 | ✅ |
+| 16 | GET — listar | Segunda página | 200 | 200 | ✅ |
+| 17 | GET — listar | Ordenar por criadoEm decrescente | 200 | 200 | ✅ |
+| 18 | GET — listar | Filtrar por nome sem acento e em minúscula (collation do MySQL) | 200 | 200 | ✅ |
+| 19 | GET — listar | Filtrar por nome com % (vale como texto, não como curinga) | 200 | 200 | ✅ |
+| 20 | GET — listar | Filtrar por ativo=true | 200 | 200 | ✅ |
+| 21 | GET — listar | Página além do fim: 200 com conteúdo vazio e totais corretos | 200 | 200 | ✅ |
+| 22 | GET — listar | Tamanho gigante é reduzido ao máximo (50) | 200 | 200 | ✅ |
+| 23 | GET — listar | Sort com injeção de SQL é recusado | 400 | 400 | ✅ |
+| 24 | GET — listar | Sort por campo fora da lista (id) | 400 | 400 | ✅ |
+| 25 | GET — listar | Página negativa | 400 | 400 | ✅ |
+| 26 | GET — listar | Tamanho zero | 400 | 400 | ✅ |
+| 27 | GET — listar | Filtro ativo inválido | 400 | 400 | ✅ |
+| 28 | GET — listar | Método não permitido na coleção (DELETE em /materias) | 405 | 405 | ✅ |
+| 29 | GET — buscar | Buscar por id | 200 | 200 | ✅ |
+| 30 | GET — buscar | Id inexistente | 404 | 404 | ✅ |
+| 31 | GET — buscar | Id malformado (não é UUID) | 400 | 400 | ✅ |
+| 32 | PUT — atualizar | Trocar nome e descrição (ignora o ativo enviado) | 200 | 200 | ✅ |
+| 33 | PUT — atualizar | Descrição omitida: PUT é substituição, vira nula (D61) | 200 | 200 | ✅ |
+| 34 | PUT — atualizar | Nome que pertence a outra matéria | 409 | 409 | ✅ |
+| 35 | PUT — atualizar | Id inexistente | 404 | 404 | ✅ |
+| 36 | PUT — atualizar | Nome inválido (só espaços) | 400 | 400 | ✅ |
+| 37 | PUT — atualizar | Id malformado | 400 | 400 | ✅ |
+| 38 | PATCH — desativar e ativar | Desativar | 200 | 200 | ✅ |
+| 39 | PATCH — desativar e ativar | Desativar de novo (idempotente) | 200 | 200 | ✅ |
+| 40 | PATCH — desativar e ativar | Ativar | 200 | 200 | ✅ |
+| 41 | PATCH — desativar e ativar | Ativar de novo (idempotente) | 200 | 200 | ✅ |
+| 42 | PATCH — desativar e ativar | Desativar id inexistente | 404 | 404 | ✅ |
+| 43 | PATCH — desativar e ativar | Ativar id inexistente | 404 | 404 | ✅ |
+| 44 | PATCH — desativar e ativar | Id malformado | 400 | 400 | ✅ |
+| 45 | DELETE — apagar | Apagar | 204 | 204 | ✅ |
+| 46 | DELETE — apagar | Buscar depois de apagar | 404 | 404 | ✅ |
+| 47 | DELETE — apagar | Apagar de novo | 404 | 404 | ✅ |
+| 48 | DELETE — apagar | Id malformado | 400 | 400 | ✅ |
+| 49 | Outras | Rota inexistente | 404 | 404 | ✅ |
+| 50 | Outras | Rota inexistente em método com corpo (POST) | 404 | 404 | ✅ |
+| 51 | Limpeza | Apagar a matéria Física | 204 | 204 | ✅ |
+| 52 | Limpeza | Apagar a matéria Química | 204 | 204 | ✅ |
+| 53 | Limpeza | Apagar a matéria História | 204 | 204 | ✅ |
 
 ## Detalhe de cada chamada
 
@@ -77,16 +91,16 @@ Esperado **201**, obtido **201**.
 
 ```http
 HTTP/1.1 201
-Location: /api/v1/materias/8fa50f72-706a-43c3-8173-9a87fd036a60
+Location: /api/v1/materias/bb6f863d-598f-4496-9234-7454a055052c
 Content-Type: application/json
 
 {
-  "id": "8fa50f72-706a-43c3-8173-9a87fd036a60",
+  "id": "bb6f863d-598f-4496-9234-7454a055052c",
   "nome": "Matemática",
   "descricao": "Álgebra e geometria",
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:34.909Z",
-  "atualizadoEm": "2026-11-20T18:11:34.909Z"
+  "criadoEm": "2026-11-21T20:19:39.228Z",
+  "atualizadoEm": "2026-11-21T20:19:39.228Z"
 }
 ```
 
@@ -110,16 +124,16 @@ Esperado **201**, obtido **201**.
 
 ```http
 HTTP/1.1 201
-Location: /api/v1/materias/25b35b8b-d1ba-46e5-ba9a-ec6fbbcba4c2
+Location: /api/v1/materias/475d5da1-2ce3-419f-b795-67dcd57f1d84
 Content-Type: application/json
 
 {
-  "id": "25b35b8b-d1ba-46e5-ba9a-ec6fbbcba4c2",
+  "id": "475d5da1-2ce3-419f-b795-67dcd57f1d84",
   "nome": "Física",
   "descricao": "Mecânica e óptica",
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:34.942Z",
-  "atualizadoEm": "2026-11-20T18:11:34.942Z"
+  "criadoEm": "2026-11-21T20:19:39.348Z",
+  "atualizadoEm": "2026-11-21T20:19:39.348Z"
 }
 ```
 
@@ -139,16 +153,16 @@ Esperado **201**, obtido **201**.
 
 ```http
 HTTP/1.1 201
-Location: /api/v1/materias/3297538b-eb93-4de0-8f3d-f2bb44838c59
+Location: /api/v1/materias/3e11b613-8401-41cb-b131-0f72a99eb88e
 Content-Type: application/json
 
 {
-  "id": "3297538b-eb93-4de0-8f3d-f2bb44838c59",
+  "id": "3e11b613-8401-41cb-b131-0f72a99eb88e",
   "nome": "Química",
   "descricao": null,
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:34.976Z",
-  "atualizadoEm": "2026-11-20T18:11:34.976Z"
+  "criadoEm": "2026-11-21T20:19:39.391Z",
+  "atualizadoEm": "2026-11-21T20:19:39.391Z"
 }
 ```
 
@@ -170,16 +184,16 @@ Esperado **201**, obtido **201**.
 
 ```http
 HTTP/1.1 201
-Location: /api/v1/materias/25e5f0b4-7d69-4e8b-b9ea-4e65e3f61903
+Location: /api/v1/materias/e46cdec2-dcbc-4e01-b60e-edfe685e5016
 Content-Type: application/json
 
 {
-  "id": "25e5f0b4-7d69-4e8b-b9ea-4e65e3f61903",
+  "id": "e46cdec2-dcbc-4e01-b60e-edfe685e5016",
   "nome": "História",
   "descricao": null,
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:35.009Z",
-  "atualizadoEm": "2026-11-20T18:11:35.009Z"
+  "criadoEm": "2026-11-21T20:19:39.428Z",
+  "atualizadoEm": "2026-11-21T20:19:39.428Z"
 }
 ```
 
@@ -202,7 +216,7 @@ HTTP/1.1 409
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.042Z",
+  "dataHora": "2026-11-21T20:19:39.476Z",
   "status": 409,
   "erro": "Conflict",
   "codigo": "MATERIA_NOME_DUPLICADO",
@@ -230,7 +244,7 @@ HTTP/1.1 409
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.066Z",
+  "dataHora": "2026-11-21T20:19:39.514Z",
   "status": 409,
   "erro": "Conflict",
   "codigo": "MATERIA_NOME_DUPLICADO",
@@ -257,7 +271,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.087Z",
+  "dataHora": "2026-11-21T20:19:39.542Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "VALIDACAO_FALHOU",
@@ -292,7 +306,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.108Z",
+  "dataHora": "2026-11-21T20:19:39.566Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "VALIDACAO_FALHOU",
@@ -325,7 +339,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.128Z",
+  "dataHora": "2026-11-21T20:19:39.612Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "VALIDACAO_FALHOU",
@@ -358,7 +372,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.147Z",
+  "dataHora": "2026-11-21T20:19:39.659Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "VALIDACAO_FALHOU",
@@ -391,7 +405,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.170Z",
+  "dataHora": "2026-11-21T20:19:39.693Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "VALIDACAO_FALHOU",
@@ -425,7 +439,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.192Z",
+  "dataHora": "2026-11-21T20:19:39.739Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "CORPO_ILEGIVEL",
@@ -453,7 +467,7 @@ HTTP/1.1 415
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.220Z",
+  "dataHora": "2026-11-21T20:19:39.799Z",
   "status": 415,
   "erro": "Unsupported Media Type",
   "codigo": "TIPO_NAO_SUPORTADO",
@@ -465,9 +479,571 @@ Verificações:
 
 - ✅ codigo TIPO_NAO_SUPORTADO
 
+### GET — listar
+
+#### 14. Listar todas (padrão: página 0, tamanho 20, nome crescente) ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [
+    {
+      "id": "475d5da1-2ce3-419f-b795-67dcd57f1d84",
+      "nome": "Física",
+      "descricao": "Mecânica e óptica",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.348Z",
+      "atualizadoEm": "2026-11-21T20:19:39.348Z"
+    },
+    {
+      "id": "e46cdec2-dcbc-4e01-b60e-edfe685e5016",
+      "nome": "História",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.428Z",
+      "atualizadoEm": "2026-11-21T20:19:39.428Z"
+    },
+    {
+      "id": "bb6f863d-598f-4496-9234-7454a055052c",
+      "nome": "Matemática",
+      "descricao": "Álgebra e geometria",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.228Z",
+      "atualizadoEm": "2026-11-21T20:19:39.228Z"
+    },
+    {
+      "id": "3e11b613-8401-41cb-b131-0f72a99eb88e",
+      "nome": "Química",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.391Z",
+      "atualizadoEm": "2026-11-21T20:19:39.391Z"
+    }
+  ],
+  "pagina": 0,
+  "tamanho": 20,
+  "totalElementos": 4,
+  "totalPaginas": 1
+}
+```
+
+Verificações:
+
+- ✅ envelope com os campos na ordem do contrato
+- ✅ ordenadas por nome crescente
+
+#### 15. Paginar: tamanho 2, página 0, ordenado por nome ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?size=2&page=0&sort=nome,asc'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [
+    {
+      "id": "475d5da1-2ce3-419f-b795-67dcd57f1d84",
+      "nome": "Física",
+      "descricao": "Mecânica e óptica",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.348Z",
+      "atualizadoEm": "2026-11-21T20:19:39.348Z"
+    },
+    {
+      "id": "e46cdec2-dcbc-4e01-b60e-edfe685e5016",
+      "nome": "História",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.428Z",
+      "atualizadoEm": "2026-11-21T20:19:39.428Z"
+    }
+  ],
+  "pagina": 0,
+  "tamanho": 2,
+  "totalElementos": 4,
+  "totalPaginas": 2
+}
+```
+
+Verificações:
+
+- ✅ tamanho 2, 4 elementos, 2 páginas
+- ✅ itens Física e História
+
+#### 16. Segunda página ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?size=2&page=1&sort=nome,asc'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [
+    {
+      "id": "bb6f863d-598f-4496-9234-7454a055052c",
+      "nome": "Matemática",
+      "descricao": "Álgebra e geometria",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.228Z",
+      "atualizadoEm": "2026-11-21T20:19:39.228Z"
+    },
+    {
+      "id": "3e11b613-8401-41cb-b131-0f72a99eb88e",
+      "nome": "Química",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.391Z",
+      "atualizadoEm": "2026-11-21T20:19:39.391Z"
+    }
+  ],
+  "pagina": 1,
+  "tamanho": 2,
+  "totalElementos": 4,
+  "totalPaginas": 2
+}
+```
+
+Verificações:
+
+- ✅ pagina 1
+- ✅ itens Matemática e Química
+
+#### 17. Ordenar por criadoEm decrescente ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?sort=criadoEm,desc'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [
+    {
+      "id": "e46cdec2-dcbc-4e01-b60e-edfe685e5016",
+      "nome": "História",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.428Z",
+      "atualizadoEm": "2026-11-21T20:19:39.428Z"
+    },
+    {
+      "id": "3e11b613-8401-41cb-b131-0f72a99eb88e",
+      "nome": "Química",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.391Z",
+      "atualizadoEm": "2026-11-21T20:19:39.391Z"
+    },
+    {
+      "id": "475d5da1-2ce3-419f-b795-67dcd57f1d84",
+      "nome": "Física",
+      "descricao": "Mecânica e óptica",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.348Z",
+      "atualizadoEm": "2026-11-21T20:19:39.348Z"
+    },
+    {
+      "id": "bb6f863d-598f-4496-9234-7454a055052c",
+      "nome": "Matemática",
+      "descricao": "Álgebra e geometria",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.228Z",
+      "atualizadoEm": "2026-11-21T20:19:39.228Z"
+    }
+  ],
+  "pagina": 0,
+  "tamanho": 20,
+  "totalElementos": 4,
+  "totalPaginas": 1
+}
+```
+
+Verificações:
+
+- ✅ mais recente primeiro (História, Química, Física, Matemática)
+
+#### 18. Filtrar por nome sem acento e em minúscula (collation do MySQL) ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?nome=matematica'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [
+    {
+      "id": "bb6f863d-598f-4496-9234-7454a055052c",
+      "nome": "Matemática",
+      "descricao": "Álgebra e geometria",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.228Z",
+      "atualizadoEm": "2026-11-21T20:19:39.228Z"
+    }
+  ],
+  "pagina": 0,
+  "tamanho": 20,
+  "totalElementos": 1,
+  "totalPaginas": 1
+}
+```
+
+Verificações:
+
+- ✅ encontra Matemática
+
+#### 19. Filtrar por nome com % (vale como texto, não como curinga) ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?nome=%25'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [],
+  "pagina": 0,
+  "tamanho": 20,
+  "totalElementos": 0,
+  "totalPaginas": 0
+}
+```
+
+Verificações:
+
+- ✅ não devolve tudo: nenhum nome contém %
+
+#### 20. Filtrar por ativo=true ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?ativo=true'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [
+    {
+      "id": "475d5da1-2ce3-419f-b795-67dcd57f1d84",
+      "nome": "Física",
+      "descricao": "Mecânica e óptica",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.348Z",
+      "atualizadoEm": "2026-11-21T20:19:39.348Z"
+    },
+    {
+      "id": "e46cdec2-dcbc-4e01-b60e-edfe685e5016",
+      "nome": "História",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.428Z",
+      "atualizadoEm": "2026-11-21T20:19:39.428Z"
+    },
+    {
+      "id": "bb6f863d-598f-4496-9234-7454a055052c",
+      "nome": "Matemática",
+      "descricao": "Álgebra e geometria",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.228Z",
+      "atualizadoEm": "2026-11-21T20:19:39.228Z"
+    },
+    {
+      "id": "3e11b613-8401-41cb-b131-0f72a99eb88e",
+      "nome": "Química",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.391Z",
+      "atualizadoEm": "2026-11-21T20:19:39.391Z"
+    }
+  ],
+  "pagina": 0,
+  "tamanho": 20,
+  "totalElementos": 4,
+  "totalPaginas": 1
+}
+```
+
+Verificações:
+
+- ✅ as 4 estão ativas
+
+#### 21. Página além do fim: 200 com conteúdo vazio e totais corretos ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?page=99'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [],
+  "pagina": 99,
+  "tamanho": 20,
+  "totalElementos": 4,
+  "totalPaginas": 1
+}
+```
+
+Verificações:
+
+- ✅ conteúdo vazio
+- ✅ totais corretos
+
+#### 22. Tamanho gigante é reduzido ao máximo (50) ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?size=100000'
+```
+
+Esperado **200**, obtido **200**.
+
+```http
+HTTP/1.1 200
+Content-Type: application/json
+
+{
+  "conteudo": [
+    {
+      "id": "475d5da1-2ce3-419f-b795-67dcd57f1d84",
+      "nome": "Física",
+      "descricao": "Mecânica e óptica",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.348Z",
+      "atualizadoEm": "2026-11-21T20:19:39.348Z"
+    },
+    {
+      "id": "e46cdec2-dcbc-4e01-b60e-edfe685e5016",
+      "nome": "História",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.428Z",
+      "atualizadoEm": "2026-11-21T20:19:39.428Z"
+    },
+    {
+      "id": "bb6f863d-598f-4496-9234-7454a055052c",
+      "nome": "Matemática",
+      "descricao": "Álgebra e geometria",
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.228Z",
+      "atualizadoEm": "2026-11-21T20:19:39.228Z"
+    },
+    {
+      "id": "3e11b613-8401-41cb-b131-0f72a99eb88e",
+      "nome": "Química",
+      "descricao": null,
+      "ativo": true,
+      "criadoEm": "2026-11-21T20:19:39.391Z",
+      "atualizadoEm": "2026-11-21T20:19:39.391Z"
+    }
+  ],
+  "pagina": 0,
+  "tamanho": 50,
+  "totalElementos": 4,
+  "totalPaginas": 1
+}
+```
+
+Verificações:
+
+- ✅ tamanho devolvido é 50
+
+#### 23. Sort com injeção de SQL é recusado ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?sort=nome%3Bdrop%20table%20x'
+```
+
+Esperado **400**, obtido **400**.
+
+```http
+HTTP/1.1 400
+Content-Type: application/json
+
+{
+  "dataHora": "2026-11-21T20:19:40.300Z",
+  "status": 400,
+  "erro": "Bad Request",
+  "codigo": "ORDENACAO_INVALIDA",
+  "mensagem": "O parâmetro 'sort' é inválido. Use campo,direção (asc ou desc) com um dos campos: criadoEm, nome."
+}
+```
+
+Verificações:
+
+- ✅ codigo ORDENACAO_INVALIDA
+- ✅ não repete o valor enviado
+
+#### 24. Sort por campo fora da lista (id) ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?sort=id,asc'
+```
+
+Esperado **400**, obtido **400**.
+
+```http
+HTTP/1.1 400
+Content-Type: application/json
+
+{
+  "dataHora": "2026-11-21T20:19:40.328Z",
+  "status": 400,
+  "erro": "Bad Request",
+  "codigo": "ORDENACAO_INVALIDA",
+  "mensagem": "O parâmetro 'sort' é inválido. Use campo,direção (asc ou desc) com um dos campos: criadoEm, nome."
+}
+```
+
+Verificações:
+
+- ✅ codigo ORDENACAO_INVALIDA
+- ✅ a mensagem lista os campos aceitos
+
+#### 25. Página negativa ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?page=-1'
+```
+
+Esperado **400**, obtido **400**.
+
+```http
+HTTP/1.1 400
+Content-Type: application/json
+
+{
+  "dataHora": "2026-11-21T20:19:40.358Z",
+  "status": 400,
+  "erro": "Bad Request",
+  "codigo": "PARAMETRO_INVALIDO",
+  "mensagem": "O parâmetro 'page' deve ser um número inteiro maior ou igual a 0."
+}
+```
+
+Verificações:
+
+- ✅ codigo PARAMETRO_INVALIDO
+- ✅ a mensagem cita o parâmetro page
+
+#### 26. Tamanho zero ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?size=0'
+```
+
+Esperado **400**, obtido **400**.
+
+```http
+HTTP/1.1 400
+Content-Type: application/json
+
+{
+  "dataHora": "2026-11-21T20:19:40.386Z",
+  "status": 400,
+  "erro": "Bad Request",
+  "codigo": "PARAMETRO_INVALIDO",
+  "mensagem": "O parâmetro 'size' deve ser um inteiro maior que zero."
+}
+```
+
+Verificações:
+
+- ✅ codigo PARAMETRO_INVALIDO
+- ✅ a mensagem cita o parâmetro size
+
+#### 27. Filtro ativo inválido ✅
+
+```bash
+curl --location '{{baseUrl}}/api/v1/materias?ativo=talvez'
+```
+
+Esperado **400**, obtido **400**.
+
+```http
+HTTP/1.1 400
+Content-Type: application/json
+
+{
+  "dataHora": "2026-11-21T20:19:40.416Z",
+  "status": 400,
+  "erro": "Bad Request",
+  "codigo": "PARAMETRO_INVALIDO",
+  "mensagem": "O parâmetro 'ativo' deve ser true ou false."
+}
+```
+
+Verificações:
+
+- ✅ codigo PARAMETRO_INVALIDO
+
+#### 28. Método não permitido na coleção (DELETE em /materias) ✅
+
+```bash
+curl --location --request DELETE '{{baseUrl}}/api/v1/materias'
+```
+
+Esperado **405**, obtido **405**.
+
+```http
+HTTP/1.1 405
+Allow: POST, GET
+Content-Type: application/json
+
+{
+  "dataHora": "2026-11-21T20:19:40.443Z",
+  "status": 405,
+  "erro": "Method Not Allowed",
+  "codigo": "METODO_NAO_PERMITIDO",
+  "mensagem": "Método HTTP não permitido para este recurso."
+}
+```
+
+Verificações:
+
+- ✅ codigo METODO_NAO_PERMITIDO
+- ✅ Allow lista GET e POST
+
 ### GET — buscar
 
-#### 14. Buscar por id ✅
+#### 29. Buscar por id ✅
 
 ```bash
 curl --location '{{baseUrl}}/api/v1/materias/{{materiaId}}'
@@ -480,12 +1056,12 @@ HTTP/1.1 200
 Content-Type: application/json
 
 {
-  "id": "8fa50f72-706a-43c3-8173-9a87fd036a60",
+  "id": "bb6f863d-598f-4496-9234-7454a055052c",
   "nome": "Matemática",
   "descricao": "Álgebra e geometria",
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:34.909Z",
-  "atualizadoEm": "2026-11-20T18:11:34.909Z"
+  "criadoEm": "2026-11-21T20:19:39.228Z",
+  "atualizadoEm": "2026-11-21T20:19:39.228Z"
 }
 ```
 
@@ -494,7 +1070,7 @@ Verificações:
 - ✅ id igual ao pedido
 - ✅ nome Matemática
 
-#### 15. Id inexistente ✅
+#### 30. Id inexistente ✅
 
 ```bash
 curl --location '{{baseUrl}}/api/v1/materias/11111111-2222-3333-4444-555555555555'
@@ -507,7 +1083,7 @@ HTTP/1.1 404
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.285Z",
+  "dataHora": "2026-11-21T20:19:40.546Z",
   "status": 404,
   "erro": "Not Found",
   "codigo": "MATERIA_NAO_ENCONTRADA",
@@ -519,7 +1095,7 @@ Verificações:
 
 - ✅ codigo MATERIA_NAO_ENCONTRADA
 
-#### 16. Id malformado (não é UUID) ✅
+#### 31. Id malformado (não é UUID) ✅
 
 ```bash
 curl --location '{{baseUrl}}/api/v1/materias/isto-nao-e-um-uuid'
@@ -532,7 +1108,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.311Z",
+  "dataHora": "2026-11-21T20:19:40.573Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "PARAMETRO_INVALIDO",
@@ -545,36 +1121,9 @@ Verificações:
 - ✅ codigo PARAMETRO_INVALIDO
 - ✅ não devolve o valor enviado
 
-#### 17. Listagem (ainda não implementada: Módulo 8) ✅
-
-```bash
-curl --location '{{baseUrl}}/api/v1/materias'
-```
-
-Esperado **405**, obtido **405**.
-
-```http
-HTTP/1.1 405
-Allow: POST
-Content-Type: application/json
-
-{
-  "dataHora": "2026-11-20T18:11:35.335Z",
-  "status": 405,
-  "erro": "Method Not Allowed",
-  "codigo": "METODO_NAO_PERMITIDO",
-  "mensagem": "Método HTTP não permitido para este recurso."
-}
-```
-
-Verificações:
-
-- ✅ codigo METODO_NAO_PERMITIDO
-- ✅ cabeçalho Allow presente
-
 ### PUT — atualizar
 
-#### 18. Trocar nome e descrição (ignora o ativo enviado) ✅
+#### 32. Trocar nome e descrição (ignora o ativo enviado) ✅
 
 ```bash
 curl --location --request PUT '{{baseUrl}}/api/v1/materias/{{materiaId}}' \
@@ -589,12 +1138,12 @@ HTTP/1.1 200
 Content-Type: application/json
 
 {
-  "id": "8fa50f72-706a-43c3-8173-9a87fd036a60",
+  "id": "bb6f863d-598f-4496-9234-7454a055052c",
   "nome": "Matemática Aplicada",
   "descricao": "Nova descrição",
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:34.909Z",
-  "atualizadoEm": "2026-11-20T18:11:35.369Z"
+  "criadoEm": "2026-11-21T20:19:39.228Z",
+  "atualizadoEm": "2026-11-21T20:19:40.634Z"
 }
 ```
 
@@ -603,7 +1152,7 @@ Verificações:
 - ✅ nome e descrição trocados
 - ✅ ativo não mudou (continua true)
 
-#### 19. Descrição omitida: PUT é substituição, vira nula (D61) ✅
+#### 33. Descrição omitida: PUT é substituição, vira nula (D61) ✅
 
 ```bash
 curl --location --request PUT '{{baseUrl}}/api/v1/materias/{{materiaId}}' \
@@ -618,12 +1167,12 @@ HTTP/1.1 200
 Content-Type: application/json
 
 {
-  "id": "8fa50f72-706a-43c3-8173-9a87fd036a60",
+  "id": "bb6f863d-598f-4496-9234-7454a055052c",
   "nome": "Matemática Aplicada",
   "descricao": null,
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:34.909Z",
-  "atualizadoEm": "2026-11-20T18:11:35.410Z"
+  "criadoEm": "2026-11-21T20:19:39.228Z",
+  "atualizadoEm": "2026-11-21T20:19:40.704Z"
 }
 ```
 
@@ -632,7 +1181,7 @@ Verificações:
 - ✅ o próprio nome é permitido
 - ✅ descricao virou nula
 
-#### 20. Nome que pertence a outra matéria ✅
+#### 34. Nome que pertence a outra matéria ✅
 
 ```bash
 curl --location --request PUT '{{baseUrl}}/api/v1/materias/{{materiaId}}' \
@@ -647,7 +1196,7 @@ HTTP/1.1 409
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.450Z",
+  "dataHora": "2026-11-21T20:19:40.746Z",
   "status": 409,
   "erro": "Conflict",
   "codigo": "MATERIA_NOME_DUPLICADO",
@@ -659,7 +1208,7 @@ Verificações:
 
 - ✅ codigo MATERIA_NOME_DUPLICADO
 
-#### 21. Id inexistente ✅
+#### 35. Id inexistente ✅
 
 ```bash
 curl --location --request PUT '{{baseUrl}}/api/v1/materias/11111111-2222-3333-4444-555555555555' \
@@ -674,7 +1223,7 @@ HTTP/1.1 404
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.481Z",
+  "dataHora": "2026-11-21T20:19:40.781Z",
   "status": 404,
   "erro": "Not Found",
   "codigo": "MATERIA_NAO_ENCONTRADA",
@@ -686,7 +1235,7 @@ Verificações:
 
 - ✅ codigo MATERIA_NAO_ENCONTRADA
 
-#### 22. Nome inválido (só espaços) ✅
+#### 36. Nome inválido (só espaços) ✅
 
 ```bash
 curl --location --request PUT '{{baseUrl}}/api/v1/materias/{{materiaId}}' \
@@ -701,7 +1250,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.520Z",
+  "dataHora": "2026-11-21T20:19:40.820Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "VALIDACAO_FALHOU",
@@ -720,7 +1269,7 @@ Verificações:
 - ✅ codigo VALIDACAO_FALHOU
 - ✅ campos aponta o campo nome
 
-#### 23. Id malformado ✅
+#### 37. Id malformado ✅
 
 ```bash
 curl --location --request PUT '{{baseUrl}}/api/v1/materias/isto-nao-e-um-uuid' \
@@ -735,7 +1284,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.566Z",
+  "dataHora": "2026-11-21T20:19:40.880Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "PARAMETRO_INVALIDO",
@@ -749,7 +1298,7 @@ Verificações:
 
 ### PATCH — desativar e ativar
 
-#### 24. Desativar ✅
+#### 38. Desativar ✅
 
 ```bash
 curl --location --request PATCH '{{baseUrl}}/api/v1/materias/{{materiaId}}/disable'
@@ -762,12 +1311,12 @@ HTTP/1.1 200
 Content-Type: application/json
 
 {
-  "id": "8fa50f72-706a-43c3-8173-9a87fd036a60",
+  "id": "bb6f863d-598f-4496-9234-7454a055052c",
   "nome": "Matemática Aplicada",
   "descricao": null,
   "ativo": false,
-  "criadoEm": "2026-11-20T18:11:34.909Z",
-  "atualizadoEm": "2026-11-20T18:11:35.621Z"
+  "criadoEm": "2026-11-21T20:19:39.228Z",
+  "atualizadoEm": "2026-11-21T20:19:40.924Z"
 }
 ```
 
@@ -775,7 +1324,7 @@ Verificações:
 
 - ✅ ativo é false
 
-#### 25. Desativar de novo (idempotente) ✅
+#### 39. Desativar de novo (idempotente) ✅
 
 ```bash
 curl --location --request PATCH '{{baseUrl}}/api/v1/materias/{{materiaId}}/disable'
@@ -788,12 +1337,12 @@ HTTP/1.1 200
 Content-Type: application/json
 
 {
-  "id": "8fa50f72-706a-43c3-8173-9a87fd036a60",
+  "id": "bb6f863d-598f-4496-9234-7454a055052c",
   "nome": "Matemática Aplicada",
   "descricao": null,
   "ativo": false,
-  "criadoEm": "2026-11-20T18:11:34.909Z",
-  "atualizadoEm": "2026-11-20T18:11:35.621Z"
+  "criadoEm": "2026-11-21T20:19:39.228Z",
+  "atualizadoEm": "2026-11-21T20:19:40.924Z"
 }
 ```
 
@@ -802,7 +1351,7 @@ Verificações:
 - ✅ mesmo resultado da chamada anterior
 - ✅ atualizadoEm não mudou (D62)
 
-#### 26. Ativar ✅
+#### 40. Ativar ✅
 
 ```bash
 curl --location --request PATCH '{{baseUrl}}/api/v1/materias/{{materiaId}}/enable'
@@ -815,12 +1364,12 @@ HTTP/1.1 200
 Content-Type: application/json
 
 {
-  "id": "8fa50f72-706a-43c3-8173-9a87fd036a60",
+  "id": "bb6f863d-598f-4496-9234-7454a055052c",
   "nome": "Matemática Aplicada",
   "descricao": null,
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:34.909Z",
-  "atualizadoEm": "2026-11-20T18:11:35.710Z"
+  "criadoEm": "2026-11-21T20:19:39.228Z",
+  "atualizadoEm": "2026-11-21T20:19:41.001Z"
 }
 ```
 
@@ -828,7 +1377,7 @@ Verificações:
 
 - ✅ ativo é true
 
-#### 27. Ativar de novo (idempotente) ✅
+#### 41. Ativar de novo (idempotente) ✅
 
 ```bash
 curl --location --request PATCH '{{baseUrl}}/api/v1/materias/{{materiaId}}/enable'
@@ -841,12 +1390,12 @@ HTTP/1.1 200
 Content-Type: application/json
 
 {
-  "id": "8fa50f72-706a-43c3-8173-9a87fd036a60",
+  "id": "bb6f863d-598f-4496-9234-7454a055052c",
   "nome": "Matemática Aplicada",
   "descricao": null,
   "ativo": true,
-  "criadoEm": "2026-11-20T18:11:34.909Z",
-  "atualizadoEm": "2026-11-20T18:11:35.710Z"
+  "criadoEm": "2026-11-21T20:19:39.228Z",
+  "atualizadoEm": "2026-11-21T20:19:41.001Z"
 }
 ```
 
@@ -855,7 +1404,7 @@ Verificações:
 - ✅ mesmo resultado da chamada anterior
 - ✅ atualizadoEm não mudou (D62)
 
-#### 28. Desativar id inexistente ✅
+#### 42. Desativar id inexistente ✅
 
 ```bash
 curl --location --request PATCH '{{baseUrl}}/api/v1/materias/11111111-2222-3333-4444-555555555555/disable'
@@ -868,7 +1417,7 @@ HTTP/1.1 404
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.786Z",
+  "dataHora": "2026-11-21T20:19:41.071Z",
   "status": 404,
   "erro": "Not Found",
   "codigo": "MATERIA_NAO_ENCONTRADA",
@@ -880,7 +1429,7 @@ Verificações:
 
 - ✅ codigo MATERIA_NAO_ENCONTRADA
 
-#### 29. Ativar id inexistente ✅
+#### 43. Ativar id inexistente ✅
 
 ```bash
 curl --location --request PATCH '{{baseUrl}}/api/v1/materias/11111111-2222-3333-4444-555555555555/enable'
@@ -893,7 +1442,7 @@ HTTP/1.1 404
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.815Z",
+  "dataHora": "2026-11-21T20:19:41.121Z",
   "status": 404,
   "erro": "Not Found",
   "codigo": "MATERIA_NAO_ENCONTRADA",
@@ -905,7 +1454,7 @@ Verificações:
 
 - ✅ codigo MATERIA_NAO_ENCONTRADA
 
-#### 30. Id malformado ✅
+#### 44. Id malformado ✅
 
 ```bash
 curl --location --request PATCH '{{baseUrl}}/api/v1/materias/isto-nao-e-um-uuid/disable'
@@ -918,7 +1467,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.838Z",
+  "dataHora": "2026-11-21T20:19:41.149Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "PARAMETRO_INVALIDO",
@@ -932,7 +1481,7 @@ Verificações:
 
 ### DELETE — apagar
 
-#### 31. Apagar ✅
+#### 45. Apagar ✅
 
 ```bash
 curl --location --request DELETE '{{baseUrl}}/api/v1/materias/{{materiaId}}'
@@ -950,7 +1499,7 @@ Verificações:
 
 - ✅ corpo vazio
 
-#### 32. Buscar depois de apagar ✅
+#### 46. Buscar depois de apagar ✅
 
 ```bash
 curl --location '{{baseUrl}}/api/v1/materias/{{materiaId}}'
@@ -963,7 +1512,7 @@ HTTP/1.1 404
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.901Z",
+  "dataHora": "2026-11-21T20:19:41.246Z",
   "status": 404,
   "erro": "Not Found",
   "codigo": "MATERIA_NAO_ENCONTRADA",
@@ -975,7 +1524,7 @@ Verificações:
 
 - ✅ codigo MATERIA_NAO_ENCONTRADA
 
-#### 33. Apagar de novo ✅
+#### 47. Apagar de novo ✅
 
 ```bash
 curl --location --request DELETE '{{baseUrl}}/api/v1/materias/{{materiaId}}'
@@ -988,7 +1537,7 @@ HTTP/1.1 404
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.923Z",
+  "dataHora": "2026-11-21T20:19:41.272Z",
   "status": 404,
   "erro": "Not Found",
   "codigo": "MATERIA_NAO_ENCONTRADA",
@@ -1000,7 +1549,7 @@ Verificações:
 
 - ✅ codigo MATERIA_NAO_ENCONTRADA
 
-#### 34. Id malformado ✅
+#### 48. Id malformado ✅
 
 ```bash
 curl --location --request DELETE '{{baseUrl}}/api/v1/materias/isto-nao-e-um-uuid'
@@ -1013,7 +1562,7 @@ HTTP/1.1 400
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.945Z",
+  "dataHora": "2026-11-21T20:19:41.298Z",
   "status": 400,
   "erro": "Bad Request",
   "codigo": "PARAMETRO_INVALIDO",
@@ -1027,7 +1576,7 @@ Verificações:
 
 ### Outras
 
-#### 35. Rota inexistente ✅
+#### 49. Rota inexistente ✅
 
 ```bash
 curl --location '{{baseUrl}}/api/v1/nao-existe'
@@ -1040,7 +1589,7 @@ HTTP/1.1 404
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:35.983Z",
+  "dataHora": "2026-11-21T20:19:41.324Z",
   "status": 404,
   "erro": "Not Found",
   "codigo": "RECURSO_NAO_ENCONTRADO",
@@ -1053,7 +1602,7 @@ Verificações:
 - ✅ codigo RECURSO_NAO_ENCONTRADO
 - ✅ resposta em JSON (nunca HTML)
 
-#### 36. Rota inexistente em método com corpo (POST) ✅
+#### 50. Rota inexistente em método com corpo (POST) ✅
 
 ```bash
 curl --location '{{baseUrl}}/api/v1/nao-existe' \
@@ -1068,7 +1617,7 @@ HTTP/1.1 404
 Content-Type: application/json
 
 {
-  "dataHora": "2026-11-20T18:11:36.006Z",
+  "dataHora": "2026-11-21T20:19:41.376Z",
   "status": 404,
   "erro": "Not Found",
   "codigo": "RECURSO_NAO_ENCONTRADO",
@@ -1082,7 +1631,7 @@ Verificações:
 
 ### Limpeza
 
-#### 37. Apagar a matéria Física ✅
+#### 51. Apagar a matéria Física ✅
 
 ```bash
 curl --location --request DELETE '{{baseUrl}}/api/v1/materias/{{outraMateriaId}}'
@@ -1096,7 +1645,7 @@ HTTP/1.1 204
 (sem corpo)
 ```
 
-#### 38. Apagar a matéria Química ✅
+#### 52. Apagar a matéria Química ✅
 
 ```bash
 curl --location --request DELETE '{{baseUrl}}/api/v1/materias/{{materiaIdC}}'
@@ -1110,7 +1659,7 @@ HTTP/1.1 204
 (sem corpo)
 ```
 
-#### 39. Apagar a matéria História ✅
+#### 53. Apagar a matéria História ✅
 
 ```bash
 curl --location --request DELETE '{{baseUrl}}/api/v1/materias/{{materiaIdD}}'
@@ -1130,5 +1679,5 @@ HTTP/1.1 204
 - O formato de erro é o mesmo em todos os casos (`dataHora`, `status`, `erro`, `codigo`, `mensagem`, e `campos` só em 400 de validação).
 - Confirmado no MySQL real: `matematica` (sem acento, minúscula) é recusado como duplicado de `Matemática` (collation `utf8mb4_unicode_ci`).
 - Confirmado: `Location` relativo (D58), nome sem espaços nas pontas (D57), no máximo uma mensagem por campo nos casos testados (D59), `PUT` como substituição (D61) e `disable`/`enable` repetidos sem alterar a resposta (D62), datas com 3 casas de milissegundos (D63).
-- `GET /api/v1/materias` (listagem) devolve **405** hoje, porque ela é do Módulo 8; `POST /api/v1/materias` é a única operação nessa rota.
-- Não cobertos aqui, por não existirem ainda: listagem, 401/403 e o 409 do `DELETE` por subtópicos.
+- `GET /api/v1/materias` lista com paginação (`page`, `size` até 50), ordenação (`sort` por `nome` ou `criadoEm`, com desempate por id) e filtros (`nome` contém, sem distinguir maiúsculas e acentos; `ativo`).
+- Não cobertos aqui, por não existirem ainda: restrições por papel na listagem, 401/403 e o 409 do `DELETE` por subtópicos.
