@@ -3,6 +3,10 @@ package br.simulado.etec.catalogo.service;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,11 +16,17 @@ import br.simulado.etec.catalogo.repository.MateriaRepository;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
+import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
+import br.simulado.etec.shared.paginacao.Filtros;
 
 /** Regras da matéria (contrato, seção 4.1). Leituras em transação somente leitura. */
 @Service
 @Transactional(readOnly = true)
 public class MateriaService {
+
+	/** Campos pelos quais a listagem aceita ordenação (lista fixa); padrão: nome, crescente. */
+	public static final CamposOrdenaveis CAMPOS_ORDENAVEIS = CamposOrdenaveis.de(Sort.by(Sort.Order.asc("nome")), "nome",
+			"criadoEm");
 
 	private final MateriaRepository repositorio;
 
@@ -38,6 +48,16 @@ public class MateriaService {
 			// As demais restrições da tabela já são garantidas pela validação do DTO.
 			throw nomeDuplicado();
 		}
+	}
+
+	/**
+	 * Lista com filtros opcionais: {@code nome} (contém, sem distinguir maiúsculas e acentos no MySQL com a
+	 * collation utf8mb4_unicode_ci; %, _ e a barra invertida valem como texto) e {@code ativo} (nulo = todos).
+	 */
+	public Page<Materia> listar(String nome, Boolean ativo, Pageable paginacao) {
+		Specification<Materia> filtros = Specification.allOf(Filtros.<Materia>contem("nome", nome),
+				Filtros.<Materia>igual("ativo", ativo));
+		return repositorio.findAll(filtros, paginacao);
 	}
 
 	public Materia buscar(UUID id) {

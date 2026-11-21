@@ -4,13 +4,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import br.simulado.etec.catalogo.model.Materia;
 
-public interface MateriaRepository extends JpaRepository<Materia, Long> {
+public interface MateriaRepository extends JpaRepository<Materia, Long>, JpaSpecificationExecutor<Materia> {
 
 	Optional<Materia> findByPublicId(UUID publicId);
 

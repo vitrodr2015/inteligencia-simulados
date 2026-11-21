@@ -42,6 +42,25 @@ class SwaggerLigadoTest {
 	}
 
 	@Test
+	void deve_documentar_a_listagem_com_200_e_400_e_parametros_sem_example() throws Exception {
+		String listagem = "$.paths['/api/v1/materias'].get";
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(jsonPath(listagem + ".responses.200").exists())
+				.andExpect(jsonPath(listagem + ".responses.400").exists())
+				.andExpect(jsonPath(listagem + ".responses.401").doesNotExist())
+				.andExpect(jsonPath(listagem + ".responses.403").doesNotExist())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='nome')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='ativo')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='page')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='size')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='sort')].description").isNotEmpty())
+				// "Try it out" envia o valor de um example como filtro: nenhum parâmetro da listagem pode ter example
+				.andExpect(jsonPath(listagem + ".parameters[?(@.example)]").isEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.schema.example)]").isEmpty())
+				.andExpect(jsonPath("$.components.schemas.PaginaResponseMateriaResponse").exists());
+	}
+
+	@Test
 	void deve_servir_a_interface_do_swagger_mesmo_com_add_mappings_false() throws Exception {
 		mockMvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk())
 				.andExpect(content().string(containsString("swagger")));

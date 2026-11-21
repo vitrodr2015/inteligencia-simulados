@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import br.simulado.etec.catalogo.dto.MateriaRequest;
 import br.simulado.etec.catalogo.dto.MateriaResponse;
 import br.simulado.etec.shared.exception.ErrorResponse;
+import br.simulado.etec.shared.paginacao.PaginaResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -29,6 +30,18 @@ public interface MateriaControllerDocs {
 	@ApiResponse(responseCode = "409", description = "Já existe uma matéria com esse nome (MATERIA_NOME_DUPLICADO).",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<MateriaResponse> criar(MateriaRequest dados);
+
+	@Operation(summary = "Lista as matérias",
+			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia.")
+	@ApiResponse(responseCode = "200", description = "Página de matérias.")
+	@ApiResponse(responseCode = "400", description = "Parâmetro inválido: page, size, sort ou ativo.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<PaginaResponse<MateriaResponse>> listar(
+			@Parameter(description = "Filtro por nome: contém o texto, sem distinguir maiúsculas e acentos. Os caracteres % e _ valem como texto.") String nome,
+			@Parameter(description = "Filtro por estado: true ou false. Ausente devolve todas.") String ativo,
+			@Parameter(description = "Número da página, a partir de 0. Padrão 0. Negativo ou não numérico dá 400.") String page,
+			@Parameter(description = "Itens por página. Padrão 20, máximo 50 (valor maior é reduzido a 50). Zero, negativo ou não numérico dá 400.") String size,
+			@Parameter(description = "Ordenação no formato campo,direção (asc ou desc). Campos aceitos: nome e criadoEm. Padrão: nome,asc. Qualquer outro valor dá 400.") String sort);
 
 	@Operation(summary = "Busca uma matéria pelo id")
 	@ApiResponse(responseCode = "200", description = "Matéria encontrada.",
