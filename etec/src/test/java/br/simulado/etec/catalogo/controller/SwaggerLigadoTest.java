@@ -30,6 +30,14 @@ class SwaggerLigadoTest {
 				.andExpect(jsonPath("$.components.schemas.MateriaResponse").exists());
 	}
 
+	/** O SomenteJsonConfig remove o conversor de YAML do Spring MVC; a rota .yaml do springdoc tem de continuar funcionando. */
+	@Test
+	void deve_responder_200_em_yaml_quando_pede_api_docs_yaml_com_o_somente_json_ativo() throws Exception {
+		mockMvc.perform(get("/v3/api-docs.yaml")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("/api/v1/materias")))
+				.andExpect(content().string(containsString("openapi:")));
+	}
+
 	@Test
 	void deve_documentar_so_os_status_que_o_codigo_devolve_hoje() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
