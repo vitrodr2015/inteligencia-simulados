@@ -5,6 +5,7 @@ import java.util.function.Function;
 
 import org.springframework.data.domain.Page;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,6 +20,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param totalPaginas total de páginas para esse tamanho
  */
 @JsonPropertyOrder({ "conteudo", "pagina", "tamanho", "totalElementos", "totalPaginas" })
+@JsonInclude(JsonInclude.Include.ALWAYS)
 @Schema(description = "Página de resultados.")
 public record PaginaResponse<T>(
 		@Schema(description = "Itens da página.") List<T> conteudo,

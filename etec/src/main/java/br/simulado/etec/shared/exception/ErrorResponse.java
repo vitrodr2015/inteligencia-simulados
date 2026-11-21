@@ -10,28 +10,32 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 /**
  * Formato único de erro da API (contrato, seção 1), igual em todo status de erro.
  *
  * <p>{@code dataHora} é texto em UTC com SEMPRE três casas de milissegundos, mesmo quando elas
  * são zero (o formato padrão do {@link Instant} omitiria). {@code campos} (só em 400 de validação)
- * e {@code detalhes} (objeto livre) não aparecem no JSON quando nulos.
+ * e {@code detalhes} (objeto livre) não aparecem no JSON quando nulos; os demais campos sempre saem.
+ * A ordem dos campos é fixa.
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonPropertyOrder({ "dataHora", "status", "erro", "codigo", "mensagem", "campos", "detalhes" })
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record ErrorResponse(
 		String dataHora,
 		int status,
 		String erro,
 		CodigoErro codigo,
 		String mensagem,
-		List<CampoInvalido> campos,
-		Map<String, Object> detalhes) {
+		@JsonInclude(JsonInclude.Include.NON_NULL) List<CampoInvalido> campos,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Map<String, Object> detalhes) {
 
 	private static final DateTimeFormatter FORMATO_DATA_HORA =
 			DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
 
 	/** Um campo inválido em erro 400 de validação. */
+	@JsonPropertyOrder({ "campo", "mensagem" })
 	public record CampoInvalido(String campo, String mensagem) {
 	}
 
