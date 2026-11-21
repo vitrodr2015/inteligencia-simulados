@@ -184,7 +184,7 @@ id	UUID	gerado
 provaId	UUID	da prova
 status	enum	EM_ANDAMENTO, FINALIZADA, EXPIRADA
 iniciadaEm, prazoEm	data/hora	UTC, definidos pelo servidor (prazoEm = início + duração da prova)
-tempoRestanteSegundos	inteiro	só em andamento; vale 0 entre prazoEm e prazoEm + 3 s (D16)
+tempoRestanteSegundos	inteiro	nulo quando a tentativa não está em andamento (D73); vale 0 entre prazoEm e prazoEm + 3 s (D16)
 finalizadaEm	data/hora	nulo até encerrar
 nota	inteiro	nulo até encerrar. Na ETEC, nota é a quantidade de acertos (0 até o total de questões), sem percentual e sem desconto por erro (D3)
 questoes	lista	{ordem, questaoId, versao, textoApoio, grupoApoio, enunciado, imagemUrl, alternativas[{letra, texto}]} (5 alternativas) sem gabarito. A ordem é a numeração da prova e as alternativas são sempre A a E, sem embaralhar (D30)
