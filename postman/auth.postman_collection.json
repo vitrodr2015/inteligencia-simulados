@@ -1,0 +1,2313 @@
+{
+  "info": {
+    "name": "Autenticação — /api/v1/auth, /me e /termos",
+    "description": "Cadastro, signin, refresh, GET /me, termos vigentes e o negar por padrão. Rode na ordem (a pasta Cadastro cria o usuário e as seguintes o usam). Gerada a partir de chamadas reais. Nenhum segredo no arquivo: e-mail e senha são gerados a cada rodada por script e os tokens ficam só nas variáveis da coleção. Não há como apagar o usuário criado pela API ainda (DELETE /me é de outra tarefa): ele fica no banco local com e-mail @exemplo.invalid. Até o Módulo 13 o refresh usado NÃO é invalidado e não há logout nem limite de 429.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get(\"email\")) {",
+          "  const s = Date.now().toString(36);",
+          "  const email = \"auth.\" + s + \"@exemplo.invalid\";",
+          "  pm.collectionVariables.set(\"email\", email);",
+          "  pm.collectionVariables.set(\"emailMaiusculo\", email.toUpperCase());",
+          "  pm.collectionVariables.set(\"senha\", \"Pm-\" + s + \"-Aa1!x\");",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "emailMaiusculo",
+      "value": ""
+    },
+    {
+      "key": "emailOutro",
+      "value": ""
+    },
+    {
+      "key": "senha",
+      "value": ""
+    },
+    {
+      "key": "termosVersao",
+      "value": ""
+    },
+    {
+      "key": "usuarioId",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "tokenAdulterado",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Termos",
+      "item": [
+        {
+          "name": "GET termos vigentes (público, 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"versao e url\", function () { const j = pm.response.json(); pm.expect(j.versao).to.be.a(\"string\"); pm.expect(j.url).to.be.a(\"string\"); });",
+                  "pm.collectionVariables.set(\"termosVersao\", pm.response.json().versao);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/termos/vigente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "termos",
+                "vigente"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cadastro (POST /auth/register)",
+      "item": [
+        {
+          "name": "Cadastrar aluno (201, sem Location e sem tokens)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"sem Location\", function () { pm.expect(pm.response.headers.has(\"Location\")).to.be.false; });",
+                  "pm.test(\"papel STUDENT, sem tokens e sem senha\", function () { const j = pm.response.json(); pm.expect(j.papel).to.eql(\"STUDENT\"); pm.expect(j).to.not.have.property(\"accessToken\"); pm.expect(j).to.not.have.property(\"senha\"); });",
+                  "pm.collectionVariables.set(\"usuarioId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{email}}\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-mail repetido (409 EMAIL_DUPLICADO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo EMAIL_DUPLICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"EMAIL_DUPLICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{email}}\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-mail repetido em MAIÚSCULAS (409, normalizado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo EMAIL_DUPLICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"EMAIL_DUPLICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{emailMaiusculo}}\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-mail com acento (400, D119)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo email\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"email\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"josé.{{senha}}@exemplo.invalid\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-mail sem arroba (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo email\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"email\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"sem-arroba\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Senha com 7 bytes (400)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailOutro\", \"outro.\" + Date.now().toString(36) + \"@exemplo.invalid\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo senha\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"senha\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{emailOutro}}\",\"senha\":\"1234567\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Senha com 73 bytes (400)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailOutro\", \"outro.\" + Date.now().toString(36) + \"@exemplo.invalid\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo senha\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"senha\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{emailOutro}}\",\"senha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Data inexistente 2000-02-30 (400, mensagem da D60)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailOutro\", \"outro.\" + Date.now().toString(36) + \"@exemplo.invalid\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo dataNascimento\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"dataNascimento\"); });",
+                  "pm.test(\"mensagem exata\", function () { pm.expect(pm.response.json().campos[0].mensagem).to.eql(\"Data inválida. Use o formato aaaa-mm-dd.\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{emailOutro}}\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2000-02-30\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Data sem zeros 2000-2-3 (400, D60)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailOutro\", \"outro.\" + Date.now().toString(36) + \"@exemplo.invalid\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo dataNascimento\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"dataNascimento\"); });",
+                  "pm.test(\"mensagem exata\", function () { pm.expect(pm.response.json().campos[0].mensagem).to.eql(\"Data inválida. Use o formato aaaa-mm-dd.\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{emailOutro}}\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2000-2-3\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Data no futuro (400)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailOutro\", \"outro.\" + Date.now().toString(36) + \"@exemplo.invalid\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo dataNascimento\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"dataNascimento\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{emailOutro}}\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2999-01-01\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Data que não é texto (400 CORPO_ILEGIVEL, D86)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CORPO_ILEGIVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_ILEGIVEL\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana\",\"email\":\"a@exemplo.invalid\",\"senha\":\"senha-12345\",\"dataNascimento\":20080510,\"aceiteTermosVersao\":\"v1\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Termos que não são os vigentes (400)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailOutro\", \"outro.\" + Date.now().toString(36) + \"@exemplo.invalid\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo aceiteTermosVersao\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"aceiteTermosVersao\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Ana Postman\",\"email\":\"{{emailOutro}}\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"v0-antiga\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Nome só com espaços (400)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailOutro\", \"outro.\" + Date.now().toString(36) + \"@exemplo.invalid\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo nome\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"nome\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"   \",\"email\":\"{{emailOutro}}\",\"senha\":\"{{senha}}\",\"dataNascimento\":\"2008-05-10\",\"aceiteTermosVersao\":\"{{termosVersao}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Corpo vazio (400, cinco campos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });",
+                  "pm.test(\"cinco campos, uma mensagem cada\", function () { pm.expect(pm.response.json().campos.length).to.eql(5); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Content-Type text/plain (415)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 415\", function () { pm.response.to.have.status(415); });",
+                  "pm.test(\"codigo TIPO_NAO_SUPORTADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"TIPO_NAO_SUPORTADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "a=b",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Signin (POST /auth/signin)",
+      "item": [
+        {
+          "name": "Signin (200, no-store, guarda os tokens)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"tokenType Bearer e expiresIn 900\", function () { pm.expect(j.tokenType).to.eql(\"Bearer\"); pm.expect(j.expiresIn).to.eql(900); });",
+                  "pm.test(\"Cache-Control exatamente no-store\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"no-store\"); });",
+                  "pm.collectionVariables.set(\"accessToken\", j.accessToken);",
+                  "pm.collectionVariables.set(\"refreshToken\", j.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"senha\":\"{{senha}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Signin com o e-mail em MAIÚSCULAS (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{emailMaiusculo}}\",\"senha\":\"{{senha}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Senha errada (401 CREDENCIAIS_INVALIDAS)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo CREDENCIAIS_INVALIDAS\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CREDENCIAIS_INVALIDAS\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });",
+                  "pm.test(\"mensagem fixa\", function () { pm.expect(pm.response.json().mensagem).to.eql(\"E-mail ou senha inválidos.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"senha\":\"senha-errada-123\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Usuário inexistente (401, a mesma resposta)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo CREDENCIAIS_INVALIDAS\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CREDENCIAIS_INVALIDAS\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });",
+                  "pm.test(\"mensagem fixa\", function () { pm.expect(pm.response.json().mensagem).to.eql(\"E-mail ou senha inválidos.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"ninguem.{{senha}}@exemplo.invalid\",\"senha\":\"qualquer-123\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-mail de formato inválido (401, a mesma resposta)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo CREDENCIAIS_INVALIDAS\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CREDENCIAIS_INVALIDAS\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"isto-nao-e-email\",\"senha\":\"{{senha}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Senha vazia (401, a mesma resposta)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo CREDENCIAIS_INVALIDAS\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CREDENCIAIS_INVALIDAS\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"senha\":\"\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Senha com 73 bytes (401, a mesma resposta)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo CREDENCIAIS_INVALIDAS\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CREDENCIAIS_INVALIDAS\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"senha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sem a senha (400 campos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo senha\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"senha\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "E-mail que não é texto (400 CORPO_ILEGIVEL, D86)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CORPO_ILEGIVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_ILEGIVEL\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":123,\"senha\":\"x\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Signin com Bearer lixo no cabeçalho (rota pública, 401 só pela credencial)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo CREDENCIAIS_INVALIDAS\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CREDENCIAIS_INVALIDAS\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer lixo"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"senha\":\"errada-1234\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Refresh (POST /auth/refresh)",
+      "item": [
+        {
+          "name": "Refresh (200, no-store, par novo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"tokenType Bearer e expiresIn 900\", function () { pm.expect(j.tokenType).to.eql(\"Bearer\"); pm.expect(j.expiresIn).to.eql(900); });",
+                  "pm.test(\"Cache-Control exatamente no-store\", function () { pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"no-store\"); });",
+                  "pm.collectionVariables.set(\"accessToken\", j.accessToken);",
+                  "pm.collectionVariables.set(\"refreshToken\", j.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"refreshToken\":\"{{refreshToken}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Access token no lugar do refresh (401 TOKEN_INVALIDO, D107)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo TOKEN_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"TOKEN_INVALIDO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"refreshToken\":\"{{accessToken}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Texto vazio (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo TOKEN_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"TOKEN_INVALIDO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"refreshToken\":\"\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Texto qualquer (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo TOKEN_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"TOKEN_INVALIDO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"refreshToken\":\"lixo\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sem o campo (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos[0].campo refreshToken\", function () { pm.expect(pm.response.json().campos[0].campo).to.eql(\"refreshToken\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Refresh que não é texto (400 CORPO_ILEGIVEL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CORPO_ILEGIVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_ILEGIVEL\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"refreshToken\":123}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuário logado e token ruim (GET /me)",
+      "item": [
+        {
+          "name": "GET /me com o access token (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"é o usuário cadastrado, sem credenciais\", function () { const j = pm.response.json(); pm.expect(j.id).to.eql(pm.collectionVariables.get(\"usuarioId\")); pm.expect(j.email).to.eql(pm.collectionVariables.get(\"email\")); pm.expect(j).to.not.have.property(\"senha\"); pm.expect(j).to.not.have.property(\"senhaHash\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sem token (401 NAO_AUTENTICADO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Token com a assinatura adulterada (401)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const t = pm.collectionVariables.get(\"accessToken\");",
+                  "pm.collectionVariables.set(\"tokenAdulterado\", t.slice(0, -4) + (t.endsWith(\"AAAA\") ? \"BBBB\" : \"AAAA\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdulterado}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Refresh usado como Bearer (401, tipo errado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refreshToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Token lixo (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "lixo",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Authorization Basic (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Basic dXNlcjpwYXNz"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sem token e Accept XML (401, sempre em JSON)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/xml"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negar por padrão (D113, D116, D120)",
+      "item": [
+        {
+          "name": "GET /materias sem token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /materias com token (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rota inexistente sem token (401, D116)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nao-existe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nao-existe"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rota inexistente com token (404, D116)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo RECURSO_NAO_ENCONTRADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"RECURSO_NAO_ENCONTRADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nao-existe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nao-existe"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /actuator/env sem token (401, D113)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/actuator/env",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "env"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /actuator/env com token (403, D113)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/actuator/env",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "env"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /error sem token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/error",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /auth/signin (401: o permitAll é por método)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "signin"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

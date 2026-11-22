@@ -89,6 +89,19 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Autenticação (Módulo 10). java-jwt 4.4.0 (Playbook): sem avisos no GitHub Advisory Database. Ele declara
+		     jackson-databind 2.14.2, mas a BOM do Boot o sobe para 2.21.8, que o springdoc já traz; o Jackson 3 do
+		     Boot não muda. O Spring Security 7 (cadeia de filtros, BCrypt) vem do starter, na versão da BOM. -->
+		<dependency>
+			<groupId>com.auth0</groupId>
+			<artifactId>java-jwt</artifactId>
+			<version>4.4.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
 		<!-- Testes de integração com MySQL real (Tarefa 06); versões da BOM do Boot -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

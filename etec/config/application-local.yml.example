@@ -4,3 +4,6 @@
 DB_PASSWORD: troque-a-senha-do-banco
 JWT_SECRET: troque-este-segredo-por-um-com-no-minimo-32-caracteres
 ADMIN_SENHA: troque-a-senha-do-admin
+# Termos de uso vigentes (D23, D94); sem padrão no application.yml. Valores de exemplo.
+TERMOS_VERSAO: v1
+TERMOS_URL: https://exemplo.invalid/termos
