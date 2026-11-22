@@ -63,7 +63,7 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
   - **Como adicionar um recurso novo mantendo o formato:** (1) o DTO de saída é um record com `@JsonPropertyOrder` listando TODOS os campos e `@JsonInclude(JsonInclude.Include.ALWAYS)`; (2) um campo novo entra no FIM da lista de ordem e do record (alterar a ordem de um campo existente quebra quem consome); (3) sem `@JsonFormat` em data; (4) o controller devolve o DTO, nunca a entidade; (5) escrever o teste de TEXTO EXATO (a string inteira, não campo a campo): na camada web, `MateriaFormatoWebTest` (service mockado, `Clock` fixo, id conhecido, texto literal) e, com o MySQL real, `MateriaFormatoIntegracaoTest` (só id e data trocados pelos marcadores `<ID>` e `<DATA>`); copiar um desses modelos para o recurso novo, cobrindo o item com valor, o item com nulo, o envelope da lista e os erros.
   - Sabotagens da tarefa: trocar a ordem de `nome` e `descricao` derrubou 6 testes (3 web e 3 de integração); trocar `ALWAYS` por `NON_NULL` derrubou 4 (os que têm `descricao` nula); a campanha de conversores falhou 2 testes antes do `SomenteJsonConfig` existir.
 - Postman: pasta `postman/` na raiz, com uma coleção por recurso (`<recurso>.postman_collection.json`, ver `postman/README.md`). **Todo endpoint novo entra na coleção do recurso na própria tarefa** (parte do "pronto"), gerada a partir de chamadas reais à aplicação no banco local; o relatório das respostas fica em `etec/docs/`. Hoje existe só a coleção da Matéria.
-- Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (rascunho v0.9, decisões D1 a D70).
+- Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (contrato v1.0 aprovado, decisões D1 a D116).
 
 ## Estado
 
