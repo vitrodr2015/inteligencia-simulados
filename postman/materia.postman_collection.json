@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Matéria — /api/v1/materias",
-    "description": "Todas as rotas da Matéria. Rode na ordem. Gerada a partir de chamadas reais. Exige autenticação: um script da coleção cria um usuário descartável e entra sozinho (o usuário fica no banco local, com e-mail @exemplo.invalid). Até o Módulo 11 qualquer usuário autenticado acessa estas rotas.",
+    "description": "Todas as rotas da Matéria. Rode na ordem. Gerada a partir de chamadas reais. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -50,11 +50,39 @@
       "value": ""
     },
     {
-      "key": "accessToken",
+      "key": "adminEmail",
       "value": ""
     },
     {
-      "key": "accessTokenExpira",
+      "key": "adminSenha",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "adminTokenExpira",
+      "value": ""
+    },
+    {
+      "key": "studentToken",
+      "value": ""
+    },
+    {
+      "key": "studentTokenExpira",
+      "value": ""
+    },
+    {
+      "key": "visSufixo",
+      "value": ""
+    },
+    {
+      "key": "visAtivaId",
+      "value": ""
+    },
+    {
+      "key": "visInativaId",
       "value": ""
     }
   ],
@@ -1037,14 +1065,14 @@
           }
         },
         {
-          "name": "Método não permitido na coleção (DELETE em /materias)",
+          "name": "Método sem regra na coleção (403, D121) (DELETE em /materias)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status 405\", function () { pm.response.to.have.status(405); });"
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });"
                 ]
               }
             }
@@ -1782,14 +1810,14 @@
       "name": "Outras",
       "item": [
         {
-          "name": "Rota inexistente",
+          "name": "Rota inexistente (403, D121)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });"
                 ]
               }
             }
@@ -1811,14 +1839,14 @@
           }
         },
         {
-          "name": "Rota inexistente em método com corpo (POST)",
+          "name": "Rota inexistente em método com corpo (POST) (403, D121)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });"
                 ]
               }
             }
@@ -2798,6 +2826,829 @@
           }
         }
       ]
+    },
+    {
+      "name": "Como STUDENT (visibilidade D28 e D103; escrita 403, D122)",
+      "item": [
+        {
+          "name": "Preparo (ADMIN): cria a matéria ativa",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"visSufixo\", Date.now().toString(36));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"visAtivaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Vis ativa {{visSufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Preparo (ADMIN): cria a matéria que ficará inativa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"visInativaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Vis inativa {{visSufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Preparo (ADMIN): desativa a matéria",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visInativaId}}/disable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visInativaId}}",
+                "disable"
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT lista: só as ativas (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"só ativas, e a inativa não aparece\", function () { const j = pm.response.json(); pm.expect(j.totalElementos).to.eql(1); pm.expect(j.conteudo[0].id).to.eql(pm.collectionVariables.get(\"visAtivaId\")); pm.expect(j.conteudo[0].ativo).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias?nome={{visSufixo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias?nome={{visSufixo}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ADMIN lista: todas (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"as duas aparecem\", function () { pm.expect(pm.response.json().totalElementos).to.eql(2); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias?nome={{visSufixo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias?nome={{visSufixo}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT envia ativo=false (400 PARAMETRO_INVALIDO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias?ativo=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias?ativo=false"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT busca a matéria ativa (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visAtivaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visAtivaId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT busca a matéria inativa (404 MATERIA_NAO_ENCONTRADA, o mesmo da inexistente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo MATERIA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"MATERIA_NAO_ENCONTRADA\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visInativaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visInativaId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ADMIN busca a matéria inativa (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visInativaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visInativaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "HEAD da matéria inativa como STUDENT (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "HEAD",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visInativaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visInativaId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "HEAD da matéria ativa como STUDENT (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "HEAD",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visAtivaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visAtivaId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta criar (403 ACESSO_NEGADO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Nao pode\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta criar com corpo inválido (403, a autorização vem antes do 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta alterar (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visAtivaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visAtivaId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Nao pode\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta desativar (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visAtivaId}}/disable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visAtivaId}}",
+                "disable"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta apagar um id que não existe (403, antes do 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta apagar com id malformado (403, antes do 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "abc"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sem token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Limpeza (ADMIN): apaga a matéria ativa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visAtivaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visAtivaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Limpeza (ADMIN): apaga a matéria inativa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visInativaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visInativaId}}"
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "auth": {
@@ -2805,7 +3656,7 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{accessToken}}",
+        "value": "{{adminToken}}",
         "type": "string"
       }
     ]
@@ -2816,23 +3667,32 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// A API exige autenticação (Módulo 10). Sem token, cadastra um usuário descartável e entra; renova perto de vencer.",
-          "const expira = Number(pm.collectionVariables.get(\"accessTokenExpira\") || 0);",
-          "if (!pm.collectionVariables.get(\"accessToken\") || Date.now() > expira - 60000) {",
-          "  const base = pm.collectionVariables.get(\"baseUrl\");",
+          "// Duas identidades (Módulo 11): ADMIN escreve e STUDENT lê. O ADMIN NÃO se cadastra pela API (não existe criação de ADMIN",
+          "// por API até o Módulo 12): você promove um usuário por SQL e informa adminEmail e adminSenha (postman/README.md).",
+          "const base = pm.collectionVariables.get(\"baseUrl\");",
+          "const cab = { \"Content-Type\": \"application/json\" };",
+          "const corpo = (c) => ({ mode: \"raw\", raw: JSON.stringify(c) });",
+          "const precisa = (nome) => !pm.collectionVariables.get(nome) || Date.now() > Number(pm.collectionVariables.get(nome + \"Expira\") || 0) - 60000;",
+          "const guardar = (nome, j) => { pm.collectionVariables.set(nome, j.accessToken); pm.collectionVariables.set(nome + \"Expira\", String(Date.now() + j.expiresIn * 1000)); };",
+          "if (precisa(\"adminToken\")) {",
+          "  const email = pm.collectionVariables.get(\"adminEmail\");",
+          "  const senha = pm.collectionVariables.get(\"adminSenha\");",
+          "  if (!email || !senha) {",
+          "    throw new Error(\"Defina as variáveis adminEmail e adminSenha desta coleção (passo da promoção por SQL no postman/README.md).\");",
+          "  }",
+          "  pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e, r) {",
+          "    guardar(\"adminToken\", r.json());",
+          "  });",
+          "}",
+          "if (precisa(\"studentToken\")) {",
           "  const s = Date.now().toString(36);",
           "  const email = \"postman.\" + s + \"@exemplo.invalid\";",
           "  const senha = \"Pm-\" + s + \"-Aa1!x\";",
-          "  const json = (corpo) => ({ mode: \"raw\", raw: JSON.stringify(corpo) });",
-          "  const cab = { \"Content-Type\": \"application/json\" };",
           "  pm.sendRequest({ url: base + \"/api/v1/termos/vigente\", method: \"GET\" }, function (e1, r1) {",
-          "    const versao = r1.json().versao;",
           "    pm.sendRequest({ url: base + \"/api/v1/auth/register\", method: \"POST\", header: cab,",
-          "      body: json({ nome: \"Postman\", email: email, senha: senha, dataNascimento: \"2000-01-01\", aceiteTermosVersao: versao }) }, function (e2) {",
-          "      pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: json({ email: email, senha: senha }) }, function (e3, r3) {",
-          "        const j = r3.json();",
-          "        pm.collectionVariables.set(\"accessToken\", j.accessToken);",
-          "        pm.collectionVariables.set(\"accessTokenExpira\", String(Date.now() + j.expiresIn * 1000));",
+          "      body: corpo({ nome: \"Postman\", email: email, senha: senha, dataNascimento: \"2000-01-01\", aceiteTermosVersao: r1.json().versao }) }, function (e2) {",
+          "      pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e3, r3) {",
+          "        guardar(\"studentToken\", r3.json());",
           "      });",
           "    });",
           "  });",

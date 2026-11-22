@@ -111,37 +111,36 @@ class MateriaFormatoIntegracaoTest extends AbstractMateriaIntegrationTest {
 	}
 
 
-	// ----- 404, 405 e 415 também saem em JSON, no formato padrão, mesmo com Accept de XML ou YAML -----
+	// ----- 403 (rota ou método sem regra, D121) e 415 também saem em JSON, no formato padrão, mesmo com Accept de XML ou YAML -----
 
-	private static final String JSON_DO_404 = "{\"dataHora\":\"<DATA>\",\"status\":404,\"erro\":\"Not Found\","
-			+ "\"codigo\":\"RECURSO_NAO_ENCONTRADO\",\"mensagem\":\"Recurso não encontrado.\"}";
-
-	private static final String JSON_DO_405 = "{\"dataHora\":\"<DATA>\",\"status\":405,\"erro\":\"Method Not Allowed\","
-			+ "\"codigo\":\"METODO_NAO_PERMITIDO\",\"mensagem\":\"Método HTTP não permitido para este recurso.\"}";
+	/** D121: rota ou método SEM regra é negado (403 a quem está logado), no mesmo formato de erro. */
+	private static final String JSON_DO_403 = "{\"dataHora\":\"<DATA>\",\"status\":403,\"erro\":\"Forbidden\","
+			+ "\"codigo\":\"ACESSO_NEGADO\",\"mensagem\":\"Você não tem permissão para acessar este recurso.\"}";
 
 	private static final String JSON_DO_415 = "{\"dataHora\":\"<DATA>\",\"status\":415,"
 			+ "\"erro\":\"Unsupported Media Type\",\"codigo\":\"TIPO_NAO_SUPORTADO\","
 			+ "\"mensagem\":\"Tipo de conteúdo não suportado. Envie o corpo em application/json.\"}";
 
 	@Test
-	void deve_devolver_404_em_json_no_formato_padrao_para_rota_inexistente_mesmo_com_accept_de_xml_ou_yaml() {
+	void deve_devolver_403_em_json_no_formato_padrao_para_rota_inexistente_mesmo_com_accept_de_xml_ou_yaml() {
 		for (String tipo : new String[] { "application/xml", "application/yaml", "text/html" }) {
 			Response resposta = requisicao().accept(tipo).get("/api/v1/nao-existe");
 
-			assertThat(resposta.statusCode()).as(tipo).isEqualTo(404);
+			assertThat(resposta.statusCode()).as(tipo).isEqualTo(403);
 			assertThat(resposta.getHeader("Content-Type")).as(tipo).isEqualTo("application/json");
-			assertThat(mascarar(corpo(resposta))).as(tipo).isEqualTo(JSON_DO_404);
+			assertThat(mascarar(corpo(resposta))).as(tipo).isEqualTo(JSON_DO_403);
 		}
 	}
 
 	@Test
-	void deve_devolver_405_em_json_no_formato_padrao_para_metodo_nao_permitido_mesmo_com_accept_de_xml_ou_yaml() {
+	void deve_devolver_403_em_json_no_formato_padrao_para_metodo_sem_regra_mesmo_com_accept_de_xml_ou_yaml() {
 		for (String tipo : new String[] { "application/xml", "application/yaml" }) {
+			// DELETE na coleção não tem regra (só /{id}): negado, e não 405 (D121).
 			Response resposta = requisicao().accept(tipo).delete(BASE);
 
-			assertThat(resposta.statusCode()).as(tipo).isEqualTo(405);
+			assertThat(resposta.statusCode()).as(tipo).isEqualTo(403);
 			assertThat(resposta.getHeader("Content-Type")).as(tipo).isEqualTo("application/json");
-			assertThat(mascarar(corpo(resposta))).as(tipo).isEqualTo(JSON_DO_405);
+			assertThat(mascarar(corpo(resposta))).as(tipo).isEqualTo(JSON_DO_403);
 		}
 	}
 
@@ -157,13 +156,13 @@ class MateriaFormatoIntegracaoTest extends AbstractMateriaIntegrationTest {
 
 
 	@Test
-	void deve_devolver_404_em_json_no_formato_padrao_para_rota_inexistente_fora_de_api_v1() {
+	void deve_devolver_403_em_json_no_formato_padrao_para_rota_inexistente_fora_de_api_v1() {
 		for (String tipo : new String[] { "application/json", "application/xml", "application/yaml" }) {
 			Response resposta = requisicao().accept(tipo).get("/nao-existe");
 
-			assertThat(resposta.statusCode()).as(tipo).isEqualTo(404);
+			assertThat(resposta.statusCode()).as(tipo).isEqualTo(403);
 			assertThat(resposta.getHeader("Content-Type")).as(tipo).isEqualTo("application/json");
-			assertThat(mascarar(corpo(resposta))).as(tipo).isEqualTo(JSON_DO_404);
+			assertThat(mascarar(corpo(resposta))).as(tipo).isEqualTo(JSON_DO_403);
 		}
 	}
 

@@ -59,7 +59,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 				UsuarioAutenticado usuario = autenticador.autenticar(token);
 				SecurityContext contexto = estrategia.createEmptyContext();
 				contexto.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(usuario, null,
-						List.of(new SimpleGrantedAuthority("ROLE_" + usuario.papel().name()))));
+						List.of(new SimpleGrantedAuthority(Authorities.de(usuario.papel())))));
 				estrategia.setContext(contexto);
 				repositorio.saveContext(contexto, requisicao, resposta);
 			}

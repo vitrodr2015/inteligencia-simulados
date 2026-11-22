@@ -33,11 +33,12 @@ security:
     access-token-expiration: 15m
     refresh-token-expiration: 24h
 
-cors:
-  # Vazio = sem CORS. Nunca usar '*'.
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:}
 
 app:
+  cors:
+    # Origens de navegador permitidas, separadas por vírgula (http(s)://domínio[:porta], sem barra nem caminho).
+    # Vazio = sem CORS. Nunca '*' (a aplicação não sobe). Em produção (perfil prod) só https.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   termos:
     # Versão e endereço dos termos de uso vigentes (D23, D94). Sem valor padrão: faltando, a aplicação não sobe.
     versao: ${TERMOS_VERSAO}

@@ -18,6 +18,7 @@ import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
 import br.simulado.etec.shared.paginacao.Filtros;
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.shared.persistencia.Restricoes;
 
 /** Regras da matéria (contrato, seção 4.1). Leituras em transação somente leitura. */
@@ -55,19 +56,33 @@ public class MateriaService {
 	 * Lista com filtros opcionais: {@code nome} (contém, sem distinguir maiúsculas e acentos no MySQL com a
 	 * collation utf8mb4_unicode_ci; %, _ e a barra invertida valem como texto) e {@code ativo} (nulo = todos).
 	 */
-	public Page<Materia> listar(String nome, Boolean ativo, Pageable paginacao) {
-		Specification<Materia> filtros = Specification.allOf(Filtros.<Materia>contem("nome", nome),
+	public Page<Materia> listar(EscopoDeLeitura escopo, String nome, Boolean ativo, Pageable paginacao) {
+		escopo.validarFiltroAtivo(ativo);
+		// STUDENT só vê matéria ativa (D28); ADMIN vê todas.
+		Specification<Materia> visibilidade = escopo.veInativos() ? Filtros.<Materia>semFiltro()
+				: Filtros.<Materia>igual("ativo", Boolean.TRUE);
+		Specification<Materia> filtros = Specification.allOf(visibilidade, Filtros.<Materia>contem("nome", nome),
 				Filtros.<Materia>igual("ativo", ativo));
 		return repositorio.findAll(filtros, paginacao);
 	}
 
-	public Materia buscar(UUID id) {
+	/** Leitura por id: para o STUDENT, matéria inativa dá o MESMO 404 da inexistente (D103). */
+	public Materia buscar(UUID id, EscopoDeLeitura escopo) {
+		Materia materia = carregar(id);
+		if (!escopo.veInativos() && !materia.visivelParaAluno()) {
+			throw naoEncontrada();
+		}
+		return materia;
+	}
+
+	/** Para as escritas (só ADMIN, a cadeia de segurança já barrou os demais): carrega sem filtro de visibilidade. */
+	private Materia carregar(UUID id) {
 		return repositorio.findByPublicId(id).orElseThrow(MateriaService::naoEncontrada);
 	}
 
 	@Transactional
 	public Materia atualizar(UUID id, MateriaRequest dados) {
-		Materia materia = buscar(id);
+		Materia materia = carregar(id);
 		if (repositorio.existsByNomeAndPublicIdNot(dados.nome(), id)) {
 			throw nomeDuplicado();
 		}
@@ -83,7 +98,7 @@ public class MateriaService {
 	/** Idempotente: repetir devolve o mesmo resultado. */
 	@Transactional
 	public Materia desativar(UUID id) {
-		Materia materia = buscar(id);
+		Materia materia = carregar(id);
 		materia.desativar();
 		return repositorio.saveAndFlush(materia);
 	}
@@ -91,7 +106,7 @@ public class MateriaService {
 	/** Idempotente: repetir devolve o mesmo resultado. */
 	@Transactional
 	public Materia ativar(UUID id) {
-		Materia materia = buscar(id);
+		Materia materia = carregar(id);
 		materia.ativar();
 		return repositorio.saveAndFlush(materia);
 	}

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Autenticação — /api/v1/auth, /me e /termos",
-    "description": "Cadastro, signin, refresh, GET /me, termos vigentes e o negar por padrão. Rode na ordem (a pasta Cadastro cria o usuário e as seguintes o usam). Gerada a partir de chamadas reais. Nenhum segredo no arquivo: e-mail e senha são gerados a cada rodada por script e os tokens ficam só nas variáveis da coleção. Não há como apagar o usuário criado pela API ainda (DELETE /me é de outra tarefa): ele fica no banco local com e-mail @exemplo.invalid. Até o Módulo 13 o refresh usado NÃO é invalidado e não há logout nem limite de 429.",
+    "description": "Cadastro, signin, refresh, GET /me, termos vigentes, o negar por padrão, o que o STUDENT não pode, o firewall e o CORS. Rode na ordem (a pasta Cadastro cria o usuário e as seguintes o usam). Gerada a partir de chamadas reais. Nenhum segredo no arquivo: e-mail e senha são gerados a cada rodada por script e os tokens ficam só nas variáveis da coleção. Não há como apagar o usuário criado pela API ainda (DELETE /me é de outra tarefa): ele fica no banco local com e-mail @exemplo.invalid. Até o Módulo 13 o refresh usado NÃO é invalidado e não há logout nem limite de 429.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -61,6 +61,14 @@
     {
       "key": "tokenAdulterado",
       "value": ""
+    },
+    {
+      "key": "origemPermitida",
+      "value": "https://app.exemplo.invalid"
+    },
+    {
+      "key": "origemNaoPermitida",
+      "value": "https://invasor.exemplo.invalid"
     }
   ],
   "item": [
@@ -2017,7 +2025,7 @@
       ]
     },
     {
-      "name": "Negar por padrão (D113, D116, D120)",
+      "name": "Negar por padrão e papéis (D113, D120, D121, D122)",
       "item": [
         {
           "name": "GET /materias sem token (401)",
@@ -2037,9 +2045,6 @@
           "request": {
             "method": "GET",
             "header": [],
-            "auth": {
-              "type": "noauth"
-            },
             "url": {
               "raw": "{{baseUrl}}/api/v1/materias",
               "host": [
@@ -2050,11 +2055,14 @@
                 "v1",
                 "materias"
               ]
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
         {
-          "name": "GET /materias com token (200)",
+          "name": "GET /materias como STUDENT (200)",
           "event": [
             {
               "listen": "test",
@@ -2069,16 +2077,6 @@
           "request": {
             "method": "GET",
             "header": [],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/api/v1/materias",
               "host": [
@@ -2089,11 +2087,189 @@
                 "v1",
                 "materias"
               ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
         {
-          "name": "Rota inexistente sem token (401, D116)",
+          "name": "HEAD /materias como STUDENT (200, HEAD segue o GET)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "HEAD",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "HEAD /materias sem token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "HEAD",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "POST /materias como STUDENT (403 ACESSO_NEGADO, só ADMIN escreve)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Nao pode\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "DELETE de matéria inexistente como STUDENT (403, a autorização vem antes do 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rota inexistente sem token (401, D121)",
           "event": [
             {
               "listen": "test",
@@ -2110,9 +2286,6 @@
           "request": {
             "method": "GET",
             "header": [],
-            "auth": {
-              "type": "noauth"
-            },
             "url": {
               "raw": "{{baseUrl}}/api/v1/nao-existe",
               "host": [
@@ -2123,19 +2296,22 @@
                 "v1",
                 "nao-existe"
               ]
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
         {
-          "name": "Rota inexistente com token (404, D116)",
+          "name": "Rota inexistente com token (403, D121: o que não tem regra é negado)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
-                  "pm.test(\"codigo RECURSO_NAO_ENCONTRADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"RECURSO_NAO_ENCONTRADO\"); });",
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
                   "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
                 ]
               }
@@ -2144,6 +2320,104 @@
           "request": {
             "method": "GET",
             "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/nao-existe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "nao-existe"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE na coleção de matérias com token (403, método sem regra, D121)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /me com token (403, sem regra até a rota nascer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            },
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2154,15 +2428,55 @@
                 }
               ]
             },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Barra no fim sem regra, com token (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/nao-existe",
+              "raw": "{{baseUrl}}/api/v1/materias/",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "nao-existe"
+                "materias",
+                ""
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
               ]
             }
           }
@@ -2185,9 +2499,6 @@
           "request": {
             "method": "GET",
             "header": [],
-            "auth": {
-              "type": "noauth"
-            },
             "url": {
               "raw": "{{baseUrl}}/actuator/env",
               "host": [
@@ -2197,6 +2508,9 @@
                 "actuator",
                 "env"
               ]
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
@@ -2218,16 +2532,6 @@
           "request": {
             "method": "GET",
             "header": [],
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
             "url": {
               "raw": "{{baseUrl}}/actuator/env",
               "host": [
@@ -2236,6 +2540,16 @@
               "path": [
                 "actuator",
                 "env"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
               ]
             }
           }
@@ -2258,9 +2572,6 @@
           "request": {
             "method": "GET",
             "header": [],
-            "auth": {
-              "type": "noauth"
-            },
             "url": {
               "raw": "{{baseUrl}}/error",
               "host": [
@@ -2269,6 +2580,9 @@
               "path": [
                 "error"
               ]
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
@@ -2290,9 +2604,6 @@
           "request": {
             "method": "GET",
             "header": [],
-            "auth": {
-              "type": "noauth"
-            },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/signin",
               "host": [
@@ -2304,6 +2615,500 @@
                 "auth",
                 "signin"
               ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Firewall do Spring Security (D124)",
+      "item": [
+        {
+          "name": "Barra dupla (400 REQUISICAO_INVALIDA)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo REQUISICAO_INVALIDA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"REQUISICAO_INVALIDA\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1//materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "",
+                "materias"
+              ]
+            },
+            "description": "O Postman pode normalizar a barra dupla antes de enviar; se isso acontecer, use o curl.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": ";jsessionid na URL (400 REQUISICAO_INVALIDA)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo REQUISICAO_INVALIDA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"REQUISICAO_INVALIDA\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias;jsessionid=ABC",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias;jsessionid=ABC"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "%2e%2e na URL (400 REQUISICAO_INVALIDA)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo REQUISICAO_INVALIDA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"REQUISICAO_INVALIDA\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/%2e%2e/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "%2e%2e",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "CORS (rode a API com CORS_ALLOWED_ORIGINS=https://app.exemplo.invalid, D123)",
+      "item": [
+        {
+          "name": "Preflight de origem permitida (200, sem autenticação)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Access-Control-Allow-Origin é a origem pedida (nunca *)\", function () { pm.expect(pm.response.headers.get(\"Access-Control-Allow-Origin\")).to.eql(pm.collectionVariables.get(\"origemPermitida\")); });",
+                  "pm.test(\"sem credenciais\", function () { pm.expect(pm.response.headers.has(\"Access-Control-Allow-Credentials\")).to.be.false; });",
+                  "pm.test(\"métodos, cabeçalhos e Max-Age\", function () { pm.expect(pm.response.headers.get(\"Access-Control-Allow-Methods\")).to.include(\"PATCH\"); pm.expect(pm.response.headers.get(\"Access-Control-Allow-Headers\").toLowerCase()).to.include(\"authorization\"); pm.expect(pm.response.headers.get(\"Access-Control-Max-Age\")).to.eql(\"3600\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origemPermitida}}"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "authorization,content-type"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Preflight de origem NÃO permitida (403 ACESSO_NEGADO em ErrorResponse)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });",
+                  "pm.test(\"sem Access-Control-Allow-Origin\", function () { pm.expect(pm.response.headers.has(\"Access-Control-Allow-Origin\")).to.be.false; });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origemNaoPermitida}}"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "authorization"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Preflight com cabeçalho fora da lista (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origemPermitida}}"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "GET"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "x-estranho"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "GET real de origem permitida (200, com os cabeçalhos e o Location exposto)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Access-Control-Allow-Origin é a origem pedida (nunca *)\", function () { pm.expect(pm.response.headers.get(\"Access-Control-Allow-Origin\")).to.eql(pm.collectionVariables.get(\"origemPermitida\")); });",
+                  "pm.test(\"sem credenciais\", function () { pm.expect(pm.response.headers.has(\"Access-Control-Allow-Credentials\")).to.be.false; });",
+                  "pm.test(\"Location exposto\", function () { pm.expect(pm.response.headers.get(\"Access-Control-Expose-Headers\")).to.include(\"Location\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origemPermitida}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/termos/vigente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "termos",
+                "vigente"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "401 de origem permitida leva os cabeçalhos de CORS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });",
+                  "pm.test(\"Access-Control-Allow-Origin é a origem pedida (nunca *)\", function () { pm.expect(pm.response.headers.get(\"Access-Control-Allow-Origin\")).to.eql(pm.collectionVariables.get(\"origemPermitida\")); });",
+                  "pm.test(\"sem credenciais\", function () { pm.expect(pm.response.headers.has(\"Access-Control-Allow-Credentials\")).to.be.false; });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origemPermitida}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "403 (STUDENT escreve) de origem permitida leva os cabeçalhos de CORS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });",
+                  "pm.test(\"Access-Control-Allow-Origin é a origem pedida (nunca *)\", function () { pm.expect(pm.response.headers.get(\"Access-Control-Allow-Origin\")).to.eql(pm.collectionVariables.get(\"origemPermitida\")); });",
+                  "pm.test(\"sem credenciais\", function () { pm.expect(pm.response.headers.has(\"Access-Control-Allow-Credentials\")).to.be.false; });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origemPermitida}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"x\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET real de origem NÃO permitida (403 ACESSO_NEGADO, sem cabeçalhos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });",
+                  "pm.test(\"sem Access-Control-Allow-Origin\", function () { pm.expect(pm.response.headers.has(\"Access-Control-Allow-Origin\")).to.be.false; });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origemNaoPermitida}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/termos/vigente",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "termos",
+                "vigente"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "OPTIONS comum, sem cabeçalhos de preflight (401: não é preflight)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "OPTIONS",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         }

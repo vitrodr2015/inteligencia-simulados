@@ -17,7 +17,7 @@ import br.simulado.etec.shared.security.JwtTokenProvider.TipoToken;
 
 /**
  * Padrão (sem SWAGGER_ENABLED): a documentação não é aberta a ninguém. Com os filtros de segurança LIGADOS, o anônimo
- * cai no "negar por padrão" (401) e quem está autenticado recebe o 404 no formato padrão de erro: nenhum dos dois vê a
+ * cai no "negar por padrão" (401) e quem está autenticado recebe o 403 no formato padrão de erro (D121): nenhum dos dois vê a
  * documentação.
  */
 @SpringBootTest
@@ -51,11 +51,12 @@ class SwaggerDesligadoTest {
 	}
 
 	@Test
-	void deve_responder_404_a_quem_esta_autenticado_quando_o_swagger_esta_desligado() throws Exception {
-		mockMvc.perform(get("/v3/api-docs").header("Authorization", autorizacao())).andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.codigo").value("RECURSO_NAO_ENCONTRADO"));
+	void deve_responder_403_a_quem_esta_autenticado_quando_o_swagger_esta_desligado() throws Exception {
+		// Sem regra (D121): negado a quem está logado também.
+		mockMvc.perform(get("/v3/api-docs").header("Authorization", autorizacao())).andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.codigo").value("ACESSO_NEGADO"));
 		mockMvc.perform(get("/swagger-ui/index.html").header("Authorization", autorizacao()))
-				.andExpect(status().isNotFound());
+				.andExpect(status().isForbidden());
 	}
 
 }

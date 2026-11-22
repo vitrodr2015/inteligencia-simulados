@@ -30,22 +30,44 @@ Depois disso, só `docker start mysql-etec` / `docker stop mysql-etec`. Se o con
 
 **Atenção à precedência:** uma variável de ambiente do sistema tem precedência sobre o arquivo local. Se `DB_PASSWORD`, `JWT_SECRET` ou `DB_URL` já existirem no seu Windows (talvez de outro projeto), elas vencem o `application-local.yml` e a aplicação usará os valores do sistema, com erro de acesso ou de configuração. Não apague variáveis do sistema para resolver: confira com `echo $env:DB_PASSWORD` (sem divulgar o valor) e, se precisar, remova a variável só da sessão atual (`Remove-Item Env:DB_PASSWORD`) antes de subir a aplicação.
 
-## Autenticação (Módulo 10) e aviso de segurança
+## Autenticação e autorização (Módulos 10 e 11) e aviso de segurança
 
-> **Rode só em `localhost` até o Módulo 11.** A API já exige login (JWT), mas os papéis nas rotas ainda não existem: qualquer usuário autenticado pode **criar, alterar e apagar matérias e subtópicos**, e o cadastro (`POST /api/v1/auth/register`) é público, ou seja, qualquer pessoa que alcançar a API vira um usuário que escreve no catálogo. Não exponha esta versão na rede, em nuvem nem em nenhum ambiente compartilhado. O Módulo 11 (ADMIN escreve, STUDENT lê) vem logo depois.
+> **Rode só em `localhost` até o Módulo 13.** O Módulo 11 fechou a escrita do catálogo (só ADMIN escreve), mas ainda NÃO existem: o limite de tentativas (429) no signin e no cadastro, o refresh token guardado e invalidado (um refresh roubado vale 24 horas, mesmo depois de usado) e o logout. O cadastro (`POST /api/v1/auth/register`) continua público e sem freio. Não exponha esta versão na rede, em nuvem nem em nenhum ambiente compartilhado.
 >
-> Também ficam para o Módulo 13: o refresh token não é guardado nem invalidado (um refresh roubado vale 24 horas, mesmo depois de usado), não há logout e não há limite de tentativas (429) no signin nem no cadastro (força bruta e gasto de CPU do BCrypt sem freio).
+> **Ainda não existe ADMIN por API.** O bootstrap do admin é do Módulo 12. Até lá, quem precisa escrever no catálogo promove um usuário por SQL (passo abaixo); sem isso, ninguém consegue criar matéria nem subtópico pela API.
 
-| Rota | Acesso | O que faz |
-|---|---|---|
-| `GET /api/v1/termos/vigente` | pública | versão e endereço dos termos de uso |
-| `POST /api/v1/auth/register` | pública | cadastra um aluno (201, sem tokens) |
-| `POST /api/v1/auth/signin` | pública | devolve `accessToken` (15 min) e `refreshToken` (24 h), com `Cache-Control: no-store` |
-| `POST /api/v1/auth/refresh` | pública | troca o refresh por um par novo |
-| `GET /api/v1/me` | Bearer | o usuário logado |
-| todo o resto | Bearer | negar por padrão: sem token válido, 401 no formato `ErrorResponse` |
+| Rota | Quem pode |
+|---|---|
+| `POST /api/v1/auth/register`, `/signin`, `/refresh`; `GET` e `HEAD /api/v1/termos/vigente` | qualquer um |
+| `GET` e `HEAD /api/v1/me` | STUDENT e ADMIN |
+| `GET` e `HEAD` de `/api/v1/materias` e `/api/v1/subtopicos` (lista e por id) | STUDENT e ADMIN (o STUDENT só vê ativos) |
+| `POST`, `PUT`, `PATCH` (disable e enable) e `DELETE` de matérias e subtópicos | só ADMIN |
+| GUARDIAN | nenhuma permissão: 403 em tudo que exige papel, inclusive `/me` |
+| todo o resto, inclusive rota ou método que não existe | negado: 401 sem token e 403 com token (até para o ADMIN) |
 
-O token vai em `Authorization: Bearer <accessToken>`. O papel que vale é o do banco (o claim do token é só informativo), e excluir o usuário (`excluido_em`) derruba o token na requisição seguinte. Os testes usam um segredo de JWT aleatório a cada execução, e nenhum valor com cara de segredo fica no repositório. O relatório das chamadas reais está em `etec/docs/relatorio-chamadas-auth.md`.
+O token vai em `Authorization: Bearer <accessToken>`. O papel que vale é o do **banco** (o claim do token é só informativo): trocar o papel de alguém no banco vale na requisição seguinte, mesmo com o token antigo, e excluir o usuário (`excluido_em`) derruba o token. A autorização vem antes da existência: quem não pode recebe 403 até para um id que não existe. As regras ficam todas na `SecurityConfig`; cada recurso novo traz a sua regra e as suas linhas na `MatrizDeAutorizacao` (a varredura de rotas quebra o build se faltar).
+
+**Promover um usuário a ADMIN por SQL (provisório, até o Módulo 12).** Passo a passo no **PowerShell** do Windows, com o contêiner `mysql-etec` ligado (`docker start mysql-etec`). A senha do banco **não aparece e não é pedida**: ela já está dentro do contêiner, e o comando a lê de lá.
+
+1. Cadastre o usuário pela API: `POST /api/v1/auth/register` (pelo Postman, coleção de Autenticação, requisição "Cadastrar aluno", ou pelo Swagger). Anote o e-mail e a senha que você usou.
+2. Promova esse e-mail a ADMIN (troque `admin.teste@exemplo.invalid` pelo seu e-mail):
+
+```powershell
+"UPDATE usuario SET papel = 'ADMIN' WHERE email = 'admin.teste@exemplo.invalid'; SELECT ROW_COUNT() AS linhas_alteradas;" | docker exec -i mysql-etec sh -c 'mysql -uroot -p$MYSQL_ROOT_PASSWORD etec'
+```
+
+   Deve aparecer `linhas_alteradas` com **1**. Se aparecer **0**, o e-mail não existe: confira o cadastro (e-mail em minúsculas, sem acento). O aviso `Using a password on the command line interface can be insecure` é do próprio MySQL e é normal aqui (a senha não está na sua linha de comando).
+3. Confira quem é ADMIN:
+
+```powershell
+"SELECT email, papel FROM usuario;" | docker exec -i mysql-etec sh -c 'mysql -uroot -p$MYSQL_ROOT_PASSWORD etec'
+```
+
+4. Não precisa sair e entrar de novo: o papel é lido do banco a cada requisição. Para desfazer, repita o passo 2 com `papel = 'STUDENT'`.
+
+Cuidados: as aspas e os `$` acima já estão no formato certo para o PowerShell (aspas duplas por fora no SQL, aspas simples por fora no `sh -c`); copie e cole sem alterar. Nunca grave e-mail e senha de ADMIN em arquivo do repositório.
+
+**CORS.** A variável `CORS_ALLOWED_ORIGINS` (propriedade `app.cors.allowed-origins`) lista as origens de navegador permitidas, separadas por vírgula, no formato `http(s)://domínio[:porta]` (sem barra nem caminho). **Vazia (o padrão) = sem CORS.** A aplicação não sobe com `*` nem com origem fora do formato, e, com o perfil `prod`, só aceita `https`. Exemplo para um front local: `CORS_ALLOWED_ORIGINS=http://localhost:5173`. Origem, método ou cabeçalho não permitido recebe 403 `ACESSO_NEGADO`. Os relatórios das chamadas reais estão em `etec/docs/relatorio-chamadas-auth.md` e `etec/docs/relatorio-chamadas-autorizacao.md`.
 
 ## Como rodar os testes
 

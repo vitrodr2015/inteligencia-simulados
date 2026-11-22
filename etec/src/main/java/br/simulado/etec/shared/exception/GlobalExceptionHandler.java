@@ -88,6 +88,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return resposta(HttpStatus.UNAUTHORIZED, ex.getCodigo(), ex.getMessage(), null, null, null);
 	}
 
+	/** Autenticado sem permissão (403), por código que precisa do papel: defesa em profundidade além da cadeia. */
+	@ExceptionHandler(AcessoNegadoException.class)
+	ResponseEntity<Object> aoNegarAcesso(AcessoNegadoException ex) {
+		return resposta(HttpStatus.FORBIDDEN, ex.getCodigo(), ex.getMessage(), null, null, null);
+	}
+
 	// ----- Validação -----
 
 	/**

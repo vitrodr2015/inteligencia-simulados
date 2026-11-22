@@ -259,9 +259,10 @@ class SubtopicoIntegracaoTest extends AbstractSubtopicoIntegrationTest {
 	// ----- rotas e métodos -----
 
 	@Test
-	void deve_devolver_405_em_json_para_metodo_nao_permitido_na_colecao() {
-		verificarErro(requisicao().delete(BASE_SUBTOPICOS), 405, "Method Not Allowed", "METODO_NAO_PERMITIDO");
-		verificarErro(requisicao().patch(BASE_SUBTOPICOS), 405, "Method Not Allowed", "METODO_NAO_PERMITIDO");
+	void deve_devolver_403_em_json_para_metodo_sem_regra_na_colecao() {
+		// D121: DELETE e PATCH na coleção não têm regra: negados, e não 405.
+		verificarErro(requisicao().delete(BASE_SUBTOPICOS), 403, "Forbidden", "ACESSO_NEGADO");
+		verificarErro(requisicao().patch(BASE_SUBTOPICOS), 403, "Forbidden", "ACESSO_NEGADO");
 	}
 
 }

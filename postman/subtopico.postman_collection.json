@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Subtópico — /api/v1/subtopicos",
-    "description": "Todas as rotas do Subtópico (e o DELETE de matéria com subtópicos). Rode na ordem, com o banco sem matérias de mesmo nome. Gerada a partir de chamadas reais; sem segredos. Exige autenticação: um script da coleção cria um usuário descartável e entra sozinho (o usuário fica no banco local, com e-mail @exemplo.invalid). Até o Módulo 11 qualquer usuário autenticado acessa estas rotas.",
+    "description": "Todas as rotas do Subtópico (e o DELETE de matéria com subtópicos). Rode na ordem, com o banco sem matérias de mesmo nome. Gerada a partir de chamadas reais; sem segredos. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -58,11 +58,51 @@
       "value": ""
     },
     {
-      "key": "accessToken",
+      "key": "adminEmail",
       "value": ""
     },
     {
-      "key": "accessTokenExpira",
+      "key": "adminSenha",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "adminTokenExpira",
+      "value": ""
+    },
+    {
+      "key": "studentToken",
+      "value": ""
+    },
+    {
+      "key": "studentTokenExpira",
+      "value": ""
+    },
+    {
+      "key": "visSufixo",
+      "value": ""
+    },
+    {
+      "key": "visMateriaAId",
+      "value": ""
+    },
+    {
+      "key": "visMateriaBId",
+      "value": ""
+    },
+    {
+      "key": "visSubAId",
+      "value": ""
+    },
+    {
+      "key": "visSubBId",
+      "value": ""
+    },
+    {
+      "key": "visSubCId",
       "value": ""
     }
   ],
@@ -1713,15 +1753,15 @@
           }
         },
         {
-          "name": "Método não permitido na coleção (DELETE em /subtopicos)",
+          "name": "Método sem regra na coleção (403, D121) (DELETE em /subtopicos)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status 405\", function () { pm.response.to.have.status(405); });",
-                  "pm.test(\"codigo METODO_NAO_PERMITIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"METODO_NAO_PERMITIDO\"); });"
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
                 ]
               }
             }
@@ -3781,6 +3821,1023 @@
           }
         }
       ]
+    },
+    {
+      "name": "Como STUDENT (visibilidade D28 e D103; escrita 403, D122)",
+      "item": [
+        {
+          "name": "Preparo (ADMIN): matéria A, ativa",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"visSufixo\", Date.now().toString(36));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"visMateriaAId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Vis A {{visSufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Preparo (ADMIN): subtópico ativo em A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"visSubAId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"{{visMateriaAId}}\",\"nome\":\"Vis sub ativo {{visSufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Preparo (ADMIN): subtópico que ficará inativo, em A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"visSubBId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"{{visMateriaAId}}\",\"nome\":\"Vis sub inativo {{visSufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Preparo (ADMIN): desativa o subtópico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubBId}}/disable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubBId}}",
+                "disable"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Preparo (ADMIN): matéria B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"visMateriaBId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Vis B {{visSufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Preparo (ADMIN): subtópico ativo em B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"visSubCId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"{{visMateriaBId}}\",\"nome\":\"Vis sub de B {{visSufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Preparo (ADMIN): desativa a matéria B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visMateriaBId}}/disable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visMateriaBId}}",
+                "disable"
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT lista: só subtópico ativo de matéria ativa (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"só o ativo de matéria ativa\", function () { const j = pm.response.json(); const meus = j.conteudo.filter((s) => s.nome.endsWith(pm.collectionVariables.get(\"visSufixo\"))); pm.expect(meus.length).to.eql(1); pm.expect(meus[0].id).to.eql(pm.collectionVariables.get(\"visSubAId\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos?nome=Vis%20sub",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos?nome=Vis%20sub"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ADMIN lista: os três (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"os três aparecem\", function () { const j = pm.response.json(); pm.expect(j.conteudo.filter((s) => s.nome.endsWith(pm.collectionVariables.get(\"visSufixo\"))).length).to.eql(3); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos?nome=Vis%20sub",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos?nome=Vis%20sub"
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT envia ativo=false (400 PARAMETRO_INVALIDO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos?ativo=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos?ativo=false"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT filtra por matéria inativa (200, lista vazia, D103)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"vazia\", function () { pm.expect(pm.response.json().totalElementos).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos?materiaId={{visMateriaBId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos?materiaId={{visMateriaBId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ADMIN filtra por matéria inativa (200, 1 item)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"1 item\", function () { pm.expect(pm.response.json().totalElementos).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos?materiaId={{visMateriaBId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos?materiaId={{visMateriaBId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT busca o subtópico ativo (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubAId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubAId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT busca o subtópico inativo (404 SUBTOPICO_NAO_ENCONTRADO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo SUBTOPICO_NAO_ENCONTRADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"SUBTOPICO_NAO_ENCONTRADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubBId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubBId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT busca o subtópico de matéria inativa (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo SUBTOPICO_NAO_ENCONTRADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"SUBTOPICO_NAO_ENCONTRADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubCId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubCId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "ADMIN busca o subtópico de matéria inativa (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubCId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubCId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "HEAD do subtópico inativo como STUDENT (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "HEAD",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubBId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubBId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta criar (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"00000000-0000-4000-8000-000000000000\",\"nome\":\"Nao pode\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta alterar (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubAId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubAId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Nao pode\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta ativar (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubBId}}/enable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubBId}}",
+                "enable"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "STUDENT tenta apagar (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });",
+                  "pm.test(\"Content-Type application/json\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.eql(\"application/json\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubAId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubAId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Limpeza (ADMIN): apaga os três subtópicos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubAId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubAId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Limpeza (ADMIN): apaga o subtópico inativo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubBId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubBId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Limpeza (ADMIN): apaga o subtópico da matéria inativa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{visSubCId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{visSubCId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Limpeza (ADMIN): apaga a matéria A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visMateriaAId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visMateriaAId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Limpeza (ADMIN): apaga a matéria B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias/{{visMateriaBId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias",
+                "{{visMateriaBId}}"
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "auth": {
@@ -3788,7 +4845,7 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{accessToken}}",
+        "value": "{{adminToken}}",
         "type": "string"
       }
     ]
@@ -3799,23 +4856,32 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// A API exige autenticação (Módulo 10). Sem token, cadastra um usuário descartável e entra; renova perto de vencer.",
-          "const expira = Number(pm.collectionVariables.get(\"accessTokenExpira\") || 0);",
-          "if (!pm.collectionVariables.get(\"accessToken\") || Date.now() > expira - 60000) {",
-          "  const base = pm.collectionVariables.get(\"baseUrl\");",
+          "// Duas identidades (Módulo 11): ADMIN escreve e STUDENT lê. O ADMIN NÃO se cadastra pela API (não existe criação de ADMIN",
+          "// por API até o Módulo 12): você promove um usuário por SQL e informa adminEmail e adminSenha (postman/README.md).",
+          "const base = pm.collectionVariables.get(\"baseUrl\");",
+          "const cab = { \"Content-Type\": \"application/json\" };",
+          "const corpo = (c) => ({ mode: \"raw\", raw: JSON.stringify(c) });",
+          "const precisa = (nome) => !pm.collectionVariables.get(nome) || Date.now() > Number(pm.collectionVariables.get(nome + \"Expira\") || 0) - 60000;",
+          "const guardar = (nome, j) => { pm.collectionVariables.set(nome, j.accessToken); pm.collectionVariables.set(nome + \"Expira\", String(Date.now() + j.expiresIn * 1000)); };",
+          "if (precisa(\"adminToken\")) {",
+          "  const email = pm.collectionVariables.get(\"adminEmail\");",
+          "  const senha = pm.collectionVariables.get(\"adminSenha\");",
+          "  if (!email || !senha) {",
+          "    throw new Error(\"Defina as variáveis adminEmail e adminSenha desta coleção (passo da promoção por SQL no postman/README.md).\");",
+          "  }",
+          "  pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e, r) {",
+          "    guardar(\"adminToken\", r.json());",
+          "  });",
+          "}",
+          "if (precisa(\"studentToken\")) {",
           "  const s = Date.now().toString(36);",
           "  const email = \"postman.\" + s + \"@exemplo.invalid\";",
           "  const senha = \"Pm-\" + s + \"-Aa1!x\";",
-          "  const json = (corpo) => ({ mode: \"raw\", raw: JSON.stringify(corpo) });",
-          "  const cab = { \"Content-Type\": \"application/json\" };",
           "  pm.sendRequest({ url: base + \"/api/v1/termos/vigente\", method: \"GET\" }, function (e1, r1) {",
-          "    const versao = r1.json().versao;",
           "    pm.sendRequest({ url: base + \"/api/v1/auth/register\", method: \"POST\", header: cab,",
-          "      body: json({ nome: \"Postman\", email: email, senha: senha, dataNascimento: \"2000-01-01\", aceiteTermosVersao: versao }) }, function (e2) {",
-          "      pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: json({ email: email, senha: senha }) }, function (e3, r3) {",
-          "        const j = r3.json();",
-          "        pm.collectionVariables.set(\"accessToken\", j.accessToken);",
-          "        pm.collectionVariables.set(\"accessTokenExpira\", String(Date.now() + j.expiresIn * 1000));",
+          "      body: corpo({ nome: \"Postman\", email: email, senha: senha, dataNascimento: \"2000-01-01\", aceiteTermosVersao: r1.json().versao }) }, function (e2) {",
+          "      pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e3, r3) {",
+          "        guardar(\"studentToken\", r3.json());",
           "      });",
           "    });",
           "  });",

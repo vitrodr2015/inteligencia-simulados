@@ -35,5 +35,7 @@ public enum CodigoErro {
 	CREDENCIAIS_INVALIDAS,
 	TOKEN_INVALIDO,
 	ACESSO_NEGADO,
-	EMAIL_DUPLICADO
+	EMAIL_DUPLICADO,
+	// Firewall do Spring Security: URL malformada ou perigosa (D124)
+	REQUISICAO_INVALIDA
 }

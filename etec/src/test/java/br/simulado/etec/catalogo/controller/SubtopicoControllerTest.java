@@ -1,5 +1,7 @@
 package br.simulado.etec.catalogo.controller;
 
+import br.simulado.etec.shared.security.ComPrincipal;
+import br.simulado.etec.usuarios.model.Papel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -38,6 +40,7 @@ import br.simulado.etec.shared.exception.CodigoErro;
 // SEM filtros de segurança (addFilters = false): este teste cobre o CONTRATO da rota e NÃO testa segurança.
 // O 401 e o 403 da cadeia são provados nos testes de integração, com os filtros ligados.
 @AutoConfigureMockMvc(addFilters = false)
+@ComPrincipal(Papel.ADMIN)
 class SubtopicoControllerTest {
 
 	private static final String BASE = "/api/v1/subtopicos";

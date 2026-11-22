@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import br.simulado.etec.catalogo.dto.MateriaRequest;
 import br.simulado.etec.catalogo.dto.MateriaResponse;
 import br.simulado.etec.shared.exception.ErrorResponse;
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.shared.paginacao.PaginaResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,7 +35,7 @@ public interface MateriaControllerDocs {
 	ResponseEntity<MateriaResponse> criar(MateriaRequest dados);
 
 	@Operation(summary = "Lista as matérias",
-			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia.")
+			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia. O STUDENT só vê matérias ativas e recebe 400 (PARAMETRO_INVALIDO) se enviar ativo=false; o ADMIN vê todas.")
 	@Parameter(name = "sort", in = ParameterIn.QUERY, description = "Ordenação no formato campo,direção (asc ou desc). Campos aceitos: nome e criadoEm (o nome do campo diferencia maiúsculas). Padrão: nome,asc. Um único sort por pedido: mais de um dá 400, e qualquer outro valor também.")
 	@ApiResponse(responseCode = "200", description = "Página de matérias.")
 	@ApiResponse(responseCode = "400", description = "Parâmetro inválido: page, size, sort ou ativo.",
@@ -44,16 +45,17 @@ public interface MateriaControllerDocs {
 			@Parameter(description = "Filtro por estado: true ou false. Ausente devolve todas.") String ativo,
 			@Parameter(description = "Número da página, a partir de 0. Padrão 0. Negativo ou não numérico dá 400.") String page,
 			@Parameter(description = "Itens por página. Padrão 20, máximo 50 (valor maior é reduzido a 50). Zero, negativo ou não numérico dá 400.") String size,
-			@Parameter(hidden = true) HttpServletRequest requisicao);
+			@Parameter(hidden = true) HttpServletRequest requisicao, @Parameter(hidden = true) EscopoDeLeitura escopo);
 
-	@Operation(summary = "Busca uma matéria pelo id")
+	@Operation(summary = "Busca uma matéria pelo id", description = "Para o STUDENT, matéria inativa dá o mesmo 404 da inexistente.")
 	@ApiResponse(responseCode = "200", description = "Matéria encontrada.",
 			content = @Content(schema = @Schema(implementation = MateriaResponse.class)))
 	@ApiResponse(responseCode = "400", description = "Id malformado.",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	@ApiResponse(responseCode = "404", description = "Matéria não encontrada (MATERIA_NAO_ENCONTRADA).",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-	ResponseEntity<MateriaResponse> buscar(@Parameter(description = "Id público da matéria (UUID).") UUID id);
+	ResponseEntity<MateriaResponse> buscar(@Parameter(description = "Id público da matéria (UUID).") UUID id,
+			@Parameter(hidden = true) EscopoDeLeitura escopo);
 
 	@Operation(summary = "Troca nome e descrição", description = "Nunca altera o estado ativo.")
 	@ApiResponse(responseCode = "200", description = "Matéria atualizada.",

@@ -8,6 +8,7 @@ import br.simulado.etec.catalogo.dto.SubtopicoAtualizacaoRequest;
 import br.simulado.etec.catalogo.dto.SubtopicoCriacaoRequest;
 import br.simulado.etec.catalogo.dto.SubtopicoResponse;
 import br.simulado.etec.shared.exception.ErrorResponse;
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.shared.paginacao.PaginaResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,7 +39,7 @@ public interface SubtopicoControllerDocs {
 	ResponseEntity<SubtopicoResponse> criar(SubtopicoCriacaoRequest dados);
 
 	@Operation(summary = "Lista os subtópicos",
-			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia.")
+			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia. O STUDENT só vê subtópicos ativos de matéria ativa e recebe 400 (PARAMETRO_INVALIDO) se enviar ativo=false; o ADMIN vê todos.")
 	@Parameter(name = "sort", in = ParameterIn.QUERY, description = "Ordenação no formato campo,direção (asc ou desc). Campos aceitos: nome e criadoEm (o nome do campo diferencia maiúsculas). Padrão: nome,asc. Um único sort por pedido: mais de um dá 400, e qualquer outro valor também.")
 	@ApiResponse(responseCode = "200", description = "Página de subtópicos.")
 	@ApiResponse(responseCode = "400", description = "Parâmetro inválido: materiaId, ativo, page, size ou sort.",
@@ -49,16 +50,17 @@ public interface SubtopicoControllerDocs {
 			@Parameter(description = "Filtro por estado: true ou false, em qualquer caixa. Ausente devolve todos.") String ativo,
 			@Parameter(description = "Número da página, a partir de 0. Padrão 0. Negativo ou não numérico dá 400.") String page,
 			@Parameter(description = "Itens por página. Padrão 20, máximo 50 (valor maior é reduzido a 50). Zero, negativo ou não numérico dá 400.") String size,
-			@Parameter(hidden = true) HttpServletRequest requisicao);
+			@Parameter(hidden = true) HttpServletRequest requisicao, @Parameter(hidden = true) EscopoDeLeitura escopo);
 
-	@Operation(summary = "Busca um subtópico pelo id")
+	@Operation(summary = "Busca um subtópico pelo id", description = "Para o STUDENT, subtópico inativo ou de matéria inativa dá o mesmo 404 do inexistente.")
 	@ApiResponse(responseCode = "200", description = "Subtópico encontrado.",
 			content = @Content(schema = @Schema(implementation = SubtopicoResponse.class)))
 	@ApiResponse(responseCode = "400", description = "Id malformado.",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	@ApiResponse(responseCode = "404", description = "Subtópico não encontrado (SUBTOPICO_NAO_ENCONTRADO).",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-	ResponseEntity<SubtopicoResponse> buscar(@Parameter(description = "Id público do subtópico (UUID).") UUID id);
+	ResponseEntity<SubtopicoResponse> buscar(@Parameter(description = "Id público do subtópico (UUID).") UUID id,
+			@Parameter(hidden = true) EscopoDeLeitura escopo);
 
 	@Operation(summary = "Troca o nome do subtópico",
 			description = "Substituição total. Permitido com a matéria desativada. A matéria não muda: materiaId é opcional e, se vier, "

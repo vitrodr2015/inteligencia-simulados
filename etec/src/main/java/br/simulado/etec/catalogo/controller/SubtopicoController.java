@@ -27,6 +27,7 @@ import br.simulado.etec.catalogo.service.SubtopicoService;
 import br.simulado.etec.shared.paginacao.ConversorDePaginacao;
 import br.simulado.etec.shared.paginacao.Filtros;
 import br.simulado.etec.shared.paginacao.PaginaResponse;
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
@@ -54,20 +55,20 @@ public class SubtopicoController implements SubtopicoControllerDocs {
 	public ResponseEntity<PaginaResponse<SubtopicoResponse>> listar(@RequestParam(required = false) UUID materiaId,
 			@RequestParam(required = false) String nome, @RequestParam(required = false) String ativo,
 			@RequestParam(required = false) String page, @RequestParam(required = false) String size,
-			HttpServletRequest requisicao) {
+			HttpServletRequest requisicao, EscopoDeLeitura escopo) {
 		// page, size e ativo chegam como texto de propósito: a validação é nossa e devolve 400. O materiaId malformado
 		// vira 400 PARAMETRO_INVALIDO pela conversão do Spring. O sort vem CRU: parâmetro repetido = 400 (D101).
 		Pageable paginacao = ConversorDePaginacao.converterRequisicao(page, size, requisicao.getParameterValues("sort"),
 				SubtopicoService.CAMPOS_ORDENAVEIS);
 		Boolean filtroAtivo = Filtros.booleano("ativo", ativo);
-		Page<Subtopico> pagina = servico.listar(materiaId, nome, filtroAtivo, paginacao);
+		Page<Subtopico> pagina = servico.listar(escopo, materiaId, nome, filtroAtivo, paginacao);
 		return ResponseEntity.ok(PaginaResponse.de(pagina, SubtopicoMapper::paraResponse));
 	}
 
 	@Override
 	@GetMapping("/{id}")
-	public ResponseEntity<SubtopicoResponse> buscar(@PathVariable UUID id) {
-		return ResponseEntity.ok(SubtopicoMapper.paraResponse(servico.buscar(id)));
+	public ResponseEntity<SubtopicoResponse> buscar(@PathVariable UUID id, EscopoDeLeitura escopo) {
+		return ResponseEntity.ok(SubtopicoMapper.paraResponse(servico.buscar(id, escopo)));
 	}
 
 	@Override

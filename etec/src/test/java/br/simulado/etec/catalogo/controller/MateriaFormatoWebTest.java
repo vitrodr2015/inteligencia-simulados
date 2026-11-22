@@ -1,7 +1,10 @@
 package br.simulado.etec.catalogo.controller;
 
+import br.simulado.etec.shared.security.ComPrincipal;
+import br.simulado.etec.usuarios.model.Papel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -54,6 +57,7 @@ import br.simulado.etec.shared.exception.ConflictException;
 @AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(controllers = { MateriaController.class, MateriaFormatoWebTest.ControllerSemProduces.class })
 @Import({ JacksonConfig.class, SomenteJsonConfig.class, MateriaFormatoWebTest.ControllerSemProduces.class })
+@ComPrincipal(Papel.ADMIN)
 class MateriaFormatoWebTest {
 
 	private static final String ID = "11111111-1111-1111-1111-111111111111";
@@ -133,7 +137,7 @@ class MateriaFormatoWebTest {
 
 	@Test
 	void deve_devolver_o_texto_exato_da_materia_quando_a_descricao_esta_preenchida() throws Exception {
-		when(servico.buscar(UUID.fromString(ID))).thenReturn(materia(ID, "Matemática", "Álgebra e geometria", true));
+		when(servico.buscar(eq(UUID.fromString(ID)), any())).thenReturn(materia(ID, "Matemática", "Álgebra e geometria", true));
 
 		ResultActions resposta = mockMvc.perform(get("/api/v1/materias/" + ID));
 
@@ -143,7 +147,7 @@ class MateriaFormatoWebTest {
 
 	@Test
 	void deve_devolver_descricao_null_no_texto_exato_quando_a_descricao_e_nula() throws Exception {
-		when(servico.buscar(UUID.fromString(OUTRO_ID))).thenReturn(materia(OUTRO_ID, "História", null, false));
+		when(servico.buscar(eq(UUID.fromString(OUTRO_ID)), any())).thenReturn(materia(OUTRO_ID, "História", null, false));
 
 		ResultActions resposta = mockMvc.perform(get("/api/v1/materias/" + OUTRO_ID));
 
@@ -154,7 +158,7 @@ class MateriaFormatoWebTest {
 
 	@Test
 	void deve_devolver_o_content_type_exatamente_application_json_e_o_json_compacto() throws Exception {
-		when(servico.buscar(UUID.fromString(ID))).thenReturn(materia(ID, "Matemática", "Álgebra e geometria", true));
+		when(servico.buscar(eq(UUID.fromString(ID)), any())).thenReturn(materia(ID, "Matemática", "Álgebra e geometria", true));
 
 		ResultActions resposta = mockMvc.perform(get("/api/v1/materias/" + ID));
 
@@ -169,7 +173,7 @@ class MateriaFormatoWebTest {
 	void deve_devolver_o_texto_exato_do_envelope_quando_lista_as_materias() throws Exception {
 		List<Materia> itens = List.of(materia(ID, "Matemática", "Álgebra e geometria", true),
 				materia(OUTRO_ID, "História", null, false));
-		when(servico.listar(any(), any(), any())).thenReturn(new PageImpl<>(itens, PageRequest.of(0, 20), 2));
+		when(servico.listar(any(), any(), any(), any())).thenReturn(new PageImpl<>(itens, PageRequest.of(0, 20), 2));
 
 		ResultActions resposta = mockMvc.perform(get("/api/v1/materias"));
 
@@ -180,7 +184,7 @@ class MateriaFormatoWebTest {
 
 	@Test
 	void deve_devolver_o_texto_exato_do_envelope_vazio_quando_a_pagina_esta_alem_do_fim() throws Exception {
-		when(servico.listar(any(), any(), any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(99, 10), 5));
+		when(servico.listar(any(), any(), any(), any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(99, 10), 5));
 
 		ResultActions resposta = mockMvc.perform(get("/api/v1/materias").param("page", "99").param("size", "10"));
 
@@ -221,7 +225,7 @@ class MateriaFormatoWebTest {
 
 	@Test
 	void deve_omitir_campos_e_detalhes_no_texto_exato_quando_eles_sao_nulos() throws Exception {
-		when(servico.buscar(any())).thenThrow(new br.simulado.etec.shared.exception.ResourceNotFoundException(
+		when(servico.buscar(any(), any())).thenThrow(new br.simulado.etec.shared.exception.ResourceNotFoundException(
 				CodigoErro.MATERIA_NAO_ENCONTRADA, "Matéria não encontrada."));
 
 		ResultActions resposta = mockMvc.perform(get("/api/v1/materias/" + ID));
