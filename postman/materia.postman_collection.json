@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Matéria — /api/v1/materias",
-    "description": "Todas as rotas da Matéria. Rode na ordem. Gerada a partir de chamadas reais.",
+    "description": "Todas as rotas da Matéria. Rode na ordem. Gerada a partir de chamadas reais. Exige autenticação: um script da coleção cria um usuário descartável e entra sozinho (o usuário fica no banco local, com e-mail @exemplo.invalid). Até o Módulo 11 qualquer usuário autenticado acessa estas rotas.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -47,6 +47,14 @@
     },
     {
       "key": "materiaIdH",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "accessTokenExpira",
       "value": ""
     }
   ],
@@ -2790,6 +2798,47 @@
           }
         }
       ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// A API exige autenticação (Módulo 10). Sem token, cadastra um usuário descartável e entra; renova perto de vencer.",
+          "const expira = Number(pm.collectionVariables.get(\"accessTokenExpira\") || 0);",
+          "if (!pm.collectionVariables.get(\"accessToken\") || Date.now() > expira - 60000) {",
+          "  const base = pm.collectionVariables.get(\"baseUrl\");",
+          "  const s = Date.now().toString(36);",
+          "  const email = \"postman.\" + s + \"@exemplo.invalid\";",
+          "  const senha = \"Pm-\" + s + \"-Aa1!x\";",
+          "  const json = (corpo) => ({ mode: \"raw\", raw: JSON.stringify(corpo) });",
+          "  const cab = { \"Content-Type\": \"application/json\" };",
+          "  pm.sendRequest({ url: base + \"/api/v1/termos/vigente\", method: \"GET\" }, function (e1, r1) {",
+          "    const versao = r1.json().versao;",
+          "    pm.sendRequest({ url: base + \"/api/v1/auth/register\", method: \"POST\", header: cab,",
+          "      body: json({ nome: \"Postman\", email: email, senha: senha, dataNascimento: \"2000-01-01\", aceiteTermosVersao: versao }) }, function (e2) {",
+          "      pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: json({ email: email, senha: senha }) }, function (e3, r3) {",
+          "        const j = r3.json();",
+          "        pm.collectionVariables.set(\"accessToken\", j.accessToken);",
+          "        pm.collectionVariables.set(\"accessTokenExpira\", String(Date.now() + j.expiresIn * 1000));",
+          "      });",
+          "    });",
+          "  });",
+          "}"
+        ]
+      }
     }
   ]
 }

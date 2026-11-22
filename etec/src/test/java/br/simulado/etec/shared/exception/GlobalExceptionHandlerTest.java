@@ -19,6 +19,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -36,17 +37,23 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.simulado.etec.shared.validacao.TamanhoEmPontosDeCodigo;
+
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
  * Prova que todo erro sai no mesmo formato. O controller é falso e vive dentro deste teste; o
  * Clock é fixo, com milissegundos zero, para provar que o dataHora vem dele e mantém as três casas.
  */
+// SEM filtros de segurança (addFilters = false): este teste cobre o CONTRATO da rota e NÃO testa segurança.
+// O 401 e o 403 da cadeia são provados nos testes de integração, com os filtros ligados.
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(controllers = { GlobalExceptionHandlerTest.ControllerFalso.class,
 		GlobalExceptionHandlerTest.ControllerFalsoValidado.class })
 @Import({ GlobalExceptionHandlerTest.ControllerFalso.class, GlobalExceptionHandlerTest.ControllerFalsoValidado.class })
@@ -120,6 +127,27 @@ class GlobalExceptionHandlerTest {
 		@GetMapping("/propriedade-inexistente")
 		public String propriedadeInexistente() {
 			throw new PropertyReferenceException("campoSecretoInexistente", TypeInformation.of(String.class), List.of());
+		}
+
+		public record EntradaD59(
+				@NotNull(message = "O código é obrigatório.")
+				@TamanhoEmPontosDeCodigo(min = 3, max = 5, message = "O código deve ter de 3 a 5 caracteres.")
+				@Pattern(regexp = "[a-z]+", message = "O código deve ter só letras minúsculas.")
+				String codigo) {
+		}
+
+		@PostMapping(path = "/corpo-d59", consumes = MediaType.APPLICATION_JSON_VALUE)
+		public void receberD59(@Valid @RequestBody EntradaD59 entrada) {
+		}
+
+		@GetMapping("/credenciais-invalidas")
+		public String credenciaisInvalidas() {
+			throw new CredenciaisInvalidasException();
+		}
+
+		@GetMapping("/token-invalido")
+		public String tokenInvalido() {
+			throw new InvalidTokenException(new IllegalStateException(TEXTO_SENSIVEL));
 		}
 
 		@GetMapping(path = "/so-json", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -345,6 +373,74 @@ class GlobalExceptionHandlerTest {
 	void deve_usar_o_clock_para_o_data_hora_quando_monta_o_erro() throws Exception {
 		mockMvc.perform(get("/api/v1/teste/nao-encontrado"))
 				.andExpect(jsonPath("$.dataHora").value("2026-11-20T15:04:05.000Z"));
+	}
+
+	// ----- D59: no máximo uma mensagem por campo, por prioridade fixa -----
+
+	private ResultActions enviarD59(String corpo) throws Exception {
+		return mockMvc.perform(post("/api/v1/teste/corpo-d59").contentType(MediaType.APPLICATION_JSON).content(corpo));
+	}
+
+	@Test
+	void deve_devolver_so_a_mensagem_de_obrigatorio_quando_o_campo_falta() throws Exception {
+		verificarFormato(enviarD59("{}"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+				.andExpect(jsonPath("$.campos.length()").value(1))
+				.andExpect(jsonPath("$.campos[0].campo").value("codigo"))
+				.andExpect(jsonPath("$.campos[0].mensagem").value("O código é obrigatório."));
+	}
+
+	@Test
+	void deve_preferir_a_mensagem_de_tamanho_a_de_formato_quando_o_campo_viola_as_duas() throws Exception {
+		// "AB": curto demais E com maiúsculas.
+		verificarFormato(enviarD59("{\"codigo\":\"AB\"}"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+				.andExpect(jsonPath("$.campos.length()").value(1))
+				.andExpect(jsonPath("$.campos[0].mensagem").value("O código deve ter de 3 a 5 caracteres."));
+		// "ABCDEFG": longo demais E com maiúsculas.
+		verificarFormato(enviarD59("{\"codigo\":\"ABCDEFG\"}"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+				.andExpect(jsonPath("$.campos.length()").value(1))
+				.andExpect(jsonPath("$.campos[0].mensagem").value("O código deve ter de 3 a 5 caracteres."));
+	}
+
+	@Test
+	void deve_devolver_a_mensagem_de_formato_quando_so_o_formato_falha() throws Exception {
+		verificarFormato(enviarD59("{\"codigo\":\"ABC\"}"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+				.andExpect(jsonPath("$.campos.length()").value(1))
+				.andExpect(jsonPath("$.campos[0].mensagem").value("O código deve ter só letras minúsculas."));
+	}
+
+	@Test
+	void deve_escolher_sempre_a_mesma_mensagem_em_varias_execucoes() throws Exception {
+		for (int i = 0; i < 25; i++) {
+			enviarD59("{\"codigo\":\"A\"}").andExpect(jsonPath("$.campos.length()").value(1))
+					.andExpect(jsonPath("$.campos[0].mensagem").value("O código deve ter de 3 a 5 caracteres."));
+		}
+	}
+
+	@Test
+	void deve_ordenar_a_prioridade_obrigatorio_tamanho_formato() {
+		assertThat(GlobalExceptionHandler.prioridade("NotNull")).isLessThan(GlobalExceptionHandler.prioridade("Size"));
+		assertThat(GlobalExceptionHandler.prioridade("TamanhoEmBytes"))
+				.isLessThan(GlobalExceptionHandler.prioridade("Pattern"));
+		assertThat(GlobalExceptionHandler.prioridade("EmailAscii")).isEqualTo(GlobalExceptionHandler.prioridade("Pattern"));
+	}
+
+	// ----- 401 do signin e do refresh -----
+
+	@Test
+	void deve_devolver_401_credenciais_invalidas_com_mensagem_fixa() throws Exception {
+		verificarFormato(mockMvc.perform(get("/api/v1/teste/credenciais-invalidas")), 401, "Unauthorized",
+				CodigoErro.CREDENCIAIS_INVALIDAS).andExpect(jsonPath("$.mensagem").value("E-mail ou senha inválidos."))
+				.andExpect(jsonPath("$.campos").doesNotExist());
+	}
+
+	@Test
+	void deve_devolver_401_token_invalido_sem_vazar_a_causa() throws Exception {
+		ResultActions resposta = mockMvc.perform(get("/api/v1/teste/token-invalido"));
+
+		verificarFormato(resposta, 401, "Unauthorized", CodigoErro.TOKEN_INVALIDO)
+				.andExpect(jsonPath("$.mensagem").value("Token inválido ou expirado."));
+		assertThat(resposta.andReturn().getResponse().getContentAsString()).doesNotContain("SELECT")
+				.doesNotContain("senha_hash").doesNotContain("IllegalState");
 	}
 
 }

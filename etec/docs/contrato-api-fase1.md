@@ -2,7 +2,7 @@ Contrato da API — Fase 1 (v1.0, aprovada)
 
 O contrato é revisado e aprovado antes de qualquer código. Ele é rascunho até a aprovação; a v1.0 é a versão aprovada (D83), e depois dela qualquer mudança é registrada na seção 10. Este é o documento completo da API da fase 1 e não depende de outros.
 
-Estado: versão aprovada (v1.0). Decisões D1 a D117 decididas, exceto D22 e D24 (pendências externas).
+Estado: versão aprovada (v1.0). Decisões D1 a D120 decididas, exceto D22 e D24 (pendências externas).
 
 1. Convenções gerais (valem para todas as rotas)
 Tema	Decisão
@@ -85,7 +85,7 @@ DELETE	/me	204 (exclusão de conta com anonimização, ver D9 e a subseção 3.2
 Não existem na fase 1: recuperação de senha, login com Google, criação de ADMIN por API (o primeiro admin nasce por bootstrap controlado, ver 3.2), vínculo com responsável, envio de e-mail.
 
 3.1 JWT (D39)
-Assinatura HS256. Access token de 15 minutos, com os claims sub (UUID do usuário), papel, tipo=access, jti e exp. Refresh token de 24 horas, tipo=refresh, com o jti guardado no banco; o tempo de vida é propriedade configurável. expiresIn em segundos (900). Cada /auth/refresh invalida o refresh usado. O reuso de um refresh já invalidado revoga todos os refresh do usuário; não existe conceito de família por login (D49). O logout revoga só o refresh enviado. A cada requisição o filtro consulta o banco para confirmar que o usuário existe e não foi excluído: o token não é a fonte da verdade (D26). A autorização usa o papel do banco; o claim papel é só informativo (D87). O tokenType é "Bearer" (D107). O segredo de assinatura vem só de variável de ambiente, sem valor padrão.
+Assinatura HS256. Access token de 15 minutos, com os claims iss (emissor, propriedade), sub (UUID do usuário), papel, tipo=access, jti, iat e exp (D118). Refresh token de 24 horas, tipo=refresh, com o jti guardado no banco; o tempo de vida é propriedade configurável. expiresIn em segundos (900). Cada /auth/refresh invalida o refresh usado. O reuso de um refresh já invalidado revoga todos os refresh do usuário; não existe conceito de família por login (D49). O logout revoga só o refresh enviado. A cada requisição o filtro consulta o banco para confirmar que o usuário existe e não foi excluído: o token não é a fonte da verdade (D26). A autorização usa o papel do banco; o claim papel é só informativo (D87). O tokenType é "Bearer" (D107). O segredo de assinatura vem só de variável de ambiente, sem valor padrão, é tratado como texto UTF-8 (não como Base64) e tem no mínimo 32 bytes. Nota: o único estado de conta que derruba o token é o de excluído (usuario.excluido_em preenchido, D26); não existe estado de suspensão nem migration para isso.
 
 3.2 Exclusão de conta e primeiro admin (D26, D45)
 A anonimização grava nome = "Usuário removido", e-mail = removido-{uuid}@invalid (então o e-mail original pode ser recadastrado como conta nova), senha inutilizada (o hash deixa de servir para o login) e dataNascimento = null (D92). Isso exige uma migration futura que torne a coluna da data de nascimento anulável; a migration já aplicada não se edita (D92). A migration que torna usuario.data_nascimento anulável é pré-requisito da tarefa do DELETE /me e vem antes dela, numerada na ordem da fila de migrations (D92). Todos os refresh do usuário são revogados na hora. Tentativas em andamento viram EXPIRADA, com finalizadaEm = o menor entre o prazoEm e o momento da exclusão (D88). O último ADMIN não pode se excluir (409). Na fase 1 há um único admin (não existe criação de ADMIN por API), então ele nunca se exclui (D81). Bootstrap do admin: as variáveis de ambiente ADMIN_EMAIL e ADMIN_SENHA criam o admin só se ainda não existir nenhum; se já existe admin, as variáveis são ignoradas. Sem as variáveis e sem nenhum admin: em desenvolvimento e teste, só um aviso no log; em produção, a aplicação não sobe (D45). O admin nasce com nome "Administrador", dataNascimento 2000-01-01 e aceiteTermosVersao igual à versão vigente; ADMIN_EMAIL e ADMIN_SENHA são validados como num cadastro comum (e-mail válido, senha de 8 a 72 bytes) e, se forem inválidos em produção, a aplicação não sobe (D91). Nunca vão para o repositório.
@@ -333,6 +333,9 @@ D114	Cache-Control: no-store vale para as respostas de signin e de refresh	✅ C
 D115	O contrato é autônomo: sem referências a outros documentos nem a numeração de pendências; a seção 11 descreve por extenso as duas pendências externas (D22 e D24)	✅ Confirmada
 D116	Em /api/v1, rota inexistente responde 401 a quem não está autenticado e 404 a quem está (rota nova nasce negada); o 404 de rota inexistente só vale após a autenticação	✅ Confirmada (refina D82 e D113)
 D117	A `descricao` que sobra só de espaços, depois de aparada, vira null: não existe "" como segundo jeito de dizer "sem descrição"; vale para Matéria e Subtópico. O `nome` em branco continua 400	✅ Confirmada (refina D104)
+D118	Os tokens também levam os claims iss (emissor, vindo de propriedade) e iat; o claim papel continua só informativo (D87). Refina D39	✅ Confirmada (refina D39)
+D119	O e-mail do cadastro só aceita caracteres ASCII, em formato válido, com parte local de até 64 caracteres e total de até 255, sem aspas, sem endereço IP entre colchetes e com domínio que tenha ponto; qualquer outro caractere = 400 VALIDACAO_FALHOU com campos[email]. A collation do banco ignora acento e caixa, então um e-mail com acento colidiria com o equivalente sem acento	✅ Confirmada (refina D105)
+D120	O 401 e o 403 de /actuator/** (fora dos três caminhos de saúde) e de /error saem em ErrorResponse, porque nascem na cadeia de segurança; a D82 vale só para o corpo do próprio actuator (health e 503). Refina D82 e D113	✅ Confirmada (refina D82 e D113)
 9. Fora da fase 1 (de propósito)
 
 Pagamento e planos, entitlements como API (na fase 1 é um serviço interno que libera tudo, por podeIniciarTentativa), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
@@ -342,6 +345,8 @@ Pagamento e planos, entitlements como API (na fase 1 é um serviço interno que 
 A v1.0 é a versão aprovada (D83). Toda mudança a partir dela entra aqui, com a decisão e o motivo.
 
 2026-11-22 — D117 (esclarecimento da D104): descricao só de espaços, depois de aparada, vira null (Matéria e Subtópico). Apêndice A: acrescentados SUBTOPICO_NOME_DUPLICADO, SUBTOPICO_NAO_ENCONTRADO e MATERIA_COM_SUBTOPICOS; CAMPO_IMUTAVEL e MATERIA_INATIVA passam de "a implementar" para "Implementado"; registrado que o 400 de materiaId inexistente no corpo usa VALIDACAO_FALHOU (D14), sem código novo. Decisões: D117 e D84 (cada recurso novo acrescenta os seus códigos ao implementar). Motivo: implementação do Subtópico (Tarefa 09).
+
+2026-11-22 — Módulo 10 (autenticação). D118: os tokens também levam iss e iat (refina D39; texto da seção 3.1 atualizado, com a nota de que só o estado de excluído derruba o token e de que o segredo é texto UTF-8 de no mínimo 32 bytes). D119: e-mail do cadastro só em ASCII (refina D105). D120: 401 e 403 de /actuator/** e /error em ErrorResponse (refina D82 e D113). Apêndice A: acrescentados NAO_AUTENTICADO, CREDENCIAIS_INVALIDAS, TOKEN_INVALIDO, ACESSO_NEGADO e EMAIL_DUPLICADO, e registrado que os 400 de data inválida (D60), e-mail fora do ASCII, senha fora de 8 a 72 bytes e termos diferentes dos vigentes usam VALIDACAO_FALHOU com campos. Nenhuma migration nova (a V1 já tem excluido_em). Motivo: implementação do Módulo 10.
 
 11. Pendências abertas e limitações conhecidas
 
@@ -354,15 +359,19 @@ Limitação conhecida (D95): o contador do limite de abuso (429) fica em memóri
 
 Apêndice A. Catálogo de códigos de erro (D84)
 
-Cada recurso novo acrescenta os seus códigos a este catálogo ao ser implementado. Os códigos de 401, 403, 413 e 429 entram quando as rotas que os produzem forem implementadas.
+Cada recurso novo acrescenta os seus códigos a este catálogo ao ser implementado. Os códigos de 413 e 429 entram quando as rotas que os produzem forem implementadas.
 
 Código	Status	Quando	Situação
-VALIDACAO_FALHOU	400	campos inválidos no corpo (traz campos); também é o código do 400 de materiaId inexistente no corpo do POST de subtópico, com campos[materiaId] (D14), sem código novo	Implementado
+VALIDACAO_FALHOU	400	campos inválidos no corpo (traz campos); também é o código do 400 de materiaId inexistente no corpo do POST de subtópico, com campos[materiaId] (D14), do 400 de data fora do formato ou inexistente (D60, com a mensagem "Data inválida. Use o formato aaaa-mm-dd."), de e-mail fora do ASCII (D119), de senha fora de 8 a 72 bytes e de termos diferentes dos vigentes, sem código novo	Implementado
 CORPO_ILEGIVEL	400	JSON ilegível ou de tipo errado	Implementado
 PARAMETRO_AUSENTE	400	parâmetro obrigatório ausente	Implementado
 PARAMETRO_INVALIDO	400	parâmetro com valor inválido (page, size, ativo, id malformado...)	Implementado
 ORDENACAO_INVALIDA	400	sort com formato ou campo inválido	Implementado
 CAMPO_IMUTAVEL	400	campo de entrada que não muda, enviado com valor diferente do atual	Implementado (materiaId no PUT de subtópico)
+NAO_AUTENTICADO	401	rota protegida sem token válido (ausente, malformado, vencido, adulterado, de outro tipo ou de usuário excluído); também o /actuator/** (fora da saúde) e o /error para o anônimo (D113, D120)	Implementado
+CREDENCIAIS_INVALIDAS	401	signin com e-mail ou senha que não conferem (mesma resposta para qualquer falha)	Implementado
+TOKEN_INVALIDO	401	refresh inválido, vencido, de outro tipo (inclusive um access token) ou de usuário excluído (D107)	Implementado
+ACESSO_NEGADO	403	autenticado sem permissão; hoje só o /actuator/** (fora da saúde) e o /error, inclusive para ADMIN (D113, D120); os papéis nas rotas entram com o Módulo 11	Implementado
 RECURSO_NAO_ENCONTRADO	404	rota sem recurso mapeado, para quem passa na autenticação (o anônimo recebe 401)	Implementado
 MATERIA_NAO_ENCONTRADA	404	matéria inexistente (ou inativa para o STUDENT)	Implementado
 SUBTOPICO_NAO_ENCONTRADO	404	subtópico inexistente (para o STUDENT, também o inativo ou de matéria inativa, quando os papéis existirem)	Implementado
@@ -373,8 +382,9 @@ MATERIA_NOME_DUPLICADO	409	já existe matéria com o nome	Implementado
 MATERIA_COM_SUBTOPICOS	409	matéria com subtópicos, ativos ou não, não pode ser apagada	Implementado
 SUBTOPICO_NOME_DUPLICADO	409	já existe subtópico com o nome nessa matéria	Implementado
 MATERIA_INATIVA	409	subtópico criado, ou inativo que seria reativado, em matéria desativada	Implementado
+EMAIL_DUPLICADO	409	já existe usuário com o e-mail (normalizado, D105; D37)	Implementado
 TENTATIVA_EM_ANDAMENTO	409	já há tentativa em andamento nessa prova (traz detalhes.tentativaId)	Nomeado no contrato; a implementar
 TIPO_NAO_SUPORTADO	415	corpo que não é application/json	Implementado
 ERRO_INTERNO	500	erro inesperado (mensagem genérica)	Implementado
 
-Histórico das versões: o contrato nasceu como lista de rotas e foi refinado em rodadas de perguntas e respostas (v0.2 a v0.10). Elas fecharam as regras de tentativa e prazo (D3 a D6, D16, D31, D50), de importação e versões de questão (D7, D8, D13, D18 a D21, D40 a D43, D51, D55, D56), de autenticação e tokens (D15, D23 a D26, D37, D39, D45, D49), do formato de erro (D1, D33, D44, D59, D60), das convenções de dados (D57 a D63), da listagem (D29, D64 a D70) e do formato da resposta (D71 a D75). v1.0 — versão aprovada: D76 a D116 (e a D117, depois da aprovação) resolveram as contradições e lacunas apontadas na leitura independente do contrato (paginação, ordem de validação, regras de questão e importação, tentativa e resultado, autenticação, CORS, actuator, textos e e-mail), acrescentaram o catálogo de códigos de erro e tornaram o documento autônomo.
+Histórico das versões: o contrato nasceu como lista de rotas e foi refinado em rodadas de perguntas e respostas (v0.2 a v0.10). Elas fecharam as regras de tentativa e prazo (D3 a D6, D16, D31, D50), de importação e versões de questão (D7, D8, D13, D18 a D21, D40 a D43, D51, D55, D56), de autenticação e tokens (D15, D23 a D26, D37, D39, D45, D49), do formato de erro (D1, D33, D44, D59, D60), das convenções de dados (D57 a D63), da listagem (D29, D64 a D70) e do formato da resposta (D71 a D75). v1.0 — versão aprovada: D76 a D116 (e as D117 a D120, depois da aprovação) resolveram as contradições e lacunas apontadas na leitura independente do contrato (paginação, ordem de validação, regras de questão e importação, tentativa e resultado, autenticação, CORS, actuator, textos e e-mail), acrescentaram o catálogo de códigos de erro e tornaram o documento autônomo.

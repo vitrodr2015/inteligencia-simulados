@@ -31,10 +31,15 @@ spring:
 
 security:
   jwt:
-    secret: segredo-de-teste-falso-nao-e-real-0123456789
+    # O segredo NÃO fica aqui: o SegredoJwtAleatorioInitializer gera um novo a cada execução (spring.factories de teste).
     issuer: etec-simulados
     access-token-expiration: 15m
     refresh-token-expiration: 24h
+
+app:
+  termos:
+    versao: v1-teste
+    url: https://exemplo.invalid/termos
 
 # Swagger desligado por padrão, como em produção; os testes do Swagger ligam por propriedade.
 springdoc:

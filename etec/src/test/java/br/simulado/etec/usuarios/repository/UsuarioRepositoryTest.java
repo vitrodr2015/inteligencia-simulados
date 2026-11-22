@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 
@@ -43,6 +44,9 @@ class UsuarioRepositoryTest {
 
 	@Autowired
 	private UsuarioRepository repositorio;
+
+	@Autowired
+	private JdbcTemplate jdbc;
 
 	@Test
 	void deve_encontrar_o_usuario_de_exemplo_quando_busca_por_email_do_data_sql() {
@@ -86,6 +90,24 @@ class UsuarioRepositoryTest {
 	@Test
 	void deve_devolver_vazio_quando_o_email_nao_existe() {
 		assertThat(repositorio.findByEmail("ninguem@exemplo.invalid")).isEmpty();
+	}
+
+	@Test
+	void deve_encontrar_pelo_public_id_quando_o_usuario_nao_foi_excluido() {
+		Usuario salvo = repositorio.saveAndFlush(new Usuario("Rita Teste", "rita.teste@exemplo.invalid",
+				"hash-falso-nao-e-real", LocalDate.of(2008, 1, 2), "v1", Papel.STUDENT));
+
+		assertThat(repositorio.findByPublicIdAndExcluidoEmIsNull(salvo.getPublicId())).isPresent();
+	}
+
+	@Test
+	void deve_devolver_vazio_pelo_public_id_quando_o_usuario_foi_excluido_ou_nao_existe() {
+		Usuario salvo = repositorio.saveAndFlush(new Usuario("Caio Teste", "caio.teste@exemplo.invalid",
+				"hash-falso-nao-e-real", LocalDate.of(2008, 1, 2), "v1", Papel.STUDENT));
+		jdbc.update("UPDATE usuario SET excluido_em = CURRENT_TIMESTAMP WHERE id = ?", salvo.getId());
+
+		assertThat(repositorio.findByPublicIdAndExcluidoEmIsNull(salvo.getPublicId())).isEmpty();
+		assertThat(repositorio.findByPublicIdAndExcluidoEmIsNull(java.util.UUID.randomUUID())).isEmpty();
 	}
 
 }

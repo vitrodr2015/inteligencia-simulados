@@ -21,6 +21,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -48,6 +49,9 @@ import br.simulado.etec.shared.exception.ConflictException;
  * então id e datas são conhecidos e o texto esperado é literal. Se alguém mudar a ordem de um campo, o
  * tratamento de nulos ou o formato das datas, estes testes quebram.
  */
+// SEM filtros de segurança (addFilters = false): este teste cobre o CONTRATO da rota e NÃO testa segurança.
+// O 401 e o 403 da cadeia são provados nos testes de integração, com os filtros ligados.
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(controllers = { MateriaController.class, MateriaFormatoWebTest.ControllerSemProduces.class })
 @Import({ JacksonConfig.class, SomenteJsonConfig.class, MateriaFormatoWebTest.ControllerSemProduces.class })
 class MateriaFormatoWebTest {
