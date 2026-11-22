@@ -20,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.catalogo.dto.MateriaRequest;
 import br.simulado.etec.catalogo.model.Materia;
 import br.simulado.etec.catalogo.repository.MateriaRepository;
@@ -82,7 +83,7 @@ class MateriaServiceTest {
 		Materia materia = new Materia("Física", null);
 		when(repositorio.findByPublicId(materia.getPublicId())).thenReturn(Optional.of(materia));
 
-		assertThat(servico.buscar(materia.getPublicId())).isSameAs(materia);
+		assertThat(servico.buscar(materia.getPublicId(), EscopoDeLeitura.TUDO)).isSameAs(materia);
 	}
 
 	@Test
@@ -90,7 +91,7 @@ class MateriaServiceTest {
 		UUID id = UUID.randomUUID();
 		when(repositorio.findByPublicId(id)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> servico.buscar(id))
+		assertThatThrownBy(() -> servico.buscar(id, EscopoDeLeitura.TUDO))
 				.isInstanceOfSatisfying(ResourceNotFoundException.class,
 						erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.MATERIA_NAO_ENCONTRADA));
 	}
@@ -264,4 +265,34 @@ class MateriaServiceTest {
 		assertThatThrownBy(() -> servico.apagar(id)).isSameAs(desconhecida);
 	}
 
+
+	// ----- visibilidade por papel (D28, D103) -----
+
+	@Test
+	void deve_dar_404_da_inexistente_quando_o_student_busca_materia_inativa() {
+		Materia inativa = new Materia("Inativa", null);
+		inativa.desativar();
+		when(repositorio.findByPublicId(inativa.getPublicId())).thenReturn(Optional.of(inativa));
+
+		assertThatThrownBy(() -> servico.buscar(inativa.getPublicId(), EscopoDeLeitura.SO_ATIVOS))
+				.isInstanceOfSatisfying(ResourceNotFoundException.class,
+						erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.MATERIA_NAO_ENCONTRADA));
+		assertThat(servico.buscar(inativa.getPublicId(), EscopoDeLeitura.TUDO)).isSameAs(inativa);
+	}
+
+	@Test
+	void deve_devolver_a_materia_ativa_ao_student() {
+		Materia ativa = new Materia("Ativa", null);
+		when(repositorio.findByPublicId(ativa.getPublicId())).thenReturn(Optional.of(ativa));
+
+		assertThat(servico.buscar(ativa.getPublicId(), EscopoDeLeitura.SO_ATIVOS)).isSameAs(ativa);
+	}
+
+	@Test
+	void deve_recusar_ativo_false_do_student_sem_consultar_o_banco() {
+		assertThatThrownBy(() -> servico.listar(EscopoDeLeitura.SO_ATIVOS, null, false, org.springframework.data.domain.Pageable.unpaged()))
+				.isInstanceOfSatisfying(br.simulado.etec.shared.exception.InvalidRequestException.class,
+						erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.PARAMETRO_INVALIDO));
+		org.mockito.Mockito.verifyNoInteractions(repositorio);
+	}
 }

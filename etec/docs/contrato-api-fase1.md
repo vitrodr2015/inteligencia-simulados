@@ -2,13 +2,13 @@ Contrato da API — Fase 1 (v1.0, aprovada)
 
 O contrato é revisado e aprovado antes de qualquer código. Ele é rascunho até a aprovação; a v1.0 é a versão aprovada (D83), e depois dela qualquer mudança é registrada na seção 10. Este é o documento completo da API da fase 1 e não depende de outros.
 
-Estado: versão aprovada (v1.0). Decisões D1 a D120 decididas, exceto D22 e D24 (pendências externas).
+Estado: versão aprovada (v1.0). Decisões D1 a D124 decididas, exceto D22 e D24 (pendências externas).
 
 1. Convenções gerais (valem para todas as rotas)
 Tema	Decisão
 Base e formato	/api/v1. As rotas de /api/v1 respondem SOMENTE JSON (D71): Accept de XML, YAML ou qualquer outro formato = 406, no formato de erro padrão, em JSON. Exceção declarada: a documentação OpenAPI (/v3/api-docs, /v3/api-docs.yaml e /swagger-ui) existe só em desenvolvimento e homologação e pode responder YAML ou HTML. Nas respostas COM corpo, o Content-Type é exatamente application/json, sem o parâmetro charset, mas o corpo é sempre UTF-8 (o padrão do JSON); o 204 não tem corpo nem Content-Type. O JSON sai compacto, sem espaços nem quebras de linha (D74). Os exemplos JSON deste documento estão formatados para leitura; a resposta real é compacta. Todas as rotas das tabelas deste documento são relativas a /api/v1 (D78), exceto as da seção 7 (actuator), que ficam fora dele; todo Location inclui o prefixo /api/v1 (D78)
 Ordem e nulos	A ordem dos campos de SAÍDA do JSON é fixa: é a ordem em que os campos aparecem escritos neste contrato, da esquerda para a direita, inclusive nos objetos entre chaves (questoes[], respostas[], itens[] e o resultado da tentativa); o envelope da lista e o ErrorResponse têm a ordem própria descrita abaixo (D72). Campo nulo de DTO de resposta sai sempre no JSON como null (por exemplo "descricao":null), nunca omitido (D73). Campo que o papel não pode ver não existe no JSON, e não sai como null: as questões da tentativa do aluno usam um DTO próprio, sem gabarito nem explicacao (D75)
-Erros que podem ocorrer em qualquer rota	404 (rota inexistente, só para quem passa na autenticação: o anônimo em rota inexistente de /api/v1 recebe 401, porque a rota nova nasce negada, e o autenticado recebe 404; em /actuator, fora dos três caminhos de saúde, e em /error vale a D113), 405 (método não permitido), 406 (formato não aceito, D71), 415 (corpo que não é application/json, D112) e 500, sempre no formato de erro padrão, em JSON, mesmo com Accept de XML ou YAML. Por valerem para toda rota, não aparecem nas colunas de erro dos endpoints
+Erros que podem ocorrer em qualquer rota	401 e 403 (rota ou método SEM regra de acesso é negado: 401 ao anônimo e 403 a quem está autenticado, inclusive ADMIN, porque a rota nova nasce negada, D121; em /actuator, fora dos três caminhos de saúde, e em /error vale a D113), 404 (recurso inexistente, só depois da autorização, ou rota que a segurança libera mas que não tem recurso mapeado), 405 (método que a segurança libera para a rota mas que o controller não atende; hoje não ocorre, porque o método sem regra é negado com 401 ou 403), 406 (formato não aceito, D71), 415 (corpo que não é application/json, D112), 400 REQUISICAO_INVALIDA (URL recusada pelo firewall de segurança, D124) e 500, sempre no formato de erro padrão, em JSON, mesmo com Accept de XML ou YAML. Por valerem para toda rota, não aparecem nas colunas de erro dos endpoints
 Ids	Campo id é um UUID (o id numérico do banco nunca sai). UUID malformado = 400; inexistente = 404
 Data e hora	ISO-8601 em UTC com exatamente 3 casas de milissegundos, mesmo quando são zero (2026-11-20T15:04:05.123Z e 2026-11-20T15:04:05.000Z). As datas são gravadas e devolvidas com precisão de milissegundos: a aplicação trunca na origem, para o banco não arredondar (D63)
 Data simples	uuuu-MM-dd (aaaa-mm-dd), leitura estrita: data inexistente ou fora do formato (2000-02-30, 2000-2-3) = 400, com campos apontando o campo e a mensagem "Data inválida. Use o formato aaaa-mm-dd."; nunca é corrigida em silêncio (D60)
@@ -24,7 +24,7 @@ PUT	É substituição: campo opcional omitido no corpo vira nulo (por exemplo, d
 Limite de abuso	/auth/* responde 429 com Retry-After (em segundos) ao exceder o limite: 10 requisições por minuto por IP em /auth/* e 5 tentativas de signin por minuto por e-mail, ambos configuráveis por propriedade (D25; números iniciais). O IP vem do X-Forwarded-For só se o proxy for confiável (propriedade); o contador fica em memória, em janela fixa de 1 minuto; a chave do signin é o e-mail normalizado, mesmo que não exista; o 429 vem antes do 400 e do 401 (D95)
 Cabeçalhos	As respostas de signin e de refresh levam Cache-Control: no-store (D114)
 Formatação nos textos	Os textos de questão (enunciado, textoApoio, alternativas[].texto, explicacao) aceitam só as marcas <b>, <u>, <i>, <sup>, <sub> e <br>, exatas, em minúsculas e com <br> sem barra (D12, D32, D98). Só as entidades &lt;, &gt; e &amp; são aceitas, e os caracteres <, > e & literais se escrevem com elas. Atributos nas tags e tags mal fechadas ou mal aninhadas = 400. O servidor recusa (400) qualquer outra marcação HTML e o front também limpa por segurança. O HTML só vale nesses textos de questão. Os limites de tamanho contam pontos de código (D98)
-CORS	As origens permitidas vêm de configuração por ambiente (D34). Métodos GET, POST, PUT, PATCH, DELETE e OPTIONS; cabeçalhos Authorization e Content-Type; sem credenciais; max-age 3600; o preflight OPTIONS não exige autenticação (D100)
+CORS	As origens permitidas vêm de configuração por ambiente (D34). Métodos GET, POST, PUT, PATCH, DELETE e OPTIONS; cabeçalhos Authorization e Content-Type; sem credenciais; max-age 3600; o preflight OPTIONS não exige autenticação (D100). Detalhes na D123: propriedade app.cors.allowed-origins, formato validado na subida, só https em produção, Location exposto e 403 ACESSO_NEGADO para origem não permitida
 
 Formato de erro (ErrorResponse) — o mesmo em todo status de erro, inclusive 401 e 403, em toda a aplicação, exceto /actuator (formato do próprio framework) e a documentação OpenAPI (D82):
 
@@ -53,6 +53,13 @@ Escrever matérias e subtópicos; publicar prova	❌	❌	✅
 GET /actuator/health, /actuator/health/liveness e /actuator/health/readiness	✅	✅	✅
 Outros caminhos de /actuator e /error	❌ (401)	❌ (403)	❌ (403)
 
+Anotação da tabela quem pode o quê:
+- O que não consta da tabela é NEGADO (D121): rota ou método sem regra responde 401 ao anônimo e 403 a quem está autenticado, inclusive ADMIN, mesmo que a rota nem exista. O 404 é só para recurso inexistente, depois da autorização.
+- GUARDIAN não tem nenhuma permissão na fase 1 (D122): 403 em tudo que exige papel, inclusive GET /me; as rotas públicas funcionam.
+- O HEAD segue a regra do GET da mesma rota.
+- O OPTIONS de preflight de CORS (com Origin e Access-Control-Request-Method) é público (D100); um OPTIONS comum é negado.
+- A autorização vem antes da existência, do formato e do conflito: STUDENT recebe 403 numa escrita mesmo com id inexistente, id malformado ou corpo inválido.
+
 Tentativa de outro aluno responde 404 (não revela que existe).
 
 3. Autenticação e conta
@@ -78,7 +85,7 @@ POST	/auth/register	201 com o usuário (mesmo corpo de GET /me), sem tokens e se
 POST	/auth/signin (entrada {email, senha})	200 {accessToken, refreshToken, tokenType, expiresIn}; tokenType é "Bearer"; expiresIn em segundos (900, D39, D96, D107)	400, 401 (mesma resposta e tempo parecido para qualquer falha), 429
 POST	/auth/refresh (entrada {refreshToken}, nunca na URL)	200 com o mesmo corpo do signin (D96; novo par; o refresh usado é invalidado; reusar um refresh já invalidado dá 401 e revoga todos os refresh do usuário, D39, D49)	400, 401 (inválido, vencido, revogado ou do tipo errado, inclusive um access token, D107), 429
 POST	/auth/logout (anônimo; entrada {refreshToken}, que é a credencial, D15)	204 para qualquer texto presente, inclusive malformado, desconhecido, vencido, já revogado ou de outro tipo; repetir não dá erro; revoga só o refresh enviado (D39, D107)	400 (refreshToken ausente ou que não é texto), 429
-GET	/me	200	401
+GET	/me	200	401, 403
 PATCH	/me (só nome; email e dataNascimento com o valor atual são aceitos, diferentes = 400 CAMPO_IMUTAVEL, D48)	200 com o usuário completo (D96)	400, 401
 DELETE	/me	204 (exclusão de conta com anonimização, ver D9 e a subseção 3.2)	401, 409 (último ADMIN)
 
@@ -100,8 +107,8 @@ ativo	booleano	nasce true; só muda por disable/enable. Desativar uma matéria n
 criadoEm, atualizadoEm	data/hora	UTC, com precisão de milissegundos (D63). atualizadoEm não muda quando disable/enable é repetido (D62)	saída
 Verbo	Rota	Sucesso	Erros
 POST	/materias	201 + Location relativo e a matéria completa (D58)	400, 401, 403, 409 (nome existe)
-GET	/materias (filtros nome e ativo; sort: nome, criadoEm; padrão nome; sem direção vale asc, D64; nome em branco = filtro ausente, D65; ativo só aceita true ou false, em qualquer caixa, D66, D101; o desempate pelo id interno é sempre crescente, D67, D93; a ordem por nome segue a collation do MySQL, D69). STUDENT só vê ativas; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401
-GET	/materias/{id} (STUDENT: matéria inativa = 404 MATERIA_NAO_ENCONTRADA, o mesmo código da matéria inexistente, D103)	200	400, 401, 404
+GET	/materias (filtros nome e ativo; sort: nome, criadoEm; padrão nome; sem direção vale asc, D64; nome em branco = filtro ausente, D65; ativo só aceita true ou false, em qualquer caixa, D66, D101; o desempate pelo id interno é sempre crescente, D67, D93; a ordem por nome segue a collation do MySQL, D69). STUDENT só vê ativas; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401, 403
+GET	/materias/{id} (STUDENT: matéria inativa = 404 MATERIA_NAO_ENCONTRADA, o mesmo código da matéria inexistente, D103)	200	400, 401, 403, 404
 PUT	/materias/{id} (substituição: troca nome e descricao, e a descricao omitida vira nula; nunca altera ativo, D61)	200 com a matéria completa (D96)	400, 401, 403, 404, 409
 PATCH	/materias/{id}/disable e /enable	200 com a matéria completa (D96), idempotentes: repetir devolve o mesmo resultado e não altera atualizadoEm (D62)	400, 401, 403, 404
 DELETE	/materias/{id}	204	400, 401, 403, 404, 409 (tem subtópicos, ativos ou não)
@@ -113,8 +120,8 @@ nome	texto	obrigatório; o servidor remove os espaços das pontas antes de valid
 ativo, criadoEm, atualizadoEm		como em Matéria	saída
 Verbo	Rota	Sucesso	Erros
 POST	/subtopicos	201 + Location relativo e o subtópico completo (D58)	400, 401, 403, 409 (nome já existe na matéria; ou matéria desativada, codigo MATERIA_INATIVA, D54)
-GET	/subtopicos (filtros materiaId, nome, ativo; sort: nome, criadoEm; padrão nome asc, D77). STUDENT só vê subtópicos ativos de matéria ativa; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401
-GET	/subtopicos/{id} (STUDENT: subtópico inativo ou de matéria inativa = 404)	200	400, 401, 404
+GET	/subtopicos (filtros materiaId, nome, ativo; sort: nome, criadoEm; padrão nome asc, D77). STUDENT só vê subtópicos ativos de matéria ativa; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401, 403
+GET	/subtopicos/{id} (STUDENT: subtópico inativo ou de matéria inativa = 404)	200	400, 401, 403, 404
 PUT	/subtopicos/{id} (só nome)	200 com o subtópico completo (D96)	400, 401, 403, 404, 409
 PATCH	/subtopicos/{id}/disable e /enable	200 com o subtópico completo (D96), idempotentes: repetir devolve o mesmo resultado e não altera atualizadoEm (D62)	400, 401, 403, 404, 409 (só quando o enable de fato ativaria um subtópico inativo de matéria desativada, codigo MATERIA_INATIVA; enable em subtópico já ativo responde 200 sem efeito, mesmo de matéria desativada, D109, D62)
 DELETE	/subtopicos/{id}	204	400, 401, 403, 404, 409 (tem questões, de qualquer status)
@@ -134,8 +141,8 @@ publicadaEm, criadoEm	data/hora	UTC	saída
 Uma prova é única por banca + ano + semestre (D20).
 
 Verbo	Rota	Sucesso	Erros
-GET	/provas (filtros ano, semestre; ADMIN também status; sort: ano, semestre; padrão ano decrescente; sort=ano sem direção vale asc, e isso é intencional, D102). STUDENT que envia status (qualquer valor) = 400 (D28, D47)	200 lista paginada	400, 401
-GET	/provas/{id} (STUDENT só vê PUBLICADA; senão 404)	200	400, 401, 404
+GET	/provas (filtros ano, semestre; ADMIN também status; sort: ano, semestre; padrão ano decrescente; sort=ano sem direção vale asc, e isso é intencional, D102). STUDENT que envia status (qualquer valor) = 400 (D28, D47)	200 lista paginada	400, 401, 403
+GET	/provas/{id} (STUDENT só vê PUBLICADA; senão 404)	200	400, 401, 403, 404
 PATCH	/provas/{id}/publish (ADMIN)	200 com a prova completa (D96), idempotente	400, 401, 403, 404, 409 (sem questões, ou com questão ainda não publicada, o que inclui questão sem gabarito; detalhes.questoesPendentes lista os números das questões pendentes, D44)
 
 Não existe POST de prova (ela nasce pela importação). PUT e DELETE existem só sob /admin/provas e só em RASCUNHO (seção 5, D21). Prova publicada é imutável: o que muda depois de publicada é a questão, por nova versão (D18). Uma prova só é publicada com o gabarito completo (D13).
@@ -331,11 +338,15 @@ D112	415: só application/json, com charset=utf-8 tolerado	✅ Confirmada
 D113	Outros caminhos de /actuator e /error: 401 para anônimo e 403 para autenticado, inclusive ADMIN; nunca 404	✅ Confirmada
 D114	Cache-Control: no-store vale para as respostas de signin e de refresh	✅ Confirmada
 D115	O contrato é autônomo: sem referências a outros documentos nem a numeração de pendências; a seção 11 descreve por extenso as duas pendências externas (D22 e D24)	✅ Confirmada
-D116	Em /api/v1, rota inexistente responde 401 a quem não está autenticado e 404 a quem está (rota nova nasce negada); o 404 de rota inexistente só vale após a autenticação	✅ Confirmada (refina D82 e D113)
+D116	Em /api/v1, rota inexistente responde 401 a quem não está autenticado e 404 a quem está (rota nova nasce negada); o 404 de rota inexistente só vale após a autenticação	✅ Confirmada (refina D82 e D113); refinada pela D121 (a quem está autenticado, rota sem regra dá 403)
 D117	A `descricao` que sobra só de espaços, depois de aparada, vira null: não existe "" como segundo jeito de dizer "sem descrição"; vale para Matéria e Subtópico. O `nome` em branco continua 400	✅ Confirmada (refina D104)
 D118	Os tokens também levam os claims iss (emissor, vindo de propriedade) e iat; o claim papel continua só informativo (D87). Refina D39	✅ Confirmada (refina D39)
 D119	O e-mail do cadastro só aceita caracteres ASCII, em formato válido, com parte local de até 64 caracteres e total de até 255, sem aspas, sem endereço IP entre colchetes e com domínio que tenha ponto; qualquer outro caractere = 400 VALIDACAO_FALHOU com campos[email]. A collation do banco ignora acento e caixa, então um e-mail com acento colidiria com o equivalente sem acento	✅ Confirmada (refina D105)
 D120	O 401 e o 403 de /actuator/** (fora dos três caminhos de saúde) e de /error saem em ErrorResponse, porque nascem na cadeia de segurança; a D82 vale só para o corpo do próprio actuator (health e 503). Refina D82 e D113	✅ Confirmada (refina D82 e D113)
+D121	Rota ou método sem regra de acesso é NEGADO: 401 ao anônimo e 403 a quem está autenticado, inclusive ADMIN, em /api/v1 e fora dele, mesmo que a rota nem exista; vale também para método sem regra numa rota que existe (por exemplo, DELETE na coleção de matérias: 403, e não 405). O 404 fica para o recurso inexistente depois da autorização, e para a rota que a segurança libera mas que não tem recurso mapeado. Refina D116	✅ Confirmada (refina D116)
+D122	GUARDIAN não tem nenhuma permissão na fase 1: 403 em tudo que exige papel, inclusive GET /me, porque a tabela da seção 2 só dá acesso a STUDENT e ADMIN; as rotas públicas continuam funcionando	✅ Confirmada
+D123	CORS: as origens vêm de app.cors.allowed-origins (variável CORS_ALLOWED_ORIGINS, separadas por vírgula), vazia por padrão, e vazia significa sem CORS. A aplicação não sobe com *, com origem fora do formato http(s)://domínio[:porta] (sem barra, caminho, consulta ou usuário) nem, em produção (perfil prod), com origem http. Métodos GET, POST, PUT, PATCH, DELETE e OPTIONS; cabeçalhos Authorization e Content-Type; sem credenciais; Max-Age 3600; Location exposto. Só o preflight de verdade (OPTIONS com Origin e Access-Control-Request-Method) dispensa autenticação; um OPTIONS comum é negado. Origem, método ou cabeçalho não permitido = 403 ACESSO_NEGADO em ErrorResponse, e os 401 e 403 também levam os cabeçalhos de CORS. O HEAD cross-origin é permitido pelo navegador sem preflight, por isso não consta da lista de métodos. Refina D34 e D100	✅ Confirmada (refina D34 e D100)
+D124	O firewall do Spring Security (barra dupla, ;jsessionid, %2e e semelhantes) responde 400 REQUISICAO_INVALIDA em ErrorResponse, com mensagem fixa e sem detalhe técnico. Fora do alcance: a barra invertida e a barra codificada (%2F) são recusadas antes pelo próprio servidor web, com a resposta dele (400, texto HTML)	✅ Confirmada
 9. Fora da fase 1 (de propósito)
 
 Pagamento e planos, entitlements como API (na fase 1 é um serviço interno que libera tudo, por podeIniciarTentativa), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
@@ -347,6 +358,8 @@ A v1.0 é a versão aprovada (D83). Toda mudança a partir dela entra aqui, com 
 2026-11-22 — D117 (esclarecimento da D104): descricao só de espaços, depois de aparada, vira null (Matéria e Subtópico). Apêndice A: acrescentados SUBTOPICO_NOME_DUPLICADO, SUBTOPICO_NAO_ENCONTRADO e MATERIA_COM_SUBTOPICOS; CAMPO_IMUTAVEL e MATERIA_INATIVA passam de "a implementar" para "Implementado"; registrado que o 400 de materiaId inexistente no corpo usa VALIDACAO_FALHOU (D14), sem código novo. Decisões: D117 e D84 (cada recurso novo acrescenta os seus códigos ao implementar). Motivo: implementação do Subtópico (Tarefa 09).
 
 2026-11-22 — Módulo 10 (autenticação). D118: os tokens também levam iss e iat (refina D39; texto da seção 3.1 atualizado, com a nota de que só o estado de excluído derruba o token e de que o segredo é texto UTF-8 de no mínimo 32 bytes). D119: e-mail do cadastro só em ASCII (refina D105). D120: 401 e 403 de /actuator/** e /error em ErrorResponse (refina D82 e D113). Apêndice A: acrescentados NAO_AUTENTICADO, CREDENCIAIS_INVALIDAS, TOKEN_INVALIDO, ACESSO_NEGADO e EMAIL_DUPLICADO, e registrado que os 400 de data inválida (D60), e-mail fora do ASCII, senha fora de 8 a 72 bytes e termos diferentes dos vigentes usam VALIDACAO_FALHOU com campos. Nenhuma migration nova (a V1 já tem excluido_em). Motivo: implementação do Módulo 10.
+
+2026-11-22 — Módulo 11 (autorização e CORS). D121 (refina D116): rota ou método sem regra é negado, 401 ao anônimo e 403 a quem está autenticado; o 404 só para recurso inexistente depois da autorização (a seção 1 e a D116 atualizadas, e o 405 deixa de ocorrer em rota com regra). D122: GUARDIAN sem nenhuma permissão. D123 (refina D34 e D100): CORS por app.cors.allowed-origins, validado na subida, só https em produção, só preflight de verdade sem autenticação, 403 ACESSO_NEGADO em ErrorResponse para origem não permitida, HEAD cross-origin permitido pelo navegador. D124: o firewall responde 400 REQUISICAO_INVALIDA em ErrorResponse. Seção 2: anotação da tabela quem pode o quê. Seções 3 e 4: a coluna de erros dos GET e do /me passa a incluir 403 (GUARDIAN). Apêndice A: acrescentado REQUISICAO_INVALIDA e atualizadas as descrições de NAO_AUTENTICADO, ACESSO_NEGADO, RECURSO_NAO_ENCONTRADO e METODO_NAO_PERMITIDO. Motivo: implementação do Módulo 11.
 
 11. Pendências abertas e limitações conhecidas
 
@@ -368,14 +381,14 @@ PARAMETRO_AUSENTE	400	parâmetro obrigatório ausente	Implementado
 PARAMETRO_INVALIDO	400	parâmetro com valor inválido (page, size, ativo, id malformado...)	Implementado
 ORDENACAO_INVALIDA	400	sort com formato ou campo inválido	Implementado
 CAMPO_IMUTAVEL	400	campo de entrada que não muda, enviado com valor diferente do atual	Implementado (materiaId no PUT de subtópico)
-NAO_AUTENTICADO	401	rota protegida sem token válido (ausente, malformado, vencido, adulterado, de outro tipo ou de usuário excluído); também o /actuator/** (fora da saúde) e o /error para o anônimo (D113, D120)	Implementado
+NAO_AUTENTICADO	401	rota protegida sem token válido (ausente, malformado, vencido, adulterado, de outro tipo ou de usuário excluído); rota ou método sem regra, para o anônimo (D121); também o /actuator/** (fora da saúde) e o /error para o anônimo (D113, D120)	Implementado
 CREDENCIAIS_INVALIDAS	401	signin com e-mail ou senha que não conferem (mesma resposta para qualquer falha)	Implementado
 TOKEN_INVALIDO	401	refresh inválido, vencido, de outro tipo (inclusive um access token) ou de usuário excluído (D107)	Implementado
-ACESSO_NEGADO	403	autenticado sem permissão; hoje só o /actuator/** (fora da saúde) e o /error, inclusive para ADMIN (D113, D120); os papéis nas rotas entram com o Módulo 11	Implementado
-RECURSO_NAO_ENCONTRADO	404	rota sem recurso mapeado, para quem passa na autenticação (o anônimo recebe 401)	Implementado
+ACESSO_NEGADO	403	autenticado sem permissão: papel que não pode a rota (STUDENT nas escritas do catálogo, GUARDIAN em tudo que exige papel, D122), rota ou método sem regra (D121), /actuator/** (fora da saúde) e /error, inclusive para ADMIN (D113, D120), e origem, método ou cabeçalho de CORS não permitido (D123)	Implementado
+RECURSO_NAO_ENCONTRADO	404	rota liberada pela segurança mas sem recurso mapeado (hoje, só os três caminhos de saúde do actuator, que ainda não existe); a rota sem regra NÃO chega aqui: é negada com 401 ou 403 (D121)	Implementado
 MATERIA_NAO_ENCONTRADA	404	matéria inexistente (ou inativa para o STUDENT)	Implementado
 SUBTOPICO_NAO_ENCONTRADO	404	subtópico inexistente (para o STUDENT, também o inativo ou de matéria inativa, quando os papéis existirem)	Implementado
-METODO_NAO_PERMITIDO	405	método HTTP não permitido na rota	Implementado
+METODO_NAO_PERMITIDO	405	método HTTP que a segurança libera para a rota mas que o controller não atende (o método sem regra é negado com 401 ou 403, D121, então hoje não ocorre)	Implementado
 FORMATO_NAO_ACEITO	406	Accept que não seja JSON	Implementado
 CONFLITO	409	conflito sem código próprio	Implementado
 MATERIA_NOME_DUPLICADO	409	já existe matéria com o nome	Implementado
@@ -384,7 +397,8 @@ SUBTOPICO_NOME_DUPLICADO	409	já existe subtópico com o nome nessa matéria	Imp
 MATERIA_INATIVA	409	subtópico criado, ou inativo que seria reativado, em matéria desativada	Implementado
 EMAIL_DUPLICADO	409	já existe usuário com o e-mail (normalizado, D105; D37)	Implementado
 TENTATIVA_EM_ANDAMENTO	409	já há tentativa em andamento nessa prova (traz detalhes.tentativaId)	Nomeado no contrato; a implementar
+REQUISICAO_INVALIDA	400	URL recusada pelo firewall de segurança (barra dupla, ;jsessionid, %2e e semelhantes), mensagem fixa (D124)	Implementado
 TIPO_NAO_SUPORTADO	415	corpo que não é application/json	Implementado
 ERRO_INTERNO	500	erro inesperado (mensagem genérica)	Implementado
 
-Histórico das versões: o contrato nasceu como lista de rotas e foi refinado em rodadas de perguntas e respostas (v0.2 a v0.10). Elas fecharam as regras de tentativa e prazo (D3 a D6, D16, D31, D50), de importação e versões de questão (D7, D8, D13, D18 a D21, D40 a D43, D51, D55, D56), de autenticação e tokens (D15, D23 a D26, D37, D39, D45, D49), do formato de erro (D1, D33, D44, D59, D60), das convenções de dados (D57 a D63), da listagem (D29, D64 a D70) e do formato da resposta (D71 a D75). v1.0 — versão aprovada: D76 a D116 (e as D117 a D120, depois da aprovação) resolveram as contradições e lacunas apontadas na leitura independente do contrato (paginação, ordem de validação, regras de questão e importação, tentativa e resultado, autenticação, CORS, actuator, textos e e-mail), acrescentaram o catálogo de códigos de erro e tornaram o documento autônomo.
+Histórico das versões: o contrato nasceu como lista de rotas e foi refinado em rodadas de perguntas e respostas (v0.2 a v0.10). Elas fecharam as regras de tentativa e prazo (D3 a D6, D16, D31, D50), de importação e versões de questão (D7, D8, D13, D18 a D21, D40 a D43, D51, D55, D56), de autenticação e tokens (D15, D23 a D26, D37, D39, D45, D49), do formato de erro (D1, D33, D44, D59, D60), das convenções de dados (D57 a D63), da listagem (D29, D64 a D70) e do formato da resposta (D71 a D75). v1.0 — versão aprovada: D76 a D116 (e as D117 a D124, depois da aprovação) resolveram as contradições e lacunas apontadas na leitura independente do contrato (paginação, ordem de validação, regras de questão e importação, tentativa e resultado, autenticação, CORS, actuator, textos e e-mail), acrescentaram o catálogo de códigos de erro e tornaram o documento autônomo.

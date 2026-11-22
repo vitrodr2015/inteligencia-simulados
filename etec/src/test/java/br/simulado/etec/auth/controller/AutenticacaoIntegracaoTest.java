@@ -357,15 +357,15 @@ class AutenticacaoIntegracaoTest extends AbstractIntegrationTest {
 		deveSer401NaoAutenticado(requisicaoSemToken().post("/api/v1/termos/vigente"));
 	}
 
-	// ----- D116: rota inexistente -----
+	// ----- D121 (refina D116): rota inexistente -----
 
 	@Test
-	void deve_dar_401_ao_anonimo_e_404_a_quem_esta_autenticado_em_rota_inexistente() {
+	void deve_dar_401_ao_anonimo_e_403_a_quem_esta_autenticado_em_rota_inexistente() {
 		deveSer401NaoAutenticado(requisicaoSemToken().get("/api/v1/nao-existe"));
 		deveSer401NaoAutenticado(requisicaoSemToken().body("{}").post("/api/v1/nao-existe"));
 		deveSer401NaoAutenticado(requisicaoSemToken().get("/nao-existe"));
 		for (String rota : new String[] { "/api/v1/nao-existe", "/nao-existe" }) {
-			requisicao().get(rota).then().statusCode(404).body("codigo", equalTo("RECURSO_NAO_ENCONTRADO"))
+			requisicao().get(rota).then().statusCode(403).body("codigo", equalTo("ACESSO_NEGADO"))
 					.header("Content-Type", "application/json");
 		}
 	}

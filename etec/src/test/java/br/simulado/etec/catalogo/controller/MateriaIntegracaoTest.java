@@ -225,17 +225,19 @@ class MateriaIntegracaoTest extends AbstractMateriaIntegrationTest {
 	// ----- outros -----
 
 	@Test
-	void deve_devolver_404_em_json_quando_a_rota_nao_existe_em_qualquer_metodo() {
-		verificarErro(requisicao().get("/api/v1/" + UUID.randomUUID()), 404, "Not Found", "RECURSO_NAO_ENCONTRADO");
-		verificarErro(requisicao().body("{}").post("/api/v1/nao-existe"), 404, "Not Found", "RECURSO_NAO_ENCONTRADO");
+	void deve_devolver_403_em_json_quando_a_rota_nao_existe_em_qualquer_metodo() {
+		// D121: rota sem regra é negada (403 a quem está logado); o 404 é só para recurso inexistente.
+		verificarErro(requisicao().get("/api/v1/" + UUID.randomUUID()), 403, "Forbidden", "ACESSO_NEGADO");
+		verificarErro(requisicao().body("{}").post("/api/v1/nao-existe"), 403, "Forbidden", "ACESSO_NEGADO");
 	}
 
 	@Test
-	void deve_devolver_405_quando_o_metodo_nao_e_permitido_na_colecao() {
+	void deve_devolver_403_quando_o_metodo_nao_tem_regra_na_colecao() {
+		// DELETE na coleção não tem regra (só /{id}): negado (D121), e não 405.
 		Response resposta = requisicao().delete(BASE);
 
-		verificarErro(resposta, 405, "Method Not Allowed", "METODO_NAO_PERMITIDO");
-		assertThat(resposta.header("Allow")).contains("GET").contains("POST");
+		verificarErro(resposta, 403, "Forbidden", "ACESSO_NEGADO");
+		assertThat(resposta.header("Allow")).isNull();
 	}
 
 }

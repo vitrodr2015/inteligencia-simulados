@@ -67,15 +67,38 @@ public abstract class AbstractIntegrationTest {
 	@Autowired
 	protected JdbcTemplate jdbc;
 
-	/** Usuário ADMIN de teste (um só para a JVM; o banco é compartilhado), criado na primeira necessidade. */
-	private static volatile Usuario administradorDeTeste;
+	/** Um usuário de teste por papel (um só para a JVM; o banco é compartilhado), criado na primeira necessidade. */
+	private static final java.util.Map<Papel, Usuario> USUARIOS_POR_PAPEL = new java.util.concurrent.ConcurrentHashMap<>();
 
 	/**
 	 * Requisição HTTP real para a aplicação, em JSON UTF-8 (o RestAssured usaria ISO-8859-1 por padrão), AUTENTICADA com
 	 * um token de acesso do ADMIN de teste.
 	 */
 	protected RequestSpecification requisicao() {
-		return requisicaoCom(tokenDeAcesso(administradorDeTeste()));
+		return requisicaoComo(Papel.ADMIN);
+	}
+
+	/** Requisição autenticada como o usuário de teste do papel dado (ADMIN, STUDENT ou GUARDIAN). */
+	protected RequestSpecification requisicaoComo(Papel papel) {
+		return requisicaoCom(tokenDeAcesso(usuarioDoPapel(papel)));
+	}
+
+	protected RequestSpecification requisicaoComoStudent() {
+		return requisicaoComo(Papel.STUDENT);
+	}
+
+	protected RequestSpecification requisicaoComoGuardian() {
+		return requisicaoComo(Papel.GUARDIAN);
+	}
+
+	/** O usuário de teste compartilhado do papel (criado uma vez). NÃO altere o papel dele: use {@link #criarUsuarioNoBanco(Papel)}. */
+	protected Usuario usuarioDoPapel(Papel papel) {
+		return USUARIOS_POR_PAPEL.computeIfAbsent(papel, this::criarUsuarioNoBanco);
+	}
+
+	/** Troca o papel direto no banco (JDBC), sem passar pela API: simula revogar ou conceder uma permissão. */
+	protected void mudarPapelNoBanco(Usuario usuario, Papel novoPapel) {
+		org.assertj.core.api.Assertions.assertThat(jdbc.update("UPDATE usuario SET papel = ? WHERE email = ?", novoPapel.name(), usuario.getEmail())).isEqualTo(1);
 	}
 
 	/** Como {@link #requisicao()}, mas sem o cabeçalho Authorization. */
@@ -101,19 +124,6 @@ public abstract class AbstractIntegrationTest {
 	protected Usuario criarUsuarioNoBanco(Papel papel) {
 		return usuariosDeTeste.saveAndFlush(new Usuario("Usuário de Teste", "teste." + sufixo() + "@exemplo.invalid",
 				"hash-falso-nao-e-real", LocalDate.of(2000, 1, 1), "v1", papel));
-	}
-
-	private Usuario administradorDeTeste() {
-		Usuario atual = administradorDeTeste;
-		if (atual == null) {
-			synchronized (AbstractIntegrationTest.class) {
-				if (administradorDeTeste == null) {
-					administradorDeTeste = criarUsuarioNoBanco(Papel.ADMIN);
-				}
-				atual = administradorDeTeste;
-			}
-		}
-		return atual;
 	}
 
 	/** Sufixo aleatório curto, para os dados de cada teste não colidirem com os de outros. */

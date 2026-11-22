@@ -22,6 +22,7 @@ import br.simulado.etec.shared.exception.InvalidRequestException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
 import br.simulado.etec.shared.paginacao.Filtros;
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.shared.persistencia.Restricoes;
 
 /**
@@ -80,13 +81,26 @@ public class SubtopicoService {
 	 * maiúsculas e acentos no MySQL; %, _ e a barra invertida valem como texto) e {@code ativo} (nulo = todos). Um
 	 * {@code materiaId} sem matéria correspondente é só um filtro que não casa com nada: devolve lista vazia.
 	 */
-	public Page<Subtopico> listar(UUID materiaId, String nome, Boolean ativo, Pageable paginacao) {
-		Specification<Subtopico> filtros = Specification.allOf(daMateria(materiaId),
+	public Page<Subtopico> listar(EscopoDeLeitura escopo, UUID materiaId, String nome, Boolean ativo, Pageable paginacao) {
+		escopo.validarFiltroAtivo(ativo);
+		// STUDENT só vê subtópico ativo de matéria ativa (D28); por isso o materiaId de uma matéria inativa dá lista vazia (D103).
+		Specification<Subtopico> visibilidade = escopo.veInativos() ? Filtros.<Subtopico>semFiltro() : soVisiveisParaAluno();
+		Specification<Subtopico> filtros = Specification.allOf(visibilidade, daMateria(materiaId),
 				Filtros.<Subtopico>contem("nome", nome), Filtros.<Subtopico>igual("ativo", ativo));
 		return repositorio.findAll(filtros, paginacao);
 	}
 
-	public Subtopico buscar(UUID id) {
+	/** Leitura por id: para o STUDENT, subtópico inativo ou de matéria inativa dá o MESMO 404 do inexistente. */
+	public Subtopico buscar(UUID id, EscopoDeLeitura escopo) {
+		Subtopico subtopico = carregar(id);
+		if (!escopo.veInativos() && !subtopico.visivelParaAluno()) {
+			throw naoEncontrado();
+		}
+		return subtopico;
+	}
+
+	/** Para as escritas (só ADMIN, a cadeia de segurança já barrou os demais): carrega sem filtro de visibilidade. */
+	private Subtopico carregar(UUID id) {
 		return repositorio.findByPublicId(id).orElseThrow(SubtopicoService::naoEncontrado);
 	}
 
@@ -96,7 +110,7 @@ public class SubtopicoService {
 	 */
 	@Transactional
 	public Subtopico atualizar(UUID id, SubtopicoAtualizacaoRequest dados) {
-		Subtopico subtopico = buscar(id);
+		Subtopico subtopico = carregar(id);
 		if (repositorio.existsByMateriaAndNomeAndPublicIdNot(subtopico.getMateria(), dados.nome(), id)) {
 			throw nomeDuplicado();
 		}
@@ -116,7 +130,7 @@ public class SubtopicoService {
 	/** Idempotente: já inativo devolve o mesmo resultado, sem tocar no registro (atualizadoEm não muda, D62). */
 	@Transactional
 	public Subtopico desativar(UUID id) {
-		Subtopico subtopico = buscar(id);
+		Subtopico subtopico = carregar(id);
 		if (subtopico.isAtivo()) {
 			subtopico.desativar();
 			return repositorio.saveAndFlush(subtopico);
@@ -130,7 +144,7 @@ public class SubtopicoService {
 	 */
 	@Transactional
 	public Subtopico ativar(UUID id) {
-		Subtopico subtopico = buscar(id);
+		Subtopico subtopico = carregar(id);
 		if (subtopico.isAtivo()) {
 			return subtopico;
 		}
@@ -150,6 +164,11 @@ public class SubtopicoService {
 		if (repositorio.apagarPorPublicId(id) == 0) {
 			throw naoEncontrado();
 		}
+	}
+
+	private static Specification<Subtopico> soVisiveisParaAluno() {
+		return (raiz, consulta, construtor) -> construtor.and(construtor.isTrue(raiz.get("ativo")),
+				construtor.isTrue(raiz.get("materia").get("ativo")));
 	}
 
 	private static Specification<Subtopico> daMateria(UUID materiaId) {

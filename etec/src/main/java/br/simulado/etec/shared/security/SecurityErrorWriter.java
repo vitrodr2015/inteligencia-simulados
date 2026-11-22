@@ -3,11 +3,15 @@ package br.simulado.etec.shared.security;
 import java.io.IOException;
 import java.time.Clock;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.firewall.RequestRejectedException;
+import org.springframework.security.web.firewall.RequestRejectedHandler;
 import org.springframework.stereotype.Component;
 
 import br.simulado.etec.shared.exception.CodigoErro;
@@ -24,7 +28,11 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code Accept} do cliente (D71). Mensagens fixas e genéricas: nunca dizem por que o token foi recusado.
  */
 @Component
-public class SecurityErrorWriter implements AuthenticationEntryPoint, AccessDeniedHandler {
+public class SecurityErrorWriter implements AuthenticationEntryPoint, AccessDeniedHandler, RequestRejectedHandler {
+
+	private static final Logger LOG = LoggerFactory.getLogger(SecurityErrorWriter.class);
+
+	static final String MENSAGEM_400 = "A requisição é inválida.";
 
 	static final String MENSAGEM_401 = "É necessário estar autenticado para acessar este recurso.";
 
@@ -50,6 +58,23 @@ public class SecurityErrorWriter implements AuthenticationEntryPoint, AccessDeni
 	@Override
 	public void handle(HttpServletRequest requisicao, HttpServletResponse resposta,
 			AccessDeniedException excecao) throws IOException {
+		escrever(resposta, HttpStatus.FORBIDDEN, CodigoErro.ACESSO_NEGADO, MENSAGEM_403);
+	}
+
+	/**
+	 * O firewall do Spring Security recusou a URL (barra dupla, {@code ;jsessionid}, {@code %2e}, barra invertida,
+	 * caractere de controle...): 400 REQUISICAO_INVALIDA (D124), em {@code ErrorResponse}, com mensagem fixa. Nada do
+	 * motivo técnico, da URL nem do nome da exceção vai para o cliente, e a URL não vai para o log.
+	 */
+	@Override
+	public void handle(HttpServletRequest requisicao, HttpServletResponse resposta, RequestRejectedException excecao)
+			throws IOException {
+		LOG.debug("Requisição recusada pelo firewall ({}).", excecao.getClass().getSimpleName());
+		escrever(resposta, HttpStatus.BAD_REQUEST, CodigoErro.REQUISICAO_INVALIDA, MENSAGEM_400);
+	}
+
+	/** CORS: origem, método ou cabeçalho não permitido (D123). 403 ACESSO_NEGADO, sem dizer qual regra falhou. */
+	public void negarOrigem(HttpServletResponse resposta) throws IOException {
 		escrever(resposta, HttpStatus.FORBIDDEN, CodigoErro.ACESSO_NEGADO, MENSAGEM_403);
 	}
 

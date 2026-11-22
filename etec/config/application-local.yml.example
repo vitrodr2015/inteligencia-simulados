@@ -7,3 +7,5 @@ ADMIN_SENHA: troque-a-senha-do-admin
 # Termos de uso vigentes (D23, D94); sem padrão no application.yml. Valores de exemplo.
 TERMOS_VERSAO: v1
 TERMOS_URL: https://exemplo.invalid/termos
+# CORS: origens de navegador permitidas, separadas por vírgula (http(s)://domínio[:porta]). Vazio = sem CORS. Nunca *.
+# CORS_ALLOWED_ORIGINS: http://localhost:5173

@@ -1,24 +1,33 @@
 package br.simulado.etec.shared.security;
 
+import java.util.function.Consumer;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsUtils;
 
 import jakarta.servlet.DispatcherType;
 
 /**
- * Cadeia de segurança (contrato, seções 1, 2 e 3): stateless, CSRF desligado, sem formulário, sem Basic, sem logout
- * do Spring, e NEGAR POR PADRÃO: tudo exige autenticação, exceto o que está listado abaixo, por MÉTODO e caminho.
- * Rota nova nasce fechada. Os papéis nas rotas (ADMIN escreve, STUDENT lê) NÃO entram aqui: são do Módulo 11, e até
- * lá qualquer usuário autenticado acessa as rotas autenticadas. CORS e preflight também ficam para o Módulo 11.
+ * Cadeia de segurança e QUEM PODE O QUÊ, num lugar só (contrato, seções 1 e 2): stateless, CSRF desligado, sem
+ * formulário, sem Basic, sem logout do Spring, e NEGAR POR PADRÃO: o que não tem regra aqui é negado ({@code denyAll}),
+ * com 401 para o anônimo e 403 para o autenticado, inclusive rota que nem existe (D121). O 404 fica para o recurso
+ * inexistente DEPOIS da autorização. Cada recurso novo traz a sua regra e a sua matriz de testes no próprio PR.
+ *
+ * <p>As regras são por MÉTODO e caminho exatos (nunca {@code /**}), e o HEAD segue o GET: o Spring Security compara o
+ * método exato, e o MVC responde HEAD pelo handler do GET. As autoridades vêm só de {@link Authorities}, e o papel vem
+ * do banco a cada requisição (D87). GUARDIAN não tem nenhuma permissão na fase 1 (D122).
  *
  * <p>O 401 e o 403 saem em {@code ErrorResponse} pelo {@link SecurityErrorWriter}, inclusive em {@code /actuator/**}
  * e {@code /error} (D120). Os cabeçalhos extras do Spring Security (Cache-Control, X-Content-Type-Options etc.) ficam
@@ -34,6 +43,21 @@ public class SecurityConfig {
 	/** Os três caminhos de saúde do actuator (a liveness e a readiness vêm das probes, D99). */
 	static final String[] SAUDE = { "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness" };
 
+	/** O usuário logado. PATCH e DELETE trazem a regra quando a rota nascer (até lá, negados). */
+	static final String[] ME = { "/api/v1/me" };
+
+	/** Leitura do catálogo: STUDENT e ADMIN. */
+	static final String[] CATALOGO_LEITURA = { "/api/v1/materias", "/api/v1/materias/{id}", "/api/v1/subtopicos",
+			"/api/v1/subtopicos/{id}" };
+
+	/** Escrita do catálogo: só ADMIN. */
+	static final String[] CATALOGO_CRIACAO = { "/api/v1/materias", "/api/v1/subtopicos" };
+
+	static final String[] CATALOGO_ITEM = { "/api/v1/materias/{id}", "/api/v1/subtopicos/{id}" };
+
+	static final String[] CATALOGO_ESTADO = { "/api/v1/materias/{id}/disable", "/api/v1/materias/{id}/enable",
+			"/api/v1/subtopicos/{id}/disable", "/api/v1/subtopicos/{id}/enable" };
+
 	/** Documentação OpenAPI: só entra como pública quando está ligada (desenvolvimento e homologação, D34). */
 	static final String[] DOCUMENTACAO = { "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui.html",
 			"/swagger-ui/**" };
@@ -45,6 +69,8 @@ public class SecurityConfig {
 				|| ambiente.getProperty("springdoc.swagger-ui.enabled", Boolean.class, false);
 
 		http.csrf(csrf -> csrf.disable())
+				// CORS: usa o bean corsFilter (origens de app.cors.allowed-origins). Sem isto não há CORS.
+				.cors(Customizer.withDefaults())
 				.formLogin(formulario -> formulario.disable())
 				.httpBasic(basic -> basic.disable())
 				.logout(logout -> logout.disable())
@@ -58,17 +84,39 @@ public class SecurityConfig {
 					// Despacho de ERRO (o container repassando um erro real): mantém o status original. Quem pede
 					// /error direto é despacho normal e cai no denyAll abaixo.
 					regras.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();
+					// Preflight de CORS de verdade (OPTIONS com Origin e Access-Control-Request-Method): não exige autenticação
+					// (D100). Um OPTIONS comum, sem esses cabeçalhos, NÃO é liberado e cai no denyAll.
+					regras.requestMatchers(request -> CorsUtils.isPreFlightRequest(request)).permitAll();
+					// ----- públicas -----
 					regras.requestMatchers(HttpMethod.POST, PUBLICAS_POST).permitAll();
-					regras.requestMatchers(HttpMethod.GET, "/api/v1/termos/vigente").permitAll();
-					regras.requestMatchers(HttpMethod.GET, SAUDE).permitAll();
+					leitura(regras, new String[] { "/api/v1/termos/vigente" }, url -> url.permitAll());
+					leitura(regras, SAUDE, url -> url.permitAll());
 					if (documentacaoLigada) {
-						regras.requestMatchers(HttpMethod.GET, DOCUMENTACAO).permitAll();
+						leitura(regras, DOCUMENTACAO, url -> url.permitAll());
 					}
+					// ----- STUDENT e ADMIN -----
+					leitura(regras, ME, url -> url.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN));
+					leitura(regras, CATALOGO_LEITURA,
+							url -> url.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN));
+					// ----- só ADMIN (escrita do catálogo) -----
+					regras.requestMatchers(HttpMethod.POST, CATALOGO_CRIACAO).hasAuthority(Authorities.ROLE_ADMIN);
+					regras.requestMatchers(HttpMethod.PUT, CATALOGO_ITEM).hasAuthority(Authorities.ROLE_ADMIN);
+					regras.requestMatchers(HttpMethod.DELETE, CATALOGO_ITEM).hasAuthority(Authorities.ROLE_ADMIN);
+					regras.requestMatchers(HttpMethod.PATCH, CATALOGO_ESTADO).hasAuthority(Authorities.ROLE_ADMIN);
 					// D113: o resto de /actuator e /error = 401 para anônimo e 403 para autenticado, nunca 404.
 					regras.requestMatchers("/actuator/**", "/actuator", "/error", "/error/**").denyAll();
-					regras.anyRequest().authenticated();
+					// D121: o que não tem regra é NEGADO (401 anônimo, 403 autenticado), inclusive rota inexistente.
+					regras.anyRequest().denyAll();
 				});
 		return http.build();
+	}
+
+	/** GET e HEAD com a mesma regra: o Spring Security compara o método exato, e o MVC atende HEAD pelo handler do GET. */
+	private static void leitura(
+			AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry regras,
+			String[] caminhos, Consumer<AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizedUrl> regra) {
+		regra.accept(regras.requestMatchers(HttpMethod.GET, caminhos));
+		regra.accept(regras.requestMatchers(HttpMethod.HEAD, caminhos));
 	}
 
 	/**

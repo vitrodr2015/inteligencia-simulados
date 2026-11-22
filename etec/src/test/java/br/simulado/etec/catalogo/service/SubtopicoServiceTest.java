@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.catalogo.dto.SubtopicoAtualizacaoRequest;
 import br.simulado.etec.catalogo.dto.SubtopicoCriacaoRequest;
 import br.simulado.etec.catalogo.model.Materia;
@@ -164,8 +165,8 @@ class SubtopicoServiceTest {
 		when(repositorio.findByPublicId(existente.getPublicId())).thenReturn(Optional.of(existente));
 		when(repositorio.findByPublicId(inexistente)).thenReturn(Optional.empty());
 
-		assertThat(servico.buscar(existente.getPublicId())).isSameAs(existente);
-		assertThatThrownBy(() -> servico.buscar(inexistente)).isInstanceOfSatisfying(ResourceNotFoundException.class,
+		assertThat(servico.buscar(existente.getPublicId(), EscopoDeLeitura.TUDO)).isSameAs(existente);
+		assertThatThrownBy(() -> servico.buscar(inexistente, EscopoDeLeitura.TUDO)).isInstanceOfSatisfying(ResourceNotFoundException.class,
 				erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.SUBTOPICO_NAO_ENCONTRADO));
 	}
 
@@ -325,4 +326,40 @@ class SubtopicoServiceTest {
 				erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.SUBTOPICO_NAO_ENCONTRADO));
 	}
 
+
+	// ----- visibilidade por papel (D28, D103) -----
+
+	@Test
+	void deve_dar_404_do_inexistente_quando_o_student_busca_subtopico_inativo_ou_de_materia_inativa() {
+		Subtopico inativo = subtopico("Inativo");
+		inativo.desativar();
+		Materia materiaInativa = new Materia("Materia inativa", null);
+		Subtopico emMateriaInativa = new Subtopico(materiaInativa, "Em materia inativa");
+		materiaInativa.desativar();
+		when(repositorio.findByPublicId(inativo.getPublicId())).thenReturn(Optional.of(inativo));
+		when(repositorio.findByPublicId(emMateriaInativa.getPublicId())).thenReturn(Optional.of(emMateriaInativa));
+
+		for (Subtopico escondido : new Subtopico[] { inativo, emMateriaInativa }) {
+			assertThatThrownBy(() -> servico.buscar(escondido.getPublicId(), EscopoDeLeitura.SO_ATIVOS))
+					.isInstanceOfSatisfying(ResourceNotFoundException.class,
+							erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.SUBTOPICO_NAO_ENCONTRADO));
+			assertThat(servico.buscar(escondido.getPublicId(), EscopoDeLeitura.TUDO)).isSameAs(escondido);
+		}
+	}
+
+	@Test
+	void deve_devolver_o_subtopico_ativo_de_materia_ativa_ao_student() {
+		Subtopico visivel = subtopico("Visivel");
+		when(repositorio.findByPublicId(visivel.getPublicId())).thenReturn(Optional.of(visivel));
+
+		assertThat(servico.buscar(visivel.getPublicId(), EscopoDeLeitura.SO_ATIVOS)).isSameAs(visivel);
+	}
+
+	@Test
+	void deve_recusar_ativo_false_do_student_sem_consultar_o_banco() {
+		assertThatThrownBy(() -> servico.listar(EscopoDeLeitura.SO_ATIVOS, null, null, false,
+				org.springframework.data.domain.Pageable.unpaged())).isInstanceOfSatisfying(InvalidRequestException.class,
+						erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.PARAMETRO_INVALIDO));
+		org.mockito.Mockito.verifyNoInteractions(repositorio);
+	}
 }

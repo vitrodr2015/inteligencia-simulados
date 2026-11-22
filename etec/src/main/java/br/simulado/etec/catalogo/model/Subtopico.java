@@ -100,6 +100,11 @@ public class Subtopico {
 		return nome;
 	}
 
+	/** O STUDENT só vê subtópico ativo de matéria ativa (D28, D103). */
+	public boolean visivelParaAluno() {
+		return ativo && materia.isAtivo();
+	}
+
 	public boolean isAtivo() {
 		return ativo;
 	}

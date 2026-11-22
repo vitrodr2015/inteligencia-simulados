@@ -91,6 +91,11 @@ public class Materia {
 		return descricao;
 	}
 
+	/** O STUDENT só vê matéria ativa (D28). */
+	public boolean visivelParaAluno() {
+		return ativo;
+	}
+
 	public boolean isAtivo() {
 		return ativo;
 	}

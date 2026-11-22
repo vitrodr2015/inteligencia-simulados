@@ -1,6 +1,7 @@
 package br.simulado.etec.shared.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -11,35 +12,40 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.context.annotation.Primary;
 
+import br.simulado.etec.catalogo.service.MateriaService;
 import br.simulado.etec.shared.security.JwtTokenProvider.TipoToken;
 
 /**
- * Um erro 500 REAL (exceção inesperada num controller) com a cadeia de segurança LIGADA e por HTTP de verdade: continua
- * 500, no {@code ErrorResponse} genérico, sem pilha nem texto da exceção, e não vira 401 nem 403 pela cadeia. O
- * {@code /error} pedido direto continua 401 (anônimo) e 403 (autenticado), D113. H2, sem Docker.
+ * Um erro 500 REAL (exceção inesperada no service) com a cadeia de segurança LIGADA e por HTTP de verdade, numa rota
+ * que TEM regra ({@code GET /api/v1/materias}): continua 500, no {@code ErrorResponse} genérico, sem pilha nem texto da
+ * exceção, e não vira 401 nem 403 pela cadeia. O {@code /error} pedido direto continua 401 (anônimo) e 403
+ * (autenticado), D113. H2, sem Docker.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(Erro500ComSegurancaTest.ControllerQueFalha.class)
+@Import(Erro500ComSegurancaTest.ServicoQueFalha.class)
 class Erro500ComSegurancaTest {
 
-	/** Usuário de exemplo do data.sql de teste (H2). */
+	/** Usuário de exemplo do data.sql de teste (H2), papel STUDENT. */
 	private static final UUID USUARIO_DE_EXEMPLO = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
 	private static final String TEXTO_SENSIVEL = "SELECT senha_hash FROM usuario -- br.simulado.etec.usuarios.model.Usuario";
 
-	@RestController
-	@RequestMapping("/api/v1/teste-erro-real")
-	static class ControllerQueFalha {
+	/** Um MateriaService que lança uma exceção inesperada em qualquer método, qualquer que seja a assinatura. */
+	@TestConfiguration(proxyBeanMethods = false)
+	static class ServicoQueFalha {
 
-		@GetMapping
-		String falhar() {
-			throw new IllegalStateException(TEXTO_SENSIVEL);
+		@Bean
+		@Primary
+		MateriaService materiaServiceQueFalha() {
+			return mock(MateriaService.class, invocacao -> {
+				throw new IllegalStateException(TEXTO_SENSIVEL);
+			});
 		}
 
 	}
@@ -66,7 +72,7 @@ class Erro500ComSegurancaTest {
 	@Test
 	void deve_devolver_500_em_error_response_generico_quando_um_erro_real_acontece_com_a_seguranca_ligada()
 			throws Exception {
-		HttpResponse<String> resposta = get("/api/v1/teste-erro-real", token());
+		HttpResponse<String> resposta = get("/api/v1/materias", token());
 
 		assertThat(resposta.statusCode()).isEqualTo(500);
 		assertThat(resposta.headers().firstValue("Content-Type")).hasValue("application/json");
@@ -78,7 +84,7 @@ class Erro500ComSegurancaTest {
 
 	@Test
 	void deve_dar_401_e_nao_500_quando_o_anonimo_chama_a_rota_que_falha() throws Exception {
-		HttpResponse<String> resposta = get("/api/v1/teste-erro-real", null);
+		HttpResponse<String> resposta = get("/api/v1/materias", null);
 
 		assertThat(resposta.statusCode()).isEqualTo(401);
 		assertThat(resposta.body()).contains("\"codigo\":\"NAO_AUTENTICADO\"").doesNotContain("SELECT");
