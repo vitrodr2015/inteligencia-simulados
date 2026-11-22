@@ -26,6 +26,7 @@ import br.simulado.etec.catalogo.service.MateriaService;
 import br.simulado.etec.shared.paginacao.ConversorDePaginacao;
 import br.simulado.etec.shared.paginacao.Filtros;
 import br.simulado.etec.shared.paginacao.PaginaResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 /** Só HTTP: valida a entrada, chama o service e monta a resposta. A documentação fica em {@link MateriaControllerDocs}. */
@@ -51,10 +52,12 @@ public class MateriaController implements MateriaControllerDocs {
 	@GetMapping
 	public ResponseEntity<PaginaResponse<MateriaResponse>> listar(@RequestParam(required = false) String nome,
 			@RequestParam(required = false) String ativo, @RequestParam(required = false) String page,
-			@RequestParam(required = false) String size, @RequestParam(required = false) String sort) {
+			@RequestParam(required = false) String size, HttpServletRequest requisicao) {
 		// Parâmetros recebidos como texto de propósito: a validação é nossa, e devolve 400 (o resolvedor do
-		// Spring corrigiria page e size inválidos em silêncio).
-		Pageable paginacao = ConversorDePaginacao.converter(page, size, sort, MateriaService.CAMPOS_ORDENAVEIS);
+		// Spring corrigiria page e size inválidos em silêncio). O sort vem CRU da requisição: quando o parâmetro
+		// se repete, o Spring juntaria os valores com vírgula e aceitaria o segundo em silêncio (D101).
+		Pageable paginacao = ConversorDePaginacao.converterRequisicao(page, size, requisicao.getParameterValues("sort"),
+				MateriaService.CAMPOS_ORDENAVEIS);
 		Boolean filtroAtivo = Filtros.booleano("ativo", ativo);
 		Page<Materia> pagina = servico.listar(nome, filtroAtivo, paginacao);
 		return ResponseEntity.ok(PaginaResponse.de(pagina, MateriaMapper::paraResponse));

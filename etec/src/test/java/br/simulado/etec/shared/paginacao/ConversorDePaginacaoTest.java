@@ -138,4 +138,40 @@ class ConversorDePaginacaoTest {
 				.hasMessageNotContaining("drop").hasMessageNotContaining("table");
 	}
 
+
+	// ----- converterRequisicao: valores crus do sort (D101) -----
+
+	private static Pageable converterRequisicao(String... sorts) {
+		return ConversorDePaginacao.converterRequisicao(null, null, sorts, CAMPOS);
+	}
+
+	@Test
+	void deve_usar_o_sort_padrao_quando_a_requisicao_nao_traz_o_parametro_sort() {
+		assertThat(ordens(ConversorDePaginacao.converterRequisicao(null, null, null, CAMPOS)))
+				.containsExactly("nome ASC", "id ASC");
+		assertThat(ordens(converterRequisicao())).containsExactly("nome ASC", "id ASC");
+	}
+
+	@Test
+	void deve_aceitar_um_unico_sort_cru_com_campo_e_direcao() {
+		assertThat(ordens(converterRequisicao("criadoEm,DESC"))).containsExactly("criadoEm DESC", "id ASC");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "nome|criadoEm", "nome,asc|criadoEm,desc", "nome|nome", "nome|desc", "senha|nome", "nome|" })
+	void deve_recusar_com_ordenacao_invalida_quando_a_requisicao_traz_mais_de_um_sort(String valores) {
+		String[] sorts = valores.split("\\|", -1);
+
+		assertThat(sorts.length).isGreaterThan(1);
+		assertThatThrownBy(() -> converterRequisicao(sorts)).isInstanceOfSatisfying(InvalidRequestException.class,
+				erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.ORDENACAO_INVALIDA));
+	}
+
+	@Test
+	void deve_diferenciar_do_texto_juntado_que_seria_valido() {
+		// O mesmo "nome,desc" é válido quando vem num só parâmetro e inválido quando vem em dois (nome e desc).
+		assertThat(ordens(converterRequisicao("nome,desc"))).containsExactly("nome DESC", "id ASC");
+		assertThatThrownBy(() -> converterRequisicao("nome", "desc")).isInstanceOf(InvalidRequestException.class);
+	}
+
 }

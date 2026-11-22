@@ -159,8 +159,9 @@ Rodar de dentro de `etec/` (no PowerShell/cmd use `mvnw.cmd`):
 ## 12. Git e CI
 
 - Remoto: `https://github.com/vitrodr2015/inteligencia-simulados.git`, branch principal `main`.
+- Fluxo: `feature/*` → PR para a `develop`; a `main` só recebe PR de `release/X.Y.Z` (ou hotfix) vindo da `develop`.
 - A `main` é protegida (ruleset `proteger-main`): só entra por pull request com o check **Build e testes** verde.
-- Trabalhar por branch e PR. Nunca commitar na `main`/`develop`.
+- Nunca commitar direto na `main`/`develop`; sempre por branch e PR.
 - Só fazer commit/push quando o usuário pedir.
 - CI: `.github/workflows/ci.yml` roda `./mvnw verify` em PRs e em push na `main`. Dependabot semanal (Maven e Actions).
 - CD: ainda não definido (destino de deploy em aberto).

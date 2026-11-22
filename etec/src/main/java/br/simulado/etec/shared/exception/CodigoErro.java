@@ -18,7 +18,16 @@ public enum CodigoErro {
 	ERRO_INTERNO,
 	ORDENACAO_INVALIDA,
 
+	// Campo de entrada que não muda depois de criado, enviado com valor diferente do atual (D48)
+	CAMPO_IMUTAVEL,
+
 	// Matéria
 	MATERIA_NOME_DUPLICADO,
-	MATERIA_NAO_ENCONTRADA
+	MATERIA_NAO_ENCONTRADA,
+	MATERIA_COM_SUBTOPICOS,
+	MATERIA_INATIVA,
+
+	// Subtópico
+	SUBTOPICO_NOME_DUPLICADO,
+	SUBTOPICO_NAO_ENCONTRADO
 }

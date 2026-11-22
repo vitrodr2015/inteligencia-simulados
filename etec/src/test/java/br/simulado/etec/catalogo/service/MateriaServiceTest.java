@@ -7,9 +7,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.sql.SQLException;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.hibernate.exception.ConstraintViolationException;
+import org.hibernate.exception.ConstraintViolationException.ConstraintKind;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -215,6 +218,50 @@ class MateriaServiceTest {
 		assertThatThrownBy(() -> servico.apagar(id))
 				.isInstanceOfSatisfying(ResourceNotFoundException.class,
 						erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.MATERIA_NAO_ENCONTRADA));
+	}
+
+
+	// ----- apagar com subtópicos: a FK é a garantia; só ela é traduzida (B5) -----
+
+	private static DataIntegrityViolationException violacao(ConstraintKind tipo, String nome) {
+		return new DataIntegrityViolationException("falha",
+				new ConstraintViolationException("v", new SQLException("x"), tipo, nome));
+	}
+
+	@Test
+	void deve_recusar_com_409_materia_com_subtopicos_quando_a_fk_do_subtopico_barra_o_delete() {
+		UUID id = UUID.randomUUID();
+		when(repositorio.apagarPorPublicId(id)).thenThrow(violacao(ConstraintKind.FOREIGN_KEY, "fk_subtopico_materia"));
+
+		assertThatThrownBy(() -> servico.apagar(id)).isInstanceOfSatisfying(ConflictException.class,
+				erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.MATERIA_COM_SUBTOPICOS));
+	}
+
+	@Test
+	void deve_deixar_subir_sem_traduzir_a_fk_de_outra_tabela() {
+		UUID id = UUID.randomUUID();
+		DataIntegrityViolationException outra = violacao(ConstraintKind.FOREIGN_KEY, "fk_questao_prova");
+		when(repositorio.apagarPorPublicId(id)).thenThrow(outra);
+
+		assertThatThrownBy(() -> servico.apagar(id)).isSameAs(outra);
+	}
+
+	@Test
+	void deve_deixar_subir_sem_traduzir_uma_violacao_que_nao_e_de_chave_estrangeira() {
+		UUID id = UUID.randomUUID();
+		DataIntegrityViolationException outra = violacao(ConstraintKind.UNIQUE, "uk_qualquer");
+		when(repositorio.apagarPorPublicId(id)).thenThrow(outra);
+
+		assertThatThrownBy(() -> servico.apagar(id)).isSameAs(outra);
+	}
+
+	@Test
+	void deve_deixar_subir_uma_falha_de_integridade_sem_violacao_conhecida() {
+		UUID id = UUID.randomUUID();
+		DataIntegrityViolationException desconhecida = new DataIntegrityViolationException("sem causa do Hibernate");
+		when(repositorio.apagarPorPublicId(id)).thenThrow(desconhecida);
+
+		assertThatThrownBy(() -> servico.apagar(id)).isSameAs(desconhecida);
 	}
 
 }
