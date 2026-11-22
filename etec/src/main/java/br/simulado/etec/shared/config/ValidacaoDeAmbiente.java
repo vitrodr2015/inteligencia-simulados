@@ -38,6 +38,13 @@ public final class ValidacaoDeAmbiente {
 			problemas.add(JWT_SECRET + " precisa ter pelo menos " + TAMANHO_MINIMO_JWT_SECRET + " caracteres.");
 		}
 
+		// Administrador inicial (D45, D91, D125): em PRODUÇÃO, variável inválida derruba a subida, ANTES de existir contexto e
+		// de o servidor abrir. Fora de produção nada falha aqui (o bootstrap só registra o erro). A falta de admin com as
+		// variáveis ausentes depende do banco e é conferida depois, ainda antes de o servidor aceitar conexões.
+		if (Perfis.emProducao(ambiente)
+				&& AdminInicialAmbiente.ler(ambiente) instanceof AdminInicialAmbiente.Invalida invalida) {
+			problemas.add("Administrador inicial: " + invalida.resumo());
+		}
 		if (!problemas.isEmpty()) {
 			StringBuilder mensagem = new StringBuilder("Configuração inválida, a aplicação não vai subir:");
 			problemas.forEach(problema -> mensagem.append("\n - ").append(problema));

@@ -1,11 +1,15 @@
 # Copie este arquivo para config/application-local.yml (ignorado pelo Git),
 # troque os valores e rode com SPRING_PROFILES_ACTIVE=local.
-# Os valores abaixo são falsos de propósito; nunca coloque segredo real neste .example.
-DB_PASSWORD: troque-a-senha-do-banco
-JWT_SECRET: troque-este-segredo-por-um-com-no-minimo-32-caracteres
-ADMIN_SENHA: troque-a-senha-do-admin
+# Neste .example só valem marcadores (<defina-aqui>) e comentários; nunca coloque valor real aqui.
+# JWT_SECRET precisa de pelo menos 32 caracteres (um valor aleatório longo).
+DB_PASSWORD: <defina-aqui>
+JWT_SECRET: <defina-aqui>
 # Termos de uso vigentes (D23, D94); sem padrão no application.yml. Valores de exemplo.
 TERMOS_VERSAO: v1
 TERMOS_URL: https://exemplo.invalid/termos
 # CORS: origens de navegador permitidas, separadas por vírgula (http(s)://domínio[:porta]). Vazio = sem CORS. Nunca *.
 # CORS_ALLOWED_ORIGINS: http://localhost:5173
+# Administrador inicial (D45): NÃO coloque ADMIN_EMAIL nem ADMIN_SENHA neste arquivo. Passe as duas pelo ambiente do
+# terminal, só na primeira subida (README.md, "Administrador inicial"); a senha tem de 12 a 72 bytes.
+# ADMIN_EMAIL: <defina-aqui>
+# ADMIN_SENHA: <defina-aqui>

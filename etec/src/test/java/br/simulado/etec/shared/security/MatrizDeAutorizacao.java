@@ -162,6 +162,24 @@ public final class MatrizDeAutorizacao {
 		linha("actuator fora da saúde", "GET", null, c -> "/actuator/env", null, 401, 403, 403, 403);
 		linha("/error direto", "GET", null, c -> "/error", null, 401, 403, 403, 403);
 		linha("sub-rota da saúde", "GET", null, c -> "/actuator/health/xyz", null, 401, 403, 403, 403);
+
+		// ----- caminhos sensíveis (D127): nenhum abre, nem para o ADMIN. Anônimo 401; logado 403 (o ADMIN também) -----
+		for (String sensivel : new String[] { "/actuator", "/actuator/env", "/actuator/heapdump", "/actuator/beans",
+				"/actuator/mappings", "/actuator/configprops", "/actuator/loggers", "/actuator/metrics",
+				"/actuator/threaddump", "/actuator/httpexchanges", "/h2-console", "/h2-console/", "/swagger-ui.html",
+				"/swagger-ui/index.html", "/v3/api-docs", "/api-docs", "/.env", "/application.yml", "/config/application-local.yml",
+				"/api/v1/admin", "/api/v1/admin/usuarios" }) {
+			linha("caminho sensível " + sensivel, "GET", null, c -> sensivel, null, 401, 403, 403, 403);
+		}
+		linha("POST em /actuator/shutdown", "POST", null, c -> "/actuator/shutdown", c -> "{}", 401, 403, 403, 403);
+		linha("POST em /h2-console", "POST", null, c -> "/h2-console", c -> "{}", 401, 403, 403, 403);
+		linha("POST em /actuator/env", "POST", null, c -> "/actuator/env", c -> "{}", 401, 403, 403, 403);
+		// /WEB-INF e /META-INF: o CONTAINER (Tomcat) responde 404 antes da cadeia de segurança, para qualquer perfil
+		// (seção 7 do contrato). O corpo seguro é provado em CaminhosSensiveisVazamentoTest.
+		linha("/WEB-INF/web.xml (o container responde antes da cadeia)", "GET", null, c -> "/WEB-INF/web.xml", null, 404,
+				404, 404, 404);
+		linha("/META-INF/MANIFEST.MF (o container responde antes da cadeia)", "GET", null, c -> "/META-INF/MANIFEST.MF",
+				null, 404, 404, 404, 404);
 	}
 
 	public static List<Caso> casos() {

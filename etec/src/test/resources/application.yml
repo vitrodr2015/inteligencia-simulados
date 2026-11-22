@@ -42,6 +42,15 @@ app:
     url: https://exemplo.invalid/termos
 
 # Swagger desligado por padrão, como em produção; os testes do Swagger ligam por propriedade.
+server:
+  error:
+    # Nenhum detalhe de erro no corpo (D127): sem mensagem, exceção nem pilha, inclusive nas respostas que o container
+    # (Tomcat) dá antes da cadeia de segurança. (No Boot 4.2 o campo path é SEMPRE incluído, não há propriedade que o tire.)
+    include-message: never
+    include-stacktrace: never
+    include-exception: never
+    include-binding-errors: never
+
 springdoc:
   api-docs:
     enabled: false
