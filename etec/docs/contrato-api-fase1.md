@@ -2,7 +2,7 @@ Contrato da API — Fase 1 (v1.0, aprovada)
 
 O contrato é revisado e aprovado antes de qualquer código. Ele é rascunho até a aprovação; a v1.0 é a versão aprovada (D83), e depois dela qualquer mudança é registrada na seção 10. Este é o documento completo da API da fase 1 e não depende de outros.
 
-Estado: versão aprovada (v1.0). Decisões D1 a D116 decididas, exceto D22 e D24 (pendências externas).
+Estado: versão aprovada (v1.0). Decisões D1 a D117 decididas, exceto D22 e D24 (pendências externas).
 
 1. Convenções gerais (valem para todas as rotas)
 Tema	Decisão
@@ -332,6 +332,7 @@ D113	Outros caminhos de /actuator e /error: 401 para anônimo e 403 para autenti
 D114	Cache-Control: no-store vale para as respostas de signin e de refresh	✅ Confirmada
 D115	O contrato é autônomo: sem referências a outros documentos nem a numeração de pendências; a seção 11 descreve por extenso as duas pendências externas (D22 e D24)	✅ Confirmada
 D116	Em /api/v1, rota inexistente responde 401 a quem não está autenticado e 404 a quem está (rota nova nasce negada); o 404 de rota inexistente só vale após a autenticação	✅ Confirmada (refina D82 e D113)
+D117	A `descricao` que sobra só de espaços, depois de aparada, vira null: não existe "" como segundo jeito de dizer "sem descrição"; vale para Matéria e Subtópico. O `nome` em branco continua 400	✅ Confirmada (refina D104)
 9. Fora da fase 1 (de propósito)
 
 Pagamento e planos, entitlements como API (na fase 1 é um serviço interno que libera tudo, por podeIniciarTentativa), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
@@ -340,7 +341,7 @@ Pagamento e planos, entitlements como API (na fase 1 é um serviço interno que 
 
 A v1.0 é a versão aprovada (D83). Toda mudança a partir dela entra aqui, com a decisão e o motivo.
 
-(vazio)
+2026-11-22 — D117 (esclarecimento da D104): descricao só de espaços, depois de aparada, vira null (Matéria e Subtópico). Apêndice A: acrescentados SUBTOPICO_NOME_DUPLICADO, SUBTOPICO_NAO_ENCONTRADO e MATERIA_COM_SUBTOPICOS; CAMPO_IMUTAVEL e MATERIA_INATIVA passam de "a implementar" para "Implementado"; registrado que o 400 de materiaId inexistente no corpo usa VALIDACAO_FALHOU (D14), sem código novo. Decisões: D117 e D84 (cada recurso novo acrescenta os seus códigos ao implementar). Motivo: implementação do Subtópico (Tarefa 09).
 
 11. Pendências abertas e limitações conhecidas
 
@@ -356,21 +357,24 @@ Apêndice A. Catálogo de códigos de erro (D84)
 Cada recurso novo acrescenta os seus códigos a este catálogo ao ser implementado. Os códigos de 401, 403, 413 e 429 entram quando as rotas que os produzem forem implementadas.
 
 Código	Status	Quando	Situação
-VALIDACAO_FALHOU	400	campos inválidos no corpo (traz campos)	Implementado
+VALIDACAO_FALHOU	400	campos inválidos no corpo (traz campos); também é o código do 400 de materiaId inexistente no corpo do POST de subtópico, com campos[materiaId] (D14), sem código novo	Implementado
 CORPO_ILEGIVEL	400	JSON ilegível ou de tipo errado	Implementado
 PARAMETRO_AUSENTE	400	parâmetro obrigatório ausente	Implementado
 PARAMETRO_INVALIDO	400	parâmetro com valor inválido (page, size, ativo, id malformado...)	Implementado
 ORDENACAO_INVALIDA	400	sort com formato ou campo inválido	Implementado
-CAMPO_IMUTAVEL	400	campo de entrada que não muda, enviado com valor diferente do atual	Nomeado no contrato; a implementar
+CAMPO_IMUTAVEL	400	campo de entrada que não muda, enviado com valor diferente do atual	Implementado (materiaId no PUT de subtópico)
 RECURSO_NAO_ENCONTRADO	404	rota sem recurso mapeado, para quem passa na autenticação (o anônimo recebe 401)	Implementado
 MATERIA_NAO_ENCONTRADA	404	matéria inexistente (ou inativa para o STUDENT)	Implementado
+SUBTOPICO_NAO_ENCONTRADO	404	subtópico inexistente (para o STUDENT, também o inativo ou de matéria inativa, quando os papéis existirem)	Implementado
 METODO_NAO_PERMITIDO	405	método HTTP não permitido na rota	Implementado
 FORMATO_NAO_ACEITO	406	Accept que não seja JSON	Implementado
 CONFLITO	409	conflito sem código próprio	Implementado
 MATERIA_NOME_DUPLICADO	409	já existe matéria com o nome	Implementado
-MATERIA_INATIVA	409	subtópico criado, ou inativo que seria reativado, em matéria desativada	Nomeado no contrato; a implementar
+MATERIA_COM_SUBTOPICOS	409	matéria com subtópicos, ativos ou não, não pode ser apagada	Implementado
+SUBTOPICO_NOME_DUPLICADO	409	já existe subtópico com o nome nessa matéria	Implementado
+MATERIA_INATIVA	409	subtópico criado, ou inativo que seria reativado, em matéria desativada	Implementado
 TENTATIVA_EM_ANDAMENTO	409	já há tentativa em andamento nessa prova (traz detalhes.tentativaId)	Nomeado no contrato; a implementar
 TIPO_NAO_SUPORTADO	415	corpo que não é application/json	Implementado
 ERRO_INTERNO	500	erro inesperado (mensagem genérica)	Implementado
 
-Histórico das versões: o contrato nasceu como lista de rotas e foi refinado em rodadas de perguntas e respostas (v0.2 a v0.10). Elas fecharam as regras de tentativa e prazo (D3 a D6, D16, D31, D50), de importação e versões de questão (D7, D8, D13, D18 a D21, D40 a D43, D51, D55, D56), de autenticação e tokens (D15, D23 a D26, D37, D39, D45, D49), do formato de erro (D1, D33, D44, D59, D60), das convenções de dados (D57 a D63), da listagem (D29, D64 a D70) e do formato da resposta (D71 a D75). v1.0 — versão aprovada: D76 a D116 resolveram as contradições e lacunas apontadas na leitura independente do contrato (paginação, ordem de validação, regras de questão e importação, tentativa e resultado, autenticação, CORS, actuator, textos e e-mail), acrescentaram o catálogo de códigos de erro e tornaram o documento autônomo.
+Histórico das versões: o contrato nasceu como lista de rotas e foi refinado em rodadas de perguntas e respostas (v0.2 a v0.10). Elas fecharam as regras de tentativa e prazo (D3 a D6, D16, D31, D50), de importação e versões de questão (D7, D8, D13, D18 a D21, D40 a D43, D51, D55, D56), de autenticação e tokens (D15, D23 a D26, D37, D39, D45, D49), do formato de erro (D1, D33, D44, D59, D60), das convenções de dados (D57 a D63), da listagem (D29, D64 a D70) e do formato da resposta (D71 a D75). v1.0 — versão aprovada: D76 a D116 (e a D117, depois da aprovação) resolveram as contradições e lacunas apontadas na leitura independente do contrato (paginação, ordem de validação, regras de questão e importação, tentativa e resultado, autenticação, CORS, actuator, textos e e-mail), acrescentaram o catálogo de códigos de erro e tornaram o documento autônomo.

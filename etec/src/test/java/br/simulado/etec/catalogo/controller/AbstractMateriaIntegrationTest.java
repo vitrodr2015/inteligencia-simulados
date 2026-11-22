@@ -21,7 +21,10 @@ abstract class AbstractMateriaIntegrationTest extends AbstractIntegrationTest {
 	}
 
 	private static String texto(String valor) {
-		return (valor == null) ? "null" : "\"" + valor.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+		// Aspas, barra e caracteres de controle escapados: um \t ou \n cru dentro de uma string JSON é JSON inválido.
+		return (valor == null) ? "null"
+				: "\"" + valor.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")
+						.replace("\t", "\\t") + "\"";
 	}
 
 	protected Response criar(String nome, String descricao) {

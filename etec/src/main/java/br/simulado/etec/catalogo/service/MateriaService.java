@@ -18,6 +18,7 @@ import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
 import br.simulado.etec.shared.paginacao.Filtros;
+import br.simulado.etec.shared.persistencia.Restricoes;
 
 /** Regras da matéria (contrato, seção 4.1). Leituras em transação somente leitura. */
 @Service
@@ -95,10 +96,25 @@ public class MateriaService {
 		return repositorio.saveAndFlush(materia);
 	}
 
-	/** Atômico: uma instrução só. Se não apagou nada, a matéria não existia. */
+	/**
+	 * Atômico: uma instrução só. Se não apagou nada, a matéria não existia. Se ela tem subtópicos (ativos ou não), a chave
+	 * estrangeira com ON DELETE RESTRICT do banco recusa o delete e isso vira 409 MATERIA_COM_SUBTOPICOS. Só essa
+	 * restrição é traduzida: qualquer outra violação de integridade sobe como está, e não é escondida (D28).
+	 */
 	@Transactional
 	public void apagar(UUID id) {
-		if (repositorio.apagarPorPublicId(id) == 0) {
+		int apagadas;
+		try {
+			apagadas = repositorio.apagarPorPublicId(id);
+		}
+		catch (DataIntegrityViolationException ex) {
+			if (Restricoes.ehChaveEstrangeira(ex, SubtopicoService.FK_MATERIA)) {
+				throw new ConflictException(CodigoErro.MATERIA_COM_SUBTOPICOS,
+						"A matéria tem subtópicos e não pode ser apagada.");
+			}
+			throw ex;
+		}
+		if (apagadas == 0) {
 			throw naoEncontrada();
 		}
 	}

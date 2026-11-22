@@ -10,10 +10,12 @@ import br.simulado.etec.shared.exception.ErrorResponse;
 import br.simulado.etec.shared.paginacao.PaginaResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Documentação OpenAPI da matéria. Só o que o código devolve hoje: 200, 201, 204, 400, 404 e 409.
@@ -33,6 +35,7 @@ public interface MateriaControllerDocs {
 
 	@Operation(summary = "Lista as matérias",
 			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia.")
+	@Parameter(name = "sort", in = ParameterIn.QUERY, description = "Ordenação no formato campo,direção (asc ou desc). Campos aceitos: nome e criadoEm (o nome do campo diferencia maiúsculas). Padrão: nome,asc. Um único sort por pedido: mais de um dá 400, e qualquer outro valor também.")
 	@ApiResponse(responseCode = "200", description = "Página de matérias.")
 	@ApiResponse(responseCode = "400", description = "Parâmetro inválido: page, size, sort ou ativo.",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
@@ -41,7 +44,7 @@ public interface MateriaControllerDocs {
 			@Parameter(description = "Filtro por estado: true ou false. Ausente devolve todas.") String ativo,
 			@Parameter(description = "Número da página, a partir de 0. Padrão 0. Negativo ou não numérico dá 400.") String page,
 			@Parameter(description = "Itens por página. Padrão 20, máximo 50 (valor maior é reduzido a 50). Zero, negativo ou não numérico dá 400.") String size,
-			@Parameter(description = "Ordenação no formato campo,direção (asc ou desc). Campos aceitos: nome e criadoEm. Padrão: nome,asc. Qualquer outro valor dá 400.") String sort);
+			@Parameter(hidden = true) HttpServletRequest requisicao);
 
 	@Operation(summary = "Busca uma matéria pelo id")
 	@ApiResponse(responseCode = "200", description = "Matéria encontrada.",
@@ -82,11 +85,13 @@ public interface MateriaControllerDocs {
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<MateriaResponse> ativar(@Parameter(description = "Id público da matéria (UUID).") UUID id);
 
-	@Operation(summary = "Apaga a matéria", description = "Atômico: uma instrução só.")
+	@Operation(summary = "Apaga a matéria", description = "Atômico: uma instrução só. Uma matéria com subtópicos (ativos ou não) não pode ser apagada.")
 	@ApiResponse(responseCode = "204", description = "Matéria apagada.")
 	@ApiResponse(responseCode = "400", description = "Id malformado.",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	@ApiResponse(responseCode = "404", description = "Matéria não encontrada (MATERIA_NAO_ENCONTRADA).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "A matéria tem subtópicos, ativos ou não (MATERIA_COM_SUBTOPICOS).",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<Void> apagar(@Parameter(description = "Id público da matéria (UUID).") UUID id);
 

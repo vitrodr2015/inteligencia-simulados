@@ -67,7 +67,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(InvalidRequestException.class)
 	ResponseEntity<Object> aoRequisitarInvalido(InvalidRequestException ex) {
-		return resposta(HttpStatus.BAD_REQUEST, ex.getCodigo(), ex.getMessage(), null, ex.getDetalhes(), null);
+		return resposta(HttpStatus.BAD_REQUEST, ex.getCodigo(), ex.getMessage(), ex.getCampos(), ex.getDetalhes(), null);
 	}
 
 	@ExceptionHandler(ConflictException.class)

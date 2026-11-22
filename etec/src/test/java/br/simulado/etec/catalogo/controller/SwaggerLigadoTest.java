@@ -74,4 +74,61 @@ class SwaggerLigadoTest {
 				.andExpect(content().string(containsString("swagger")));
 	}
 
+
+	@Test
+	void deve_documentar_as_rotas_do_subtopico_e_o_schema_de_saida() throws Exception {
+		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos']").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}']").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}/disable']").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}/enable']").exists())
+				.andExpect(jsonPath("$.components.schemas.SubtopicoResponse").exists())
+				.andExpect(jsonPath("$.components.schemas.SubtopicoResponse.properties.materiaId").exists())
+				.andExpect(jsonPath("$.components.schemas.PaginaResponseSubtopicoResponse").exists());
+	}
+
+	@Test
+	void deve_documentar_so_os_status_que_o_codigo_devolve_hoje_no_subtopico() throws Exception {
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos'].post.responses.201").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos'].post.responses.400").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos'].post.responses.409").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos'].get.responses.200").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos'].get.responses.400").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}'].put.responses.409").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}'].delete.responses.204").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}/enable'].patch.responses.409").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}'].get.responses.401").doesNotExist())
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}'].get.responses.403").doesNotExist());
+	}
+
+	@Test
+	void deve_documentar_os_filtros_e_o_sort_da_listagem_do_subtopico_sem_example() throws Exception {
+		String listagem = "$.paths['/api/v1/subtopicos'].get";
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='materiaId')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='nome')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='ativo')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='page')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='size')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='sort')].description").isNotEmpty())
+				// a requisição servlet é só para ler o sort cru: não aparece como parâmetro
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='requisicao')]").isEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.example)]").isEmpty());
+	}
+
+	@Test
+	void deve_documentar_o_409_de_materia_com_subtopicos_no_delete_da_materia() throws Exception {
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(jsonPath("$.paths['/api/v1/materias/{id}'].delete.responses.409").exists());
+	}
+
+	@Test
+	void deve_manter_o_sort_da_listagem_de_materias_documentado_sem_expor_a_requisicao() throws Exception {
+		String listagem = "$.paths['/api/v1/materias'].get";
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='sort')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='requisicao')]").isEmpty());
+	}
+
 }

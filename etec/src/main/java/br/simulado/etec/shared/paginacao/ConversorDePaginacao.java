@@ -51,6 +51,23 @@ public final class ConversorDePaginacao {
 	private ConversorDePaginacao() {
 	}
 
+	/**
+	 * Versão para os controllers: recebe os valores CRUS do parâmetro {@code sort}
+	 * ({@code request.getParameterValues("sort")}). Mais de um {@code sort} no pedido é 400
+	 * (ORDENACAO_INVALIDA, D101).
+	 *
+	 * <p>Por que não basta receber um {@code String sort}: quando o parâmetro se repete, o Spring junta os
+	 * valores com vírgula ({@code sort=nome&sort=desc} vira {@code "nome,desc"}, que é um sort válido), e o
+	 * segundo parâmetro seria aceito em silêncio.
+	 */
+	public static Pageable converterRequisicao(String page, String size, String[] sorts, CamposOrdenaveis campos) {
+		if (sorts != null && sorts.length > 1) {
+			throw ordenacaoInvalida(campos);
+		}
+		String sort = (sorts == null || sorts.length == 0) ? null : sorts[0];
+		return converter(page, size, sort, campos);
+	}
+
 	public static Pageable converter(String page, String size, String sort, CamposOrdenaveis campos) {
 		BigInteger paginaPedida = converterPagina(page);
 		int tamanho = converterTamanho(size);
