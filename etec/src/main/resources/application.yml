@@ -43,10 +43,6 @@ app:
     # Versão e endereço dos termos de uso vigentes (D23, D94). Sem valor padrão: faltando, a aplicação não sobe.
     versao: ${TERMOS_VERSAO}
     url: ${TERMOS_URL}
-  admin-bootstrap:
-    # Vazio = ainda sem admin. A regra de produção entra na tarefa do admin inicial.
-    email: ${ADMIN_EMAIL:}
-    senha: ${ADMIN_SENHA:}
   imagens:
     hosts-permitidos: ${IMAGENS_HOSTS_PERMITIDOS:localhost}
   rate-limit:
@@ -59,6 +55,15 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:false}
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:false}
+
+server:
+  error:
+    # Nenhum detalhe de erro no corpo (D127): sem mensagem, exceção nem pilha, inclusive nas respostas que o container
+    # (Tomcat) dá antes da cadeia de segurança. (No Boot 4.2 o campo path é SEMPRE incluído, não há propriedade que o tire.)
+    include-message: never
+    include-stacktrace: never
+    include-exception: never
+    include-binding-errors: never
 
 management:
   endpoints:

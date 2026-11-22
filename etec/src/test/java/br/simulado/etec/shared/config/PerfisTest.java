@@ -20,9 +20,9 @@ import org.springframework.mock.env.MockEnvironment;
  */
 class PerfisTest {
 
-	private static final Path CODIGO = Path.of("src/main/java");
+	private static final Path CODIGO = RaizDoProjeto.resolver("src/main/java");
 
-	private static final List<Path> PASTAS_DE_CONFIGURACAO = List.of(Path.of("src/main/resources"), Path.of("config"));
+	private static final List<Path> PASTAS_DE_CONFIGURACAO = List.of(RaizDoProjeto.resolver("src/main/resources"), RaizDoProjeto.resolver("config"));
 
 	/** Perfis que existem de fato: o de desenvolvimento local e o de produção. */
 	private static final Set<String> PERFIS_CONHECIDOS = Set.of("local", Perfis.PRODUCAO);
@@ -80,7 +80,7 @@ class PerfisTest {
 
 	@Test
 	void deve_nao_ativar_blocos_por_perfil_com_nome_de_producao_diferente_no_application_yml() throws IOException {
-		String yml = ler(Path.of("src/main/resources/application.yml"));
+		String yml = ler(RaizDoProjeto.resolver("src/main/resources/application.yml"));
 
 		assertThat(yml).doesNotContain("on-profile: production").doesNotContain("on-profile: producao")
 				.doesNotContain("on-profile: prd");
@@ -92,9 +92,9 @@ class PerfisTest {
 		String esperado = "perfil " + Perfis.PRODUCAO;
 		String esperadoCrase = "perfil `" + Perfis.PRODUCAO + "`";
 
-		assertThat(ler(Path.of("src/main/resources/application.yml"))).contains(esperado);
-		assertThat(ler(Path.of("../README.md"))).contains(esperadoCrase);
-		assertThat(ler(Path.of("docs/contrato-api-fase1.md"))).contains("(perfil " + Perfis.PRODUCAO + ")");
+		assertThat(ler(RaizDoProjeto.resolver("src/main/resources/application.yml"))).contains(esperado);
+		assertThat(ler(RaizDoProjeto.repositorio().resolve("README.md"))).contains(esperadoCrase);
+		assertThat(ler(RaizDoProjeto.resolver("docs/contrato-api-fase1.md"))).contains("(perfil " + Perfis.PRODUCAO + ")");
 	}
 
 	private static String ler(Path arquivo) {

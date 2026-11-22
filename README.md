@@ -34,7 +34,7 @@ Depois disso, só `docker start mysql-etec` / `docker stop mysql-etec`. Se o con
 
 > **Rode só em `localhost` até o Módulo 13.** O Módulo 11 fechou a escrita do catálogo (só ADMIN escreve), mas ainda NÃO existem: o limite de tentativas (429) no signin e no cadastro, o refresh token guardado e invalidado (um refresh roubado vale 24 horas, mesmo depois de usado) e o logout. O cadastro (`POST /api/v1/auth/register`) continua público e sem freio. Não exponha esta versão na rede, em nuvem nem em nenhum ambiente compartilhado.
 >
-> **Ainda não existe ADMIN por API.** O bootstrap do admin é do Módulo 12. Até lá, quem precisa escrever no catálogo promove um usuário por SQL (passo abaixo); sem isso, ninguém consegue criar matéria nem subtópico pela API.
+> **O ADMIN nasce na subida, não por API.** O primeiro administrador é criado pelo bootstrap a partir de `ADMIN_EMAIL` e `ADMIN_SENHA` (passo abaixo, "Administrador inicial"). Sem ele, ninguém consegue criar matéria nem subtópico pela API.
 
 | Rota | Quem pode |
 |---|---|
@@ -47,25 +47,44 @@ Depois disso, só `docker start mysql-etec` / `docker stop mysql-etec`. Se o con
 
 O token vai em `Authorization: Bearer <accessToken>`. O papel que vale é o do **banco** (o claim do token é só informativo): trocar o papel de alguém no banco vale na requisição seguinte, mesmo com o token antigo, e excluir o usuário (`excluido_em`) derruba o token. A autorização vem antes da existência: quem não pode recebe 403 até para um id que não existe. As regras ficam todas na `SecurityConfig`; cada recurso novo traz a sua regra e as suas linhas na `MatrizDeAutorizacao` (a varredura de rotas quebra o build se faltar).
 
-**Promover um usuário a ADMIN por SQL (provisório, até o Módulo 12).** Passo a passo no **PowerShell** do Windows, com o contêiner `mysql-etec` ligado (`docker start mysql-etec`). A senha do banco **não aparece e não é pedida**: ela já está dentro do contêiner, e o comando a lê de lá.
+**Administrador inicial (Módulo 12, D45 e D126).** A API não cria ADMIN por rota: o primeiro administrador nasce **na subida**, a partir de duas variáveis de ambiente, `ADMIN_EMAIL` e `ADMIN_SENHA`. As duas vêm juntas ou nenhuma. A senha tem de 12 a 72 bytes (UTF-8), sem espaço no começo ou no fim e sem quebra de linha. Quem digita a senha é **você**, no terminal, sem eco, sem arquivo e sem colar de lugar nenhum. No **PowerShell**, na pasta `etec/`, **antes** de subir a aplicação:
 
-1. Cadastre o usuário pela API: `POST /api/v1/auth/register` (pelo Postman, coleção de Autenticação, requisição "Cadastrar aluno", ou pelo Swagger). Anote o e-mail e a senha que você usou.
-2. Promova esse e-mail a ADMIN (troque `admin.teste@exemplo.invalid` pelo seu e-mail):
+```powershell
+$email = Read-Host "E-mail do administrador"
+$seguro = Read-Host "Senha do administrador (12 a 72 caracteres)" -AsSecureString
+$env:ADMIN_EMAIL = $email
+$env:ADMIN_SENHA = [System.Net.NetworkCredential]::new("", $seguro).Password
+```
+
+Suba a aplicação na mesma janela (`./mvnw spring-boot:run`, com o perfil `local` como no começo deste arquivo). No log aparece **`Administrador inicial criado.`** (nunca o e-mail nem a senha). **Depois da primeira subida, tire a senha do ambiente:**
+
+```powershell
+Remove-Item Env:ADMIN_SENHA, Env:ADMIN_EMAIL
+```
+
+Regras que não mudam:
+
+- O bootstrap **só cria** se não existir nenhum ADMIN ativo (`excluido_em` nulo). Se já existe, as variáveis são **ignoradas**, inclusive para trocar a senha: subir de novo com outra `ADMIN_SENHA` não muda nada.
+- **Nunca promove** um usuário que já existe: se o e-mail de `ADMIN_EMAIL` for de um aluno cadastrado, a subida registra o erro (em produção, não sobe) e o aluno continua aluno. Use outro e-mail.
+- Sem variáveis e sem admin: em desenvolvimento, só um aviso no log (ninguém consegue entrar como ADMIN); **em produção (perfil `prod`) a aplicação não sobe.** Variável inválida também derruba a subida em produção, com a lista do que está errado e nunca o valor.
+- Nada de senha, hash ou e-mail do admin vai para o log.
+- Limitação conhecida (revisitar no Módulo 17): duas subidas **simultâneas** com `ADMIN_EMAIL` **diferentes** podem criar dois administradores. Com o mesmo e-mail, só um nasce.
+
+**Esqueci a senha do admin.** Não há rota nem variável que troque a senha (o bootstrap ignora as variáveis quando já existe admin). Em **ambiente controlado** (o seu banco local, ou o servidor com acesso restrito), remova o administrador por SQL e suba de novo com as variáveis do passo acima:
+
+```powershell
+"DELETE FROM usuario WHERE papel = 'ADMIN'; SELECT ROW_COUNT() AS linhas_removidas;" | docker exec -i mysql-etec sh -c 'mysql -uroot -p$MYSQL_ROOT_PASSWORD etec'
+```
+
+Deve aparecer `linhas_removidas` com **1**. O aviso `Using a password on the command line interface can be insecure` é do próprio MySQL e é normal (a senha do banco não está na sua linha de comando). Em produção, faça isso só com backup e com a janela de manutenção combinada.
+
+**Só em desenvolvimento, alternativa por SQL.** Se preferir não usar as variáveis, cadastre um usuário pela API (`POST /api/v1/auth/register`) e promova o e-mail dele:
 
 ```powershell
 "UPDATE usuario SET papel = 'ADMIN' WHERE email = 'admin.teste@exemplo.invalid'; SELECT ROW_COUNT() AS linhas_alteradas;" | docker exec -i mysql-etec sh -c 'mysql -uroot -p$MYSQL_ROOT_PASSWORD etec'
 ```
 
-   Deve aparecer `linhas_alteradas` com **1**. Se aparecer **0**, o e-mail não existe: confira o cadastro (e-mail em minúsculas, sem acento). O aviso `Using a password on the command line interface can be insecure` é do próprio MySQL e é normal aqui (a senha não está na sua linha de comando).
-3. Confira quem é ADMIN:
-
-```powershell
-"SELECT email, papel FROM usuario;" | docker exec -i mysql-etec sh -c 'mysql -uroot -p$MYSQL_ROOT_PASSWORD etec'
-```
-
-4. Não precisa sair e entrar de novo: o papel é lido do banco a cada requisição. Para desfazer, repita o passo 2 com `papel = 'STUDENT'`.
-
-Cuidados: as aspas e os `$` acima já estão no formato certo para o PowerShell (aspas duplas por fora no SQL, aspas simples por fora no `sh -c`); copie e cole sem alterar. Nunca grave e-mail e senha de ADMIN em arquivo do repositório.
+Deve aparecer `linhas_alteradas` com **1** (se for **0**, o e-mail não existe). O papel é lido do banco a cada requisição, então não precisa entrar de novo. Para conferir quem é ADMIN: `"SELECT email, papel FROM usuario;" | docker exec -i mysql-etec sh -c 'mysql -uroot -p$MYSQL_ROOT_PASSWORD etec'`. Nunca grave e-mail e senha de ADMIN em arquivo do repositório.
 
 **CORS.** A variável `CORS_ALLOWED_ORIGINS` (propriedade `app.cors.allowed-origins`) lista as origens de navegador permitidas, separadas por vírgula, no formato `http(s)://domínio[:porta]` (sem barra nem caminho). **Vazia (o padrão) = sem CORS.** A aplicação não sobe com `*` nem com origem fora do formato, e, com o perfil `prod`, só aceita `https`. Exemplo para um front local: `CORS_ALLOWED_ORIGINS=http://localhost:5173`. Origem, método ou cabeçalho não permitido recebe 403 `ACESSO_NEGADO`. Os relatórios das chamadas reais estão em `etec/docs/relatorio-chamadas-auth.md` e `etec/docs/relatorio-chamadas-autorizacao.md`.
 

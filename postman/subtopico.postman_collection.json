@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Subtópico — /api/v1/subtopicos",
-    "description": "Todas as rotas do Subtópico (e o DELETE de matéria com subtópicos). Rode na ordem, com o banco sem matérias de mesmo nome. Gerada a partir de chamadas reais; sem segredos. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; passo da promoção por SQL no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local.",
+    "description": "Todas as rotas do Subtópico (e o DELETE de matéria com subtópicos). Rode na ordem, com o banco sem matérias de mesmo nome. Gerada a partir de chamadas reais; sem segredos. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local. Exige autenticação, com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, vazias no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) faz tudo, e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid) faz a pasta \"Como STUDENT\". Os usuários criados ficam no banco local.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -4856,8 +4856,8 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// Duas identidades (Módulo 11): ADMIN escreve e STUDENT lê. O ADMIN NÃO se cadastra pela API (não existe criação de ADMIN",
-          "// por API até o Módulo 12): você promove um usuário por SQL e informa adminEmail e adminSenha (postman/README.md).",
+          "// Duas identidades (Módulo 11): ADMIN escreve e STUDENT lê. O ADMIN NÃO se cadastra pela API (ele nasce na subida,",
+          "// pelo bootstrap do Módulo 12): informe adminEmail e adminSenha, os mesmos de ADMIN_EMAIL e ADMIN_SENHA (postman/README.md).",
           "const base = pm.collectionVariables.get(\"baseUrl\");",
           "const cab = { \"Content-Type\": \"application/json\" };",
           "const corpo = (c) => ({ mode: \"raw\", raw: JSON.stringify(c) });",
@@ -4867,7 +4867,7 @@
           "  const email = pm.collectionVariables.get(\"adminEmail\");",
           "  const senha = pm.collectionVariables.get(\"adminSenha\");",
           "  if (!email || !senha) {",
-          "    throw new Error(\"Defina as variáveis adminEmail e adminSenha desta coleção (passo da promoção por SQL no postman/README.md).\");",
+          "    throw new Error(\"Defina as variáveis adminEmail e adminSenha desta coleção (os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida; passo a passo no postman/README.md).\");",
           "  }",
           "  pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e, r) {",
           "    guardar(\"adminToken\", r.json());",

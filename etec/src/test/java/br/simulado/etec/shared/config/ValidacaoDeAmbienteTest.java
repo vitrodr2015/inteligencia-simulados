@@ -116,4 +116,71 @@ class ValidacaoDeAmbienteTest {
 				.satisfies(erro -> assertThat(erro.getMessage()).doesNotContain(valorSecreto));
 	}
 
+
+	// ----- administrador inicial (D45, D91, D125) -----
+
+	private MockEnvironment emProducao(String email, String senha) {
+		MockEnvironment ambiente = ambienteValido();
+		ambiente.setActiveProfiles(Perfis.PRODUCAO);
+		if (email != null) {
+			ambiente.setProperty("ADMIN_EMAIL", email);
+		}
+		if (senha != null) {
+			ambiente.setProperty("ADMIN_SENHA", senha);
+		}
+		return ambiente;
+	}
+
+	@Test
+	void deve_aceitar_em_producao_as_variaveis_do_admin_validas_ou_ausentes() {
+		assertThatCode(() -> ValidacaoDeAmbiente.validar(emProducao("admin@exemplo.invalid", "Senha-Do-Admin-123")))
+				.doesNotThrowAnyException();
+		// ausentes: a falta de admin depende do banco e é conferida depois (antes de o servidor aceitar conexões)
+		assertThatCode(() -> ValidacaoDeAmbiente.validar(emProducao(null, null))).doesNotThrowAnyException();
+		assertThatCode(() -> ValidacaoDeAmbiente.validar(emProducao("", ""))).doesNotThrowAnyException();
+	}
+
+	@Test
+	void deve_recusar_em_producao_variavel_do_admin_invalida_sem_mostrar_valor() {
+		String senhaCurta = "senha-curta";
+		String emailRuim = "isto-nao-e-um-email";
+
+		assertThatThrownBy(() -> ValidacaoDeAmbiente.validar(emProducao("admin@exemplo.invalid", senhaCurta)))
+				.isInstanceOf(IllegalStateException.class).hasMessageContaining("Administrador inicial")
+				.hasMessageContaining("ADMIN_SENHA tem menos de 12 bytes").hasMessageNotContaining(senhaCurta);
+		assertThatThrownBy(() -> ValidacaoDeAmbiente.validar(emProducao(emailRuim, "Senha-Do-Admin-123")))
+				.isInstanceOf(IllegalStateException.class).hasMessageContaining("ADMIN_EMAIL")
+				.hasMessageNotContaining(emailRuim);
+		assertThatThrownBy(() -> ValidacaoDeAmbiente.validar(emProducao("admin@exemplo.invalid", "Senha-Do-Admin-123\n")))
+				.isInstanceOf(IllegalStateException.class).hasMessageContaining("início ou no fim");
+	}
+
+	@Test
+	void deve_recusar_em_producao_so_uma_das_duas_variaveis() {
+		assertThatThrownBy(() -> ValidacaoDeAmbiente.validar(emProducao("admin@exemplo.invalid", null)))
+				.isInstanceOf(IllegalStateException.class).hasMessageContaining("ADMIN_SENHA não foi definida");
+		assertThatThrownBy(() -> ValidacaoDeAmbiente.validar(emProducao(null, "Senha-Do-Admin-123")))
+				.isInstanceOf(IllegalStateException.class).hasMessageContaining("ADMIN_EMAIL não foi definida");
+	}
+
+	@Test
+	void deve_nao_falhar_fora_de_producao_mesmo_com_variavel_do_admin_invalida() {
+		MockEnvironment desenvolvimento = ambienteValido().withProperty("ADMIN_EMAIL", "ruim").withProperty("ADMIN_SENHA", "curta");
+		MockEnvironment local = ambienteValido().withProperty("ADMIN_SENHA", "curta");
+		local.setActiveProfiles("local");
+
+		assertThatCode(() -> ValidacaoDeAmbiente.validar(desenvolvimento)).doesNotThrowAnyException();
+		assertThatCode(() -> ValidacaoDeAmbiente.validar(local)).doesNotThrowAnyException();
+	}
+
+	@Test
+	void deve_listar_junto_com_os_outros_problemas_do_ambiente_em_producao() {
+		MockEnvironment ambiente = new MockEnvironment().withProperty("spring.datasource.url", URL_FALSA)
+				.withProperty("ADMIN_SENHA", "curta");
+		ambiente.setActiveProfiles(Perfis.PRODUCAO);
+
+		assertThatThrownBy(() -> ValidacaoDeAmbiente.validar(ambiente)).hasMessageContaining("DB_PASSWORD")
+				.hasMessageContaining("JWT_SECRET").hasMessageContaining("Administrador inicial");
+	}
+
 }
