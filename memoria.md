@@ -63,7 +63,7 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
   - **Como adicionar um recurso novo mantendo o formato:** (1) o DTO de saída é um record com `@JsonPropertyOrder` listando TODOS os campos e `@JsonInclude(JsonInclude.Include.ALWAYS)`; (2) um campo novo entra no FIM da lista de ordem e do record (alterar a ordem de um campo existente quebra quem consome); (3) sem `@JsonFormat` em data; (4) o controller devolve o DTO, nunca a entidade; (5) escrever o teste de TEXTO EXATO (a string inteira, não campo a campo): na camada web, `MateriaFormatoWebTest` (service mockado, `Clock` fixo, id conhecido, texto literal) e, com o MySQL real, `MateriaFormatoIntegracaoTest` (só id e data trocados pelos marcadores `<ID>` e `<DATA>`); copiar um desses modelos para o recurso novo, cobrindo o item com valor, o item com nulo, o envelope da lista e os erros.
   - Sabotagens da tarefa: trocar a ordem de `nome` e `descricao` derrubou 6 testes (3 web e 3 de integração); trocar `ALWAYS` por `NON_NULL` derrubou 4 (os que têm `descricao` nula); a campanha de conversores falhou 2 testes antes do `SomenteJsonConfig` existir.
 - Postman: pasta `postman/` na raiz, com uma coleção por recurso (`<recurso>.postman_collection.json`, ver `postman/README.md`). **Todo endpoint novo entra na coleção do recurso na própria tarefa** (parte do "pronto"), gerada a partir de chamadas reais à aplicação no banco local; o relatório das respostas fica em `etec/docs/`. Hoje existe só a coleção da Matéria.
-- Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (rascunho v0.9, decisões D1 a D70).
+- Contrato da API da fase 1: `etec/docs/contrato-api-fase1.md` (contrato v1.0 aprovado, decisões D1 a D116).
 
 ## Estado
 
@@ -124,3 +124,15 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 - Aviso do Mockito (agent dinâmico) no JDK 25: só aviso por enquanto.
 - `duvida-CICD.md` fica para a fase de nuvem.
 - Módulos 10 e 11 (login com token, 401 e 403): vão reaproveitar a `AbstractIntegrationTest`; os testes de integração delas precisarão criar o próprio usuário e o token com nomes únicos. As propriedades do admin inicial (`ADMIN_EMAIL`/`ADMIN_SENHA`) ainda não existem e entram com a tarefa do admin inicial.
+
+## Ajustes de código pendentes da v1.0
+
+O contrato v1.0 (D76 a D116) mudou regras que o código já implementado não segue. Cada item diz em que tarefa entra:
+
+- **Tarefa do Subtópico:** aparar também a `descricao` em `MateriaRequest` (hoje só o `nome` é aparado), com teste (D104).
+- **Tarefa do Subtópico:** criar em `shared` uma validação de tamanho por pontos de código (o `@Size` conta unidades UTF-16) e aplicá-la ao `nome` e à `descricao` de Matéria e de Subtópico, com teste de emoji (D98).
+- **Tarefa do Subtópico:** teste que fixe "mais de um `sort` = 400" (D101). Hoje o 400 sai por acaso, porque o Spring junta os dois valores num texto que não casa com o formato.
+- **Segurança (Módulo 10):** os testes de 404 de `/nao-existe` e de `/api/v1/nao-existe` passam a autenticar, e sem credencial esperam 401 (D116).
+- **Tarefa do `DELETE /me`:** a migration que torna `usuario.data_nascimento` anulável vem ANTES dessa tarefa, numerada na ordem da fila de migrations; a V1 não se edita (D92).
+- **Tarefa da Importação:** implementar o D90 (hash SHA-256 sem `subtopicoId`, `dificuldade`, `explicacao` e `gabarito`; o gabarito ignorado vale só para questão que já existe, e a questão nova recebe o gabarito) e `questoesIgnoradas` como contagem, sem detalhar quais campos divergiram.
+- **Deploy (Módulo 18):** o contador do 429 fica em memória e vale por instância; antes de subir mais de uma réplica ele precisa ir para armazenamento compartilhado (D95).
