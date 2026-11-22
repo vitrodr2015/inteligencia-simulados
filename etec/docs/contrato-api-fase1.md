@@ -1,45 +1,46 @@
-Contrato da API — Fase 1 (rascunho v0.10)
+Contrato da API — Fase 1 (v1.0, aprovada)
 
-Escrito no formato do Módulo 2 do Playbook2. Regra do módulo: o contrato é revisado e aprovado antes de qualquer código; depois de aprovado, qualquer mudança é registrada na seção 10. Substitui, para a fase 1, a lista de alto nível de apis-backend.md.
+O contrato é revisado e aprovado antes de qualquer código. Ele é rascunho até a aprovação; a v1.0 é a versão aprovada (D83), e depois dela qualquer mudança é registrada na seção 10. Este é o documento completo da API da fase 1 e não depende de outros.
 
-Estado: decisões D1 a D75 decididas, exceto D22 e D24 (pendências externas).
+Estado: versão aprovada (v1.0). Decisões D1 a D116 decididas, exceto D22 e D24 (pendências externas).
 
 1. Convenções gerais (valem para todas as rotas)
 Tema	Decisão
-Base e formato	/api/v1. As rotas de /api/v1 respondem SOMENTE JSON (D71): Accept de XML, YAML ou qualquer outro formato = 406, no formato de erro padrão, em JSON. Exceção declarada: a documentação OpenAPI (/v3/api-docs, /v3/api-docs.yaml e /swagger-ui) existe só em desenvolvimento e homologação e pode responder YAML ou HTML. Nas respostas COM corpo, o Content-Type é exatamente application/json, sem o parâmetro charset, mas o corpo é sempre UTF-8 (o padrão do JSON); o 204 não tem corpo nem Content-Type. O JSON sai compacto, sem espaços nem quebras de linha (D74). Os exemplos JSON deste documento estão formatados para leitura; a resposta real é compacta
+Base e formato	/api/v1. As rotas de /api/v1 respondem SOMENTE JSON (D71): Accept de XML, YAML ou qualquer outro formato = 406, no formato de erro padrão, em JSON. Exceção declarada: a documentação OpenAPI (/v3/api-docs, /v3/api-docs.yaml e /swagger-ui) existe só em desenvolvimento e homologação e pode responder YAML ou HTML. Nas respostas COM corpo, o Content-Type é exatamente application/json, sem o parâmetro charset, mas o corpo é sempre UTF-8 (o padrão do JSON); o 204 não tem corpo nem Content-Type. O JSON sai compacto, sem espaços nem quebras de linha (D74). Os exemplos JSON deste documento estão formatados para leitura; a resposta real é compacta. Todas as rotas das tabelas deste documento são relativas a /api/v1 (D78), exceto as da seção 7 (actuator), que ficam fora dele; todo Location inclui o prefixo /api/v1 (D78)
 Ordem e nulos	A ordem dos campos de SAÍDA do JSON é fixa: é a ordem em que os campos aparecem escritos neste contrato, da esquerda para a direita, inclusive nos objetos entre chaves (questoes[], respostas[], itens[] e o resultado da tentativa); o envelope da lista e o ErrorResponse têm a ordem própria descrita abaixo (D72). Campo nulo de DTO de resposta sai sempre no JSON como null (por exemplo "descricao":null), nunca omitido (D73). Campo que o papel não pode ver não existe no JSON, e não sai como null: as questões da tentativa do aluno usam um DTO próprio, sem gabarito nem explicacao (D75)
-Erros que podem ocorrer em qualquer rota	404 (rota inexistente), 405 (método não permitido), 406 (formato não aceito, D71), 415 (tipo de conteúdo do corpo não suportado) e 500, sempre no formato de erro padrão, em JSON, mesmo com Accept de XML ou YAML. Por valerem para toda rota, não aparecem nas colunas de erro dos endpoints
+Erros que podem ocorrer em qualquer rota	404 (rota inexistente, só para quem passa na autenticação: o anônimo em rota inexistente de /api/v1 recebe 401, porque a rota nova nasce negada, e o autenticado recebe 404; em /actuator, fora dos três caminhos de saúde, e em /error vale a D113), 405 (método não permitido), 406 (formato não aceito, D71), 415 (corpo que não é application/json, D112) e 500, sempre no formato de erro padrão, em JSON, mesmo com Accept de XML ou YAML. Por valerem para toda rota, não aparecem nas colunas de erro dos endpoints
 Ids	Campo id é um UUID (o id numérico do banco nunca sai). UUID malformado = 400; inexistente = 404
 Data e hora	ISO-8601 em UTC com exatamente 3 casas de milissegundos, mesmo quando são zero (2026-11-20T15:04:05.123Z e 2026-11-20T15:04:05.000Z). As datas são gravadas e devolvidas com precisão de milissegundos: a aplicação trunca na origem, para o banco não arredondar (D63)
 Data simples	uuuu-MM-dd (aaaa-mm-dd), leitura estrita: data inexistente ou fora do formato (2000-02-30, 2000-2-3) = 400, com campos apontando o campo e a mensagem "Data inválida. Use o formato aaaa-mm-dd."; nunca é corrigida em silêncio (D60)
-Entidade	Nunca sai pela API: DTOs de entrada e de saída. Campos de saída que não são do cliente (id, ativo, status, datas, nota) são ignorados se vierem no corpo. Campo de entrada que não muda depois de criado (materiaId, email, dataNascimento, provaId, numero...): valor igual ao atual é aceito; valor diferente = 400 com codigo CAMPO_IMUTAVEL. Como a comparação é com o valor atual, esse 400 só é avaliado depois da existência (404) (D27, D42, D48)
+Entidade	Nunca sai pela API: DTOs de entrada e de saída. Campos de saída que não são do cliente (id, ativo, status, datas, nota) são ignorados se vierem no corpo. Campo de entrada que não muda depois de criado (materiaId, email, dataNascimento, provaId, numero...): valor igual ao atual é aceito; valor diferente = 400 com codigo CAMPO_IMUTAVEL. Como a comparação é com o valor atual, esse 400 é a última validação: só é avaliado depois da existência (404) e do conflito de estado (409) (D27, D42, D48, D79)
 Referência no corpo	Se o corpo aponta para um recurso que não existe (ex.: materiaId, provaId em POST /tentativas), responde 400. Se a rota aponta (/materias/{id}), responde 404 (D14)
-Ordem de validação	autenticação e autorização (401/403) → corpo (400) → id (400) → existência (404) → conflito (409) → alteração (D17)
+Corpo da requisição	Só application/json, com charset=utf-8 tolerado; outro tipo = 415 (D112). Campo desconhecido no corpo é ignorado; tipo errado ou JSON ilegível = 400; campo obrigatório ausente ou null = 400 com campos (D86)
+Ordem de validação	autenticação e autorização (401/403) → 400 de formato (corpo e id) → existência (404) → conflito de estado (409) → 400 CAMPO_IMUTAVEL → alteração (D17, D79). O limite de abuso (429) vem antes de tudo (D95)
 Autorização antes da existência	Quem não pode recebe 403 até para um id que não existe
 Idempotência	PUT de resposta e de gabarito, disable/enable, publish e finalizar podem ser repetidos com o mesmo resultado. O logout também (D15). Repetir disable/enable devolve o mesmo resultado e não altera atualizadoEm (D62)
-Nome	Campo nome (de matéria, subtópico, usuário e demais recursos): o servidor remove os espaços das pontas ANTES de validar; nome vazio depois disso = 400 (D57)
-Criação (201)	Location relativo (/api/v1/recurso/{id}) e o corpo traz o recurso completo, não só o id (D58). Exceção: POST /auth/register, que não tem Location (o recurso só existe em /me)
-PUT	É substituição: campo opcional omitido no corpo vira nulo (por exemplo, descricao da matéria) (D61). Exceções, por decisões próprias: PUT /admin/provas/{id}/gabarito, que é parcial (D13), e PUT /tentativas/{id}/respostas/{questaoId}, em que tempoGastoMs omitido mantém o valor salvo (D30). Campos que o servidor controla (ativo, status, datas) nunca mudam por PUT
-Limite de abuso	/auth/* responde 429 com Retry-After ao exceder o limite: 10 requisições por minuto por IP em /auth/* e 5 tentativas de signin por minuto por e-mail, ambos configuráveis por propriedade (D25; números iniciais)
-Cabeçalhos	Respostas com token levam Cache-Control: no-store
-Formatação nos textos	Os textos de questão (enunciado, textoApoio, alternativas[].texto, explicacao) aceitam só as marcas <b>, <u>, <i>, <sup>, <sub> e <br> (D12, D32). Os caracteres <, > e & literais se escrevem &lt;, &gt; e &amp;. Atributos nas tags e tags mal fechadas ou mal aninhadas = 400. O servidor recusa (400) qualquer outra marcação HTML e o front também limpa por segurança. Os limites de tamanho contam caracteres
-CORS	As origens permitidas vêm de configuração por ambiente (D34)
+Nome e textos curtos	Campo nome (de matéria, subtópico, usuário e demais recursos) e os demais textos curtos (descricao, titulo, banca...): o servidor remove os espaços das pontas ANTES de validar; nome vazio depois disso = 400 (D57, D104). A unicidade é pela collation do banco: os espaços internos contam e não há normalização Unicode própria; o subtópico ignora caixa e acento como a matéria (D104)
+Criação (201)	Location relativo, sempre com o prefixo (/api/v1/recurso/{id}, D78), e o corpo traz o recurso completo, não só o id (D58). Exceção: POST /auth/register, que não tem Location (o recurso só existe em /me)
+PUT	É substituição: campo opcional omitido no corpo vira nulo (por exemplo, descricao da matéria) (D61). Exceções, por decisões próprias: PUT /admin/provas/{id}/gabarito, que é parcial (D13), e PUT /tentativas/{id}/respostas/{questaoId}, em que tempoGastoMs omitido mantém o valor salvo (D30). Campos que o servidor controla (ativo, status, datas) nunca mudam por PUT. A substituição é total, inclusive de gabarito, explicacao e fonteUrl: um PUT de questão que omite o gabarito o apaga (D111; ver a seção 5)
+Limite de abuso	/auth/* responde 429 com Retry-After (em segundos) ao exceder o limite: 10 requisições por minuto por IP em /auth/* e 5 tentativas de signin por minuto por e-mail, ambos configuráveis por propriedade (D25; números iniciais). O IP vem do X-Forwarded-For só se o proxy for confiável (propriedade); o contador fica em memória, em janela fixa de 1 minuto; a chave do signin é o e-mail normalizado, mesmo que não exista; o 429 vem antes do 400 e do 401 (D95)
+Cabeçalhos	As respostas de signin e de refresh levam Cache-Control: no-store (D114)
+Formatação nos textos	Os textos de questão (enunciado, textoApoio, alternativas[].texto, explicacao) aceitam só as marcas <b>, <u>, <i>, <sup>, <sub> e <br>, exatas, em minúsculas e com <br> sem barra (D12, D32, D98). Só as entidades &lt;, &gt; e &amp; são aceitas, e os caracteres <, > e & literais se escrevem com elas. Atributos nas tags e tags mal fechadas ou mal aninhadas = 400. O servidor recusa (400) qualquer outra marcação HTML e o front também limpa por segurança. O HTML só vale nesses textos de questão. Os limites de tamanho contam pontos de código (D98)
+CORS	As origens permitidas vêm de configuração por ambiente (D34). Métodos GET, POST, PUT, PATCH, DELETE e OPTIONS; cabeçalhos Authorization e Content-Type; sem credenciais; max-age 3600; o preflight OPTIONS não exige autenticação (D100)
 
-Formato de erro (ErrorResponse) — o mesmo em todo status de erro, inclusive 401 e 403:
+Formato de erro (ErrorResponse) — o mesmo em todo status de erro, inclusive 401 e 403, em toda a aplicação, exceto /actuator (formato do próprio framework) e a documentação OpenAPI (D82):
 
 json
 { "dataHora": "2026-11-20T15:04:05.123Z", "status": 409, "erro": "Conflict", "codigo": "MATERIA_NOME_DUPLICADO", "mensagem": "Já existe uma matéria com esse nome." }
 
-O campo codigo é estável (texto em MAIÚSCULAS com sublinhado, por exemplo TENTATIVA_EM_ANDAMENTO); o front decide pelo codigo, nunca pelo texto da mensagem (D33). Os campos saem na ordem dataHora, status, erro, codigo, mensagem, campos, detalhes (D72); campos e detalhes são omitidos quando nulos, e os demais sempre saem (D73). O campo detalhes (opcional, um objeto) leva dados estruturados de alguns erros (D44): no 409 de tentativa em andamento, { "tentativaId": "..." }; no 409 do publish da prova, { "questoesPendentes": [3, 7] }, com os números das questões pendentes; no 409 de reimportação, { "numerosEmConflito": [4, 9] }. Os valores de codigo são definidos na implementação, um por situação de erro do contrato. Em erros 400 de validação, campos (opcional): [ { "campo": "nome", "mensagem": "O nome deve ter de 2 a 100 caracteres." } ] (decisão D1), com no máximo uma mensagem por campo. O texto da mensagem não é contratual: o front decide pelo codigo (D59). O 500 devolve mensagem genérica; a pilha só vai para o log.
+O campo codigo é estável (texto em MAIÚSCULAS com sublinhado, por exemplo TENTATIVA_EM_ANDAMENTO); o front decide pelo codigo, nunca pelo texto da mensagem (D33). Os campos saem na ordem dataHora, status, erro, codigo, mensagem, campos, detalhes (D72); campos e detalhes são omitidos quando nulos, e os demais sempre saem (D73). O campo detalhes (opcional, um objeto) leva dados estruturados de alguns erros (D44): no 409 de tentativa em andamento, { "tentativaId": "..." }; no 409 do publish da prova, { "questoesPendentes": [3, 7] }, com os números das questões pendentes; no 409 de reimportação, { "numerosEmConflito": [4, 9] }. Os valores de codigo estão no apêndice A (catálogo de códigos de erro), e cada recurso novo acrescenta os seus códigos ao catálogo ao ser implementado (D84). Em erros 400 de validação, campos (opcional): [ { "campo": "nome", "mensagem": "O nome deve ter de 2 a 100 caracteres." } ] (decisão D1), com no máximo uma mensagem por campo. O texto da mensagem não é contratual: o front decide pelo codigo (D59). O 500 devolve mensagem genérica; a pilha só vai para o log.
 
-Lista paginada — parâmetros page (a partir de 0), size (padrão 20, máximo 50, valor maior é reduzido ao máximo) e sort no formato campo,direção (por exemplo sort=nome,desc; sem direção vale asc e a direção aceita qualquer caixa, D64; só campos da lista de cada recurso; outro campo = 400). page ou size inválidos (negativo, zero ou não numérico) = 400. Página além do fim devolve 200 com lista vazia e os totais corretos; se página × tamanho passar de 2³¹-1, a resposta também é 200 vazia com os totais corretos, e o pagina do envelope é limitado à maior página possível (D70). Nos filtros, nome é "contém", ignorando maiúsculas e acentos (D29), e nome em branco equivale a filtro ausente (D65); ativo só aceita true ou false, e outros valores = 400 (D66). Resposta:
+Lista paginada — parâmetros page (a partir de 0), size (padrão 20, máximo 50, valor maior é reduzido ao máximo) e sort no formato campo,direção (por exemplo sort=nome,desc; sem direção vale asc e a direção aceita qualquer caixa, D64; só campos da lista de cada recurso; outro campo = 400; um único sort por pedido, e mais de um = 400; o nome do campo diferencia maiúsculas, e NOME = 400, D101). page começa em 0 e zero é válido; page negativo ou não numérico = 400; size zero, negativo ou não numérico = 400 (D76). Página além do fim devolve 200 com lista vazia e os totais corretos, e o pagina do envelope devolve a página pedida (D101); se página × tamanho passar de 2³¹-1, a resposta também é 200 vazia com os totais corretos, e o pagina do envelope é limitado à maior página possível (D70). Nos filtros, nome é "contém", ignorando maiúsculas e acentos (D29), e nome em branco equivale a filtro ausente (D65); ativo só aceita true ou false, em qualquer caixa, e outros valores = 400 (D66, D101). Filtro com enum inválido, ano não numérico ou id malformado (materiaId) = 400, e STUDENT filtrando por materiaId de matéria inativa recebe lista vazia (D103). Resposta:
 
 json
 { "conteudo": [ ... ], "pagina": 0, "tamanho": 20, "totalElementos": 135, "totalPaginas": 7 }
 
-Desempate sempre por id, em ordem crescente, inclusive quando o sort é desc (nas questões, por id e versao), para a paginação ser estável (D67). O campo tamanho do envelope é o tamanho aplicado (já reduzido ao máximo), e não a quantidade de itens da página (D68). A ordem alfabética, quando o sort é por texto (como nome), segue a collation do MySQL, que ignora acento e caixa (D69). O envelope sai na ordem do exemplo acima: conteudo, pagina, tamanho, totalElementos, totalPaginas (D72).
+Desempate sempre pelo id numérico interno (o id do banco, que nunca sai pela API), em ordem crescente, inclusive quando o sort é desc (nas questões, pelo id interno e depois pela versao), para a paginação ser estável (D67, D93). O campo tamanho do envelope é o tamanho aplicado (já reduzido ao máximo), e não a quantidade de itens da página (D68). A ordem alfabética, quando o sort é por texto (como nome), segue a collation do MySQL, que ignora acento e caixa (D69). O envelope sai na ordem do exemplo acima: conteudo, pagina, tamanho, totalElementos, totalPaginas (D72).
 
-Autenticação: Authorization: Bearer <accessToken>. Papéis: STUDENT, GUARDIAN (reservado, sem rotas próprias na fase 1) e ADMIN. Rota nova nasce negada. Sem token válido = 401; sem permissão = 403.
+Autenticação: Authorization: Bearer <accessToken>. Papéis: STUDENT, GUARDIAN (reservado, sem rotas próprias na fase 1) e ADMIN. Rota nova nasce negada. Sem token válido = 401; sem permissão = 403. A autorização usa o papel gravado no banco; o claim papel do token é só informativo (D87).
 
 2. Quem pode o quê
 Operação	Anônimo	STUDENT	ADMIN
@@ -49,7 +50,8 @@ GET de matérias, subtópicos e provas	❌	✅ (só ativos; provas só PUBLICADA
 Escrever matérias e subtópicos; publicar prova	❌	❌	✅
 /admin/** (provas, questões, importação, gabarito)	❌	❌	✅
 /tentativas/**	❌	✅ (só as próprias)	❌
-GET /actuator/health/**	✅	✅	✅
+GET /actuator/health, /actuator/health/liveness e /actuator/health/readiness	✅	✅	✅
+Outros caminhos de /actuator e /error	❌ (401)	❌ (403)	❌ (403)
 
 Tentativa de outro aluno responde 404 (não revela que existe).
 
@@ -60,33 +62,33 @@ Campos de Usuário
 Campo	Tipo	Regra	Quem preenche
 id	UUID	gerado	saída
 nome	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 2 a 100 caracteres (vazio = 400, D57)	entrada e saída
-email	texto	obrigatório, formato válido, até 255, único, normalizado em minúsculas	entrada e saída
+email	texto	obrigatório, formato válido, até 255, único; o servidor remove os espaços das pontas e converte para minúsculas antes de validar e antes do 409 (D105)	entrada e saída
 senha	texto	obrigatório, 8 a 72 bytes (limite do BCrypt)	só entrada (nunca sai)
-dataNascimento	data	obrigatória, no passado, no formato aaaa-mm-dd (data inválida = 400, D60)	entrada e saída
+dataNascimento	data	obrigatória, no passado (em UTC) e a partir de 1900-01-01 (D106), no formato aaaa-mm-dd (data inválida = 400, D60)	entrada e saída
 aceiteTermosVersao	texto	obrigatório, igual à versão devolvida por GET /termos/vigente; diferente = 400 (D23)	só entrada
 papel	enum	sempre STUDENT no cadastro; o corpo não escolhe	saída
-menor	booleano	calculado: menor de 18 anos. Na fase 1 é só uma marca, não muda comportamento (D24)	saída
+menor	booleano	calculado na leitura (D106): menor de 18 anos. Na fase 1 é só uma marca, não muda comportamento (D24)	saída
 criadoEm	data/hora	UTC	saída
 
 Endpoints
 
 Verbo	Rota	Sucesso	Erros
-GET	/termos/vigente (pública)	200 {versao, url}	—
+GET	/termos/vigente (pública)	200 {versao, url}; os dois valores vêm de propriedades por ambiente (D94)	—
 POST	/auth/register	201 com o usuário (mesmo corpo de GET /me), sem tokens e sem Location; o aluno entra depois pelo signin (D23)	400, 409 (e-mail já cadastrado, D37), 429
-POST	/auth/signin	200 {accessToken, refreshToken, tokenType, expiresIn}; expiresIn em segundos (900, D39)	400, 401 (mesma resposta e tempo parecido para qualquer falha), 429
-POST	/auth/refresh (refresh no corpo, nunca na URL)	200 (novo par; o refresh usado é invalidado; reusar um refresh já invalidado dá 401 e revoga todos os refresh do usuário, D39, D49)	400, 401 (inválido, vencido, revogado ou do tipo errado), 429
-POST	/auth/logout (anônimo; o refresh no corpo é a credencial, D15)	204 sempre, inclusive para refresh desconhecido, vencido ou já revogado; repetir não dá erro; revoga só o refresh enviado (D39)	400 (corpo sem refresh), 429
+POST	/auth/signin (entrada {email, senha})	200 {accessToken, refreshToken, tokenType, expiresIn}; tokenType é "Bearer"; expiresIn em segundos (900, D39, D96, D107)	400, 401 (mesma resposta e tempo parecido para qualquer falha), 429
+POST	/auth/refresh (entrada {refreshToken}, nunca na URL)	200 com o mesmo corpo do signin (D96; novo par; o refresh usado é invalidado; reusar um refresh já invalidado dá 401 e revoga todos os refresh do usuário, D39, D49)	400, 401 (inválido, vencido, revogado ou do tipo errado, inclusive um access token, D107), 429
+POST	/auth/logout (anônimo; entrada {refreshToken}, que é a credencial, D15)	204 para qualquer texto presente, inclusive malformado, desconhecido, vencido, já revogado ou de outro tipo; repetir não dá erro; revoga só o refresh enviado (D39, D107)	400 (refreshToken ausente ou que não é texto), 429
 GET	/me	200	401
-PATCH	/me (só nome; email e dataNascimento com o valor atual são aceitos, diferentes = 400 CAMPO_IMUTAVEL, D48)	200	400, 401
+PATCH	/me (só nome; email e dataNascimento com o valor atual são aceitos, diferentes = 400 CAMPO_IMUTAVEL, D48)	200 com o usuário completo (D96)	400, 401
 DELETE	/me	204 (exclusão de conta com anonimização, ver D9 e a subseção 3.2)	401, 409 (último ADMIN)
 
 Não existem na fase 1: recuperação de senha, login com Google, criação de ADMIN por API (o primeiro admin nasce por bootstrap controlado, ver 3.2), vínculo com responsável, envio de e-mail.
 
 3.1 JWT (D39)
-Assinatura HS256. Access token de 15 minutos, com os claims sub (UUID do usuário), papel, tipo=access, jti e exp. Refresh token de 24 horas, tipo=refresh, com o jti guardado no banco; o tempo de vida é propriedade configurável. expiresIn em segundos (900). Cada /auth/refresh invalida o refresh usado. O reuso de um refresh já invalidado revoga todos os refresh do usuário; não existe conceito de família por login (D49). O logout revoga só o refresh enviado. A cada requisição o filtro consulta o banco para confirmar que o usuário existe e não foi excluído: o token não é a fonte da verdade (D26). O segredo de assinatura vem só de variável de ambiente, sem valor padrão.
+Assinatura HS256. Access token de 15 minutos, com os claims sub (UUID do usuário), papel, tipo=access, jti e exp. Refresh token de 24 horas, tipo=refresh, com o jti guardado no banco; o tempo de vida é propriedade configurável. expiresIn em segundos (900). Cada /auth/refresh invalida o refresh usado. O reuso de um refresh já invalidado revoga todos os refresh do usuário; não existe conceito de família por login (D49). O logout revoga só o refresh enviado. A cada requisição o filtro consulta o banco para confirmar que o usuário existe e não foi excluído: o token não é a fonte da verdade (D26). A autorização usa o papel do banco; o claim papel é só informativo (D87). O tokenType é "Bearer" (D107). O segredo de assinatura vem só de variável de ambiente, sem valor padrão.
 
 3.2 Exclusão de conta e primeiro admin (D26, D45)
-O e-mail anonimizado vira removido-{uuid}@invalid, então o e-mail original pode ser recadastrado como conta nova. Todos os refresh do usuário são revogados na hora. Tentativas em andamento viram EXPIRADA. O último ADMIN não pode se excluir (409). Bootstrap do admin: as variáveis de ambiente ADMIN_EMAIL e ADMIN_SENHA criam o admin só se ainda não existir nenhum; se já existe admin, as variáveis são ignoradas. Sem as variáveis e sem nenhum admin: em desenvolvimento e teste, só um aviso no log; em produção, a aplicação não sobe (D45). Nunca vão para o repositório.
+A anonimização grava nome = "Usuário removido", e-mail = removido-{uuid}@invalid (então o e-mail original pode ser recadastrado como conta nova), senha inutilizada (o hash deixa de servir para o login) e dataNascimento = null (D92). Isso exige uma migration futura que torne a coluna da data de nascimento anulável; a migration já aplicada não se edita (D92). A migration que torna usuario.data_nascimento anulável é pré-requisito da tarefa do DELETE /me e vem antes dela, numerada na ordem da fila de migrations (D92). Todos os refresh do usuário são revogados na hora. Tentativas em andamento viram EXPIRADA, com finalizadaEm = o menor entre o prazoEm e o momento da exclusão (D88). O último ADMIN não pode se excluir (409). Na fase 1 há um único admin (não existe criação de ADMIN por API), então ele nunca se exclui (D81). Bootstrap do admin: as variáveis de ambiente ADMIN_EMAIL e ADMIN_SENHA criam o admin só se ainda não existir nenhum; se já existe admin, as variáveis são ignoradas. Sem as variáveis e sem nenhum admin: em desenvolvimento e teste, só um aviso no log; em produção, a aplicação não sobe (D45). O admin nasce com nome "Administrador", dataNascimento 2000-01-01 e aceiteTermosVersao igual à versão vigente; ADMIN_EMAIL e ADMIN_SENHA são validados como num cadastro comum (e-mail válido, senha de 8 a 72 bytes) e, se forem inválidos em produção, a aplicação não sobe (D91). Nunca vão para o repositório.
 
 4. Catálogo
 4.1 Matéria
@@ -98,23 +100,23 @@ ativo	booleano	nasce true; só muda por disable/enable. Desativar uma matéria n
 criadoEm, atualizadoEm	data/hora	UTC, com precisão de milissegundos (D63). atualizadoEm não muda quando disable/enable é repetido (D62)	saída
 Verbo	Rota	Sucesso	Erros
 POST	/materias	201 + Location relativo e a matéria completa (D58)	400, 401, 403, 409 (nome existe)
-GET	/materias (filtros nome e ativo; sort: nome, criadoEm; padrão nome; sem direção vale asc, D64; nome em branco = filtro ausente, D65; ativo só aceita true ou false, D66; o desempate por id é sempre crescente, D67; a ordem por nome segue a collation do MySQL, D69). STUDENT só vê ativas; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401
-GET	/materias/{id} (STUDENT: matéria inativa = 404)	200	400, 401, 404
-PUT	/materias/{id} (substituição: troca nome e descricao, e a descricao omitida vira nula; nunca altera ativo, D61)	200	400, 401, 403, 404, 409
-PATCH	/materias/{id}/disable e /enable	200, idempotentes: repetir devolve o mesmo resultado e não altera atualizadoEm (D62)	400, 401, 403, 404
+GET	/materias (filtros nome e ativo; sort: nome, criadoEm; padrão nome; sem direção vale asc, D64; nome em branco = filtro ausente, D65; ativo só aceita true ou false, em qualquer caixa, D66, D101; o desempate pelo id interno é sempre crescente, D67, D93; a ordem por nome segue a collation do MySQL, D69). STUDENT só vê ativas; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401
+GET	/materias/{id} (STUDENT: matéria inativa = 404 MATERIA_NAO_ENCONTRADA, o mesmo código da matéria inexistente, D103)	200	400, 401, 404
+PUT	/materias/{id} (substituição: troca nome e descricao, e a descricao omitida vira nula; nunca altera ativo, D61)	200 com a matéria completa (D96)	400, 401, 403, 404, 409
+PATCH	/materias/{id}/disable e /enable	200 com a matéria completa (D96), idempotentes: repetir devolve o mesmo resultado e não altera atualizadoEm (D62)	400, 401, 403, 404
 DELETE	/materias/{id}	204	400, 401, 403, 404, 409 (tem subtópicos, ativos ou não)
 4.2 Subtópico
 Campo	Tipo	Regra	Quem preenche
 id	UUID	gerado	saída
-materiaId	UUID	obrigatório na criação, deve existir (senão 400); não muda depois (valor igual ao atual é aceito; diferente = 400, codigo CAMPO_IMUTAVEL, D48); matéria desativada = 409, codigo MATERIA_INATIVA (D54)	entrada e saída
-nome	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 2 a 100 caracteres (vazio = 400, D57); único dentro da matéria	entrada e saída
+materiaId	UUID	obrigatório na criação, deve existir (senão 400); não muda depois (valor igual ao atual é aceito; diferente = 400, codigo CAMPO_IMUTAVEL, D48); matéria desativada = 409, codigo MATERIA_INATIVA, na criação e quando o enable de fato ativaria um subtópico inativo; enable em subtópico já ativo responde 200 sem efeito; renomear (PUT) e desativar continuam permitidos (D54, D109)	entrada e saída
+nome	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 2 a 100 caracteres (vazio = 400, D57); único dentro da matéria, ignorando maiúsculas e acentos como a matéria (D104)	entrada e saída
 ativo, criadoEm, atualizadoEm		como em Matéria	saída
 Verbo	Rota	Sucesso	Erros
 POST	/subtopicos	201 + Location relativo e o subtópico completo (D58)	400, 401, 403, 409 (nome já existe na matéria; ou matéria desativada, codigo MATERIA_INATIVA, D54)
-GET	/subtopicos (filtros materiaId, nome, ativo; sort: nome, criadoEm). STUDENT só vê subtópicos ativos de matéria ativa; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401
+GET	/subtopicos (filtros materiaId, nome, ativo; sort: nome, criadoEm; padrão nome asc, D77). STUDENT só vê subtópicos ativos de matéria ativa; ativo=false enviado por STUDENT = 400 (D28, D47)	200 lista paginada	400, 401
 GET	/subtopicos/{id} (STUDENT: subtópico inativo ou de matéria inativa = 404)	200	400, 401, 404
-PUT	/subtopicos/{id} (só nome)	200	400, 401, 403, 404, 409
-PATCH	/subtopicos/{id}/disable e /enable	200, idempotentes: repetir devolve o mesmo resultado e não altera atualizadoEm (D62)	400, 401, 403, 404
+PUT	/subtopicos/{id} (só nome)	200 com o subtópico completo (D96)	400, 401, 403, 404, 409
+PATCH	/subtopicos/{id}/disable e /enable	200 com o subtópico completo (D96), idempotentes: repetir devolve o mesmo resultado e não altera atualizadoEm (D62)	400, 401, 403, 404, 409 (só quando o enable de fato ativaria um subtópico inativo de matéria desativada, codigo MATERIA_INATIVA; enable em subtópico já ativo responde 200 sem efeito, mesmo de matéria desativada, D109, D62)
 DELETE	/subtopicos/{id}	204	400, 401, 403, 404, 409 (tem questões, de qualquer status)
 4.3 Prova
 Campo	Tipo	Regra	Quem preenche
@@ -124,7 +126,7 @@ banca	texto	obrigatório, até 80	importação; saída
 ano	inteiro	2000 a 2100	importação; saída
 semestre	inteiro	1 ou 2	importação; saída
 duracaoMinutos	inteiro	1 a 600 (a prova da ETEC tem 180)	importação; saída
-quantidadeQuestoes	inteiro	calculado	saída
+quantidadeQuestoes	inteiro	calculado: o número de questões da prova, uma por numero, em qualquer status (D108)	saída
 fonteUrl	texto	opcional, https, até 500	importação; saída
 status	enum	RASCUNHO ou PUBLICADA	saída
 publicadaEm, criadoEm	data/hora	UTC	saída
@@ -132,9 +134,9 @@ publicadaEm, criadoEm	data/hora	UTC	saída
 Uma prova é única por banca + ano + semestre (D20).
 
 Verbo	Rota	Sucesso	Erros
-GET	/provas (filtros ano, semestre; ADMIN também status; sort: ano, semestre; padrão ano decrescente). STUDENT que envia status (qualquer valor) = 400 (D28, D47)	200 lista paginada	400, 401
+GET	/provas (filtros ano, semestre; ADMIN também status; sort: ano, semestre; padrão ano decrescente; sort=ano sem direção vale asc, e isso é intencional, D102). STUDENT que envia status (qualquer valor) = 400 (D28, D47)	200 lista paginada	400, 401
 GET	/provas/{id} (STUDENT só vê PUBLICADA; senão 404)	200	400, 401, 404
-PATCH	/provas/{id}/publish (ADMIN)	200, idempotente	400, 401, 403, 404, 409 (sem questões, ou com questão ainda não publicada, o que inclui questão sem gabarito; detalhes.questoesPendentes lista os números das questões pendentes, D44)
+PATCH	/provas/{id}/publish (ADMIN)	200 com a prova completa (D96), idempotente	400, 401, 403, 404, 409 (sem questões, ou com questão ainda não publicada, o que inclui questão sem gabarito; detalhes.questoesPendentes lista os números das questões pendentes, D44)
 
 Não existe POST de prova (ela nasce pela importação). PUT e DELETE existem só sob /admin/provas e só em RASCUNHO (seção 5, D21). Prova publicada é imutável: o que muda depois de publicada é a questão, por nova versão (D18). Uma prova só é publicada com o gabarito completo (D13).
 
@@ -147,29 +149,31 @@ id	UUID	identifica a questão (estável entre versões)	saída
 versao	inteiro	1, 2, ...; cada edição de questão publicada cria uma nova	saída
 provaId	UUID	obrigatório, deve existir; não muda depois (valor igual ao atual é aceito; diferente = 400, codigo CAMPO_IMUTAVEL, D48)	entrada e saída
 numero	inteiro	≥ 1, único dentro da prova; não muda depois (valor igual ao atual é aceito; diferente = 400, codigo CAMPO_IMUTAVEL; número errado: descartar o rascunho e reimportar, D42, D48)	entrada e saída
-subtopicoId	UUID	obrigatório, deve existir e estar ativo	entrada e saída
+subtopicoId	UUID	obrigatório (na criação e na importação), deve existir e estar ativo (D80)	entrada e saída
 textoApoio	texto	opcional, até 10.000 (o "Leia o texto..." que a questão usa; copiado em cada questão que o usa, D11)	entrada e saída
 grupoApoio	inteiro	opcional, ≥ 1; questões da mesma prova com o mesmo valor compartilham o mesmo texto de apoio, para o app exibi-lo uma vez	entrada e saída
-enunciado	texto	obrigatório, até 10.000	entrada e saída
+enunciado	texto	obrigatório (D80), até 10.000	entrada e saída
 imagemUrl	texto	opcional, https, até 500, e o host precisa estar na propriedade app.imagens.hosts-permitidos, definida por ambiente (em desenvolvimento, localhost; onde as imagens ficam fisicamente fica para o módulo de infraestrutura; D36, D46) (charge, tirinha, mapa, gráfico)	entrada e saída
-alternativas	lista	exatamente 5 itens {letra, texto}, com as letras A, B, C, D, E (D2)	entrada e saída
-gabarito	letra	uma das letras A a E. Opcional no rascunho; obrigatório para publicar (D13)	entrada e saída
+alternativas	lista	exatamente 5 itens {letra, texto}, com as letras A, B, C, D, E, cada uma uma vez e em qualquer ordem na entrada; na saída, de A a E (D2, D80, D90)	entrada e saída
+gabarito	letra	uma das letras A a E. Opcional no rascunho, na criação e na importação; obrigatório para publicar (D13, D80)	entrada e saída
 dificuldade	enum	FACIL, MEDIA, DIFICIL; opcional	entrada e saída
 explicacao	texto	opcional, até 10.000	entrada e saída
 status	enum	RASCUNHO, PUBLICADA, ARQUIVADA	saída
 Verbo	Rota	Sucesso	Erros
-POST	/admin/importacoes	200 {provaId, questoesCriadas, questoesIgnoradas}	400 (JSON inválido, qualquer questão inválida ou mais de 100 questões: tudo ou nada, D7, D55), 401, 403, 409 (prova já publicada, ou questão do mesmo numero com conteúdo diferente; detalhes.numerosEmConflito lista os números, D40), 413 (corpo acima de 2 MB, D55)
-PUT	/admin/provas/{id} (só RASCUNHO; troca titulo, banca, ano, semestre, duracaoMinutos e fonteUrl)	200	400, 401, 403, 404, 409 (prova publicada, ou outra prova com a mesma banca + ano + semestre)
-DELETE	/admin/provas/{id} (só RASCUNHO)	204	400, 401, 403, 404, 409 (prova publicada, ou com questão já publicada alguma vez; nada é apagado junto, D43)
-PUT	/admin/provas/{id}/gabarito (corpo { "itens": [ {numero, gabarito} ] })	200 {atualizadas}, idempotente; pode ser parcial	400 (letra inválida, numero repetido ou que não existe na prova; tudo ou nada), 401, 403, 404, 409 (prova publicada ou questão já publicada)
-GET	/admin/questoes (filtros provaId, subtopicoId, status; status aceita só RASCUNHO e PUBLICADA, ARQUIVADA = 400; sort: numero, criadoEm). Traz só a versão mais recente de cada questão, e o filtro status vale para essa versão exibida (D56); a ARQUIVADA se lê por ?versao=n (D41)	200 lista paginada	400, 401, 403
+POST	/admin/importacoes	200 {provaId, questoesCriadas, questoesIgnoradas}	400 (JSON inválido, qualquer questão inválida, numero repetido no payload, lista de questões vazia ou mais de 100 questões: tudo ou nada, D7, D55, D90), 401, 403, 409 (prova já publicada, ou questão do mesmo numero com conteúdo diferente; detalhes.numerosEmConflito lista os números, D40), 413 (corpo acima de 2 MB, D55)
+PUT	/admin/provas/{id} (só RASCUNHO; troca titulo, banca, ano, semestre, duracaoMinutos e fonteUrl)	200 com a prova completa (D96)	400, 401, 403, 404, 409 (prova publicada, ou outra prova com a mesma banca + ano + semestre)
+DELETE	/admin/provas/{id} (só RASCUNHO)	204 (apaga também as questões em rascunho da prova, D110)	400, 401, 403, 404, 409 (prova publicada, ou com questão já publicada alguma vez; nada é apagado junto, D43)
+PUT	/admin/provas/{id}/gabarito (corpo { "itens": [ {numero, gabarito} ] })	200 {atualizadas}, idempotente; pode ser parcial	400 (letra inválida, numero repetido ou que não existe na prova; tudo ou nada), 401, 403, 404, 409 (prova publicada ou questão já publicada: um item de questão publicada derruba o lote inteiro, D110)
+GET	/admin/questoes (filtros provaId, subtopicoId, status; status aceita só RASCUNHO e PUBLICADA, ARQUIVADA = 400; sort: só numero, padrão numero asc, D77). Traz só a versão mais recente de cada questão, e o filtro status vale para essa versão exibida (D56); a ARQUIVADA se lê por ?versao=n (D41)	200 lista paginada	400, 401, 403
 GET	/admin/questoes/{id} (devolve o rascunho aberto, se houver, senão a última publicada; ?versao=n lê uma versão específica, inclusive ARQUIVADA)	200	400, 401, 403, 404 (questão ou versão inexistente)
-PUT	/admin/questoes/{id}	200	400 (inclui provaId ou numero com valor diferente do atual, codigo CAMPO_IMUTAVEL, D27, D42, D48), 401, 403, 404, 409 (só RASCUNHO pode ser editada)
-POST	/admin/questoes/{id}/versoes	201 + Location (aponta para /admin/questoes/{id}; cópia em RASCUNHO)	400, 401, 403, 404, 409 (já há rascunho aberto)
-PATCH	/admin/questoes/{id}/publish	200, idempotente; a versão anterior vira ARQUIVADA	400, 401, 403, 404, 409 (sem subtópico, subtópico desativado, sem gabarito, gabarito inválido ou enunciado vazio)
+PUT	/admin/questoes/{id}	200 com a questão completa (D96)	400 (inclui provaId ou numero com valor diferente do atual, codigo CAMPO_IMUTAVEL, avaliado por último, depois do 404 e do 409, D27, D42, D48, D79), 401, 403, 404, 409 (só RASCUNHO pode ser editada)
+POST	/admin/questoes/{id}/versoes	201 + Location (/api/v1/admin/questoes/{id}, D78) e a nova versão no corpo (cópia em RASCUNHO, D96)	400, 401, 403, 404, 409 (já há rascunho aberto)
+PATCH	/admin/questoes/{id}/publish	200 com a questão completa (D96), idempotente (publicar uma questão já publicada e sem rascunho aberto = 200 sem efeito, D110); a versão anterior vira ARQUIVADA	400, 401, 403, 404, 409 (subtópico desativado ou sem gabarito, D80)
 DELETE	/admin/questoes/{id} (se nunca foi publicada, apaga a questão; se tem versão publicada, descarta só o rascunho aberto)	204	400, 401, 403, 404, 409 (questão publicada sem rascunho aberto)
 
-Importação: entrada { prova: {titulo, banca, ano, semestre, duracaoMinutos, fonteUrl}, questoes: [ {numero, subtopicoId, textoApoio, grupoApoio, enunciado, imagemUrl, alternativas, gabarito, dificuldade, explicacao} ] }, com gabarito opcional. Tudo entra como RASCUNHO. A prova é identificada por banca + ano + semestre: reimportar uma prova em RASCUNHO reutiliza o provaId e atualiza titulo, duracaoMinutos e fonteUrl; se ela já estiver publicada, 409 (D20). Se já existe questão no mesmo numero com conteúdo diferente, responde 409 listando os números em conflito (nunca sobrescreve em silêncio); para editar essa questão, usa-se PUT /admin/questoes/{id} (D40). Reimportar o mesmo conteúdo não duplica: o hash identifica o que já existe e conta em questoesIgnoradas. O hash inclui prova, número e conteúdo da questão, e não inclui o gabarito, para que aplicar ou corrigir o gabarito não faça uma reimportação criar questões de novo. Limites: corpo de 2 MB (acima disso, 413) e 100 questões por importação (acima disso, 400) (D55). O hash é gerado na importação, guardado com a questão e nunca muda: nem por PUT, nem por nova versão, e todas as versões da questão carregam o mesmo hash (D51).
+Criação e importação de questão exigem subtopicoId (existente e ativo), enunciado e as 5 alternativas; o gabarito é opcional (D80). O PUT de questão e o PUT de prova são substituição total (D61, D111): o campo opcional omitido vira nulo, inclusive gabarito, explicacao e fonteUrl. Um PUT de questão que omite o gabarito o apaga, e essa advertência também vai no texto do Swagger do endpoint (D111).
+
+Importação: entrada { prova: {titulo, banca, ano, semestre, duracaoMinutos, fonteUrl}, questoes: [ {numero, subtopicoId, textoApoio, grupoApoio, enunciado, imagemUrl, alternativas, gabarito, dificuldade, explicacao} ] }, com gabarito opcional. Tudo entra como RASCUNHO. A prova é identificada por banca + ano + semestre: reimportar uma prova em RASCUNHO reutiliza o provaId e atualiza titulo, duracaoMinutos e fonteUrl; se ela já estiver publicada, 409 (D20). Se já existe questão no mesmo numero com conteúdo diferente, responde 409 listando os números em conflito (nunca sobrescreve em silêncio); para editar essa questão, usa-se PUT /admin/questoes/{id} (D40). Reimportar o mesmo conteúdo não duplica: o hash identifica o que já existe e conta em questoesIgnoradas. O hash é o SHA-256 de provaId, numero, textoApoio, grupoApoio, enunciado, imagemUrl e alternativas (ordenadas por letra), com os espaços das pontas aparados e as quebras de linha normalizadas; NÃO inclui subtopicoId, dificuldade, explicacao nem gabarito (D90). A reimportação de questão que já existe com o mesmo hash, mas com subtopicoId, dificuldade, explicacao ou gabarito diferentes, é ignorada e contada em questoesIgnoradas, e a resposta informa isso (não é silencioso); para mudar esses campos o caminho é o PUT (numa questão publicada, antes se cria a versão em rascunho por POST /versoes, D8; o gabarito também se aplica por PUT .../gabarito, D13). A regra do gabarito ignorado vale só para questão que já existe: a questão nova criada na reimportação recebe o gabarito normalmente (D90). Questões que existem e não vêm no payload ficam como estão. numero repetido no payload ou lista de questões vazia = 400. As alternativas são A a E, cada uma uma vez, em qualquer ordem no payload (D90). Limites: corpo de 2 MB (acima disso, 413) e 100 questões por importação (acima disso, 400) (D55). O hash é gerado na importação, guardado com a questão e nunca muda: nem por PUT, nem por nova versão, e todas as versões da questão carregam o mesmo hash (D51).
 
 Fluxo esperado: importar a prova (sem gabarito) → aplicar o gabarito oficial de uma vez (PUT .../gabarito) → revisar → publicar as questões → publicar a prova. Para corrigir uma questão ou gabarito depois de publicado: POST /versoes, editar o rascunho e publicar; tentativas novas usam a última versão publicada e as antigas mantêm o snapshot (D18).
 
@@ -184,31 +188,31 @@ id	UUID	gerado
 provaId	UUID	da prova
 status	enum	EM_ANDAMENTO, FINALIZADA, EXPIRADA
 iniciadaEm, prazoEm	data/hora	UTC, definidos pelo servidor (prazoEm = início + duração da prova)
-tempoRestanteSegundos	inteiro	nulo quando a tentativa não está em andamento (D73); vale 0 entre prazoEm e prazoEm + 3 s (D16)
-finalizadaEm	data/hora	nulo até encerrar
+tempoRestanteSegundos	inteiro	nulo quando a tentativa não está em andamento (D73); vale 0 entre prazoEm e prazoEm + 3 s (D16); null na EXPIRADA (D88)
+finalizadaEm	data/hora	nulo até encerrar; na tentativa EXPIRADA é o menor entre o prazoEm e o momento da expiração (D88)
 nota	inteiro	nulo até encerrar. Na ETEC, nota é a quantidade de acertos (0 até o total de questões), sem percentual e sem desconto por erro (D3)
-questoes	lista	{ordem, questaoId, versao, textoApoio, grupoApoio, enunciado, imagemUrl, alternativas[{letra, texto}]} (5 alternativas) sem gabarito. A ordem é a numeração da prova e as alternativas são sempre A a E, sem embaralhar (D30)
+questoes	lista	{ordem, questaoId, versao, textoApoio, grupoApoio, enunciado, imagemUrl, alternativas[{letra, texto}]} (5 alternativas) sem gabarito. A ordem é o numero da questão na prova (buracos são permitidos) e as alternativas são sempre A a E, sem embaralhar (D30, D108)
 respostas	lista	{questaoId, alternativa, tempoGastoMs} já salvas
 
-Resposta (entrada): alternativa (uma das letras A a E, ou null para deixar em branco) e tempoGastoMs (inteiro ≥ 0, opcional). tempoGastoMs é o total acumulado da questão; se for omitido, mantém o valor já salvo (D30).
+Resposta (entrada): alternativa é obrigatória (uma das letras A a E, ou null para deixar em branco), e omitida dá 400 (D97); tempoGastoMs (inteiro ≥ 0 e ≤ a duração da prova em milissegundos, opcional) é o total acumulado da questão e, se for omitido, mantém o valor já salvo (D30, D97).
 
 Verbo	Rota	Sucesso	Erros
 POST	/tentativas ({provaId}); passa por podeIniciarTentativa(usuario, prova), que devolve sempre verdadeiro na fase 1 (D35)	201 + Location, com a tentativa completa (mesmo corpo de GET /tentativas/{id}, D52); fixa as questões (última versão publicada de cada uma) e o prazoEm (snapshot)	400 (prova inexistente ou não publicada, a mesma resposta para as duas, D14), 401, 403, 409 (já há tentativa em andamento nessa prova, D4; detalhes.tentativaId informa o id da tentativa aberta, D31, D44)
 GET	/tentativas/{id}	200	400, 401, 403, 404
-PUT	/tentativas/{id}/respostas/{questaoId}	200, idempotente (vale a última)	400 (alternativa fora de A a E, D53), 401, 403, 404 (tentativa inexistente, de outro aluno, ou questaoId que não pertence à tentativa, D53), 409 (tentativa encerrada ou prazo vencido além da tolerância, D5)
+PUT	/tentativas/{id}/respostas/{questaoId}	200 com a resposta salva {questaoId, alternativa, tempoGastoMs} (D96), idempotente (vale a última)	400 (alternativa fora de A a E, D53; alternativa omitida ou tempoGastoMs fora de 0 até a duração da prova, D97), 401, 403, 404 (tentativa inexistente, de outro aluno, ou questaoId que não pertence à tentativa, D53), 409 (tentativa encerrada ou prazo vencido além da tolerância, D5)
 POST	/tentativas/{id}/finalizar	200 {id, status, finalizadaEm, nota, total, acertos, erros, emBranco}, sem itens (D52); repetir devolve o mesmo. Entre prazoEm e prazoEm + 3 s encerra como FINALIZADA; passada a tolerância, devolve 200 com status EXPIRADA (D31, D50)	400, 401, 403, 404
-GET	/tentativas/{id}/resultado	200 {nota, total, acertos, erros, emBranco, itens[{ordem, questaoId, alternativaMarcada, gabarito, correta, explicacao}]} (na ETEC nota = acertos; gabarito e explicação vêm da versão do snapshot)	400, 401, 403, 404, 409 (ainda em andamento)
+GET	/tentativas/{id}/resultado	200 {nota, total, acertos, erros, emBranco, itens[{ordem, questaoId, alternativaMarcada, gabarito, correta, explicacao}]} (na ETEC nota = acertos; gabarito e explicação vêm da versão do snapshot; a questão em branco tem correta = false e alternativaMarcada = null; erros exclui emBranco; acertos + erros + emBranco = total; total é o número de questões do snapshot, D89)	400, 401, 403, 404, 409 (ainda em andamento)
 GET	/tentativas (histórico; filtros status, provaId; sort: iniciadaEm; padrão decrescente)	200 lista paginada	400, 401, 403
 
 Depois de FINALIZADA ou EXPIRADA, o aluno pode refazer a mesma prova, sem limite na fase 1 (o D4 só barra duas tentativas simultâneas).
 
-Encerramento automático: a tentativa só expira quando agora > prazoEm + 3 s (tolerância do D5); até lá continua EM_ANDAMENTO e aceita respostas. Passado esse ponto, ela vira EXPIRADA e é pontuada com o que foi salvo (D6). Se o aluno chamar finalizar antes desse ponto, ainda que depois do prazoEm, a tentativa encerra como FINALIZADA (D50). Isso acontece ao ler/salvar e por um job de varredura; o cliente nunca decide (D16). Não existem: PUT, PATCH e DELETE de tentativa; resposta fora do prazo; gabarito antes de encerrar.
+Encerramento automático: a tentativa só expira quando agora > prazoEm + 3 s (tolerância do D5); até lá continua EM_ANDAMENTO e aceita respostas. Passado esse ponto, ela vira EXPIRADA e é pontuada com o que foi salvo (D6); o finalizadaEm dela é o menor entre o prazoEm e o momento da expiração (na varredura, o prazoEm; na exclusão da conta antes do prazo, o momento da exclusão) e o tempoRestanteSegundos é null (D88). Se o aluno chamar finalizar antes desse ponto, ainda que depois do prazoEm, a tentativa encerra como FINALIZADA (D50). Isso acontece ao ler/salvar e por um job de varredura que roda a cada minuto (propriedade, D88); o cliente nunca decide (D16). Não existem: PUT, PATCH e DELETE de tentativa; resposta depois de prazoEm + 3 s (D85); gabarito antes de encerrar.
 
 7. Operação
 Verbo	Rota	Sucesso	Erros
-GET	/actuator/health e /actuator/health/liveness, /readiness (fora de /api/v1; sem detalhes)	200 UP	503 (banco fora do ar)
+GET	/actuator/health e /actuator/health/liveness, /readiness (fora de /api/v1; sem detalhes)	200 UP	503 (banco fora do ar, só em /actuator/health e /actuator/health/readiness; a liveness responde sempre 200, D99)
 
-Qualquer outro caminho de /actuator e /error: negado. A documentação OpenAPI (/v3/api-docs e /swagger-ui) fica ligada em desenvolvimento e homologação e desligada em produção (D34).
+Qualquer outro caminho de /actuator e /error: 401 para anônimo e 403 para autenticado, inclusive ADMIN; nunca 404 (D113). O /actuator responde no formato do próprio framework, e não no ErrorResponse (D82). A documentação OpenAPI (/v3/api-docs e /swagger-ui) fica ligada em desenvolvimento e homologação e desligada em produção (D34).
 
 8. Decisões
 #	Decisão	Estado
@@ -233,9 +237,9 @@ D18	Corrigir gabarito ou texto de prova publicada = POST /versoes + publish. Ten
 D19	GET /admin/questoes/{id} devolve o rascunho aberto, se houver, senão a última publicada, e aceita ?versao=n. A lista traz só a versão mais recente de cada questão. Location do POST /versoes = /admin/questoes/{id}. Desempate (id, versao)	✅ Confirmada
 D20	Prova única por banca + ano + semestre. Reimportar prova em RASCUNHO reutiliza o provaId; publicada = 409. Hash da questão inclui prova, número e conteúdo (sem gabarito). Limites: 2 MB e 100 questões (refinados pelo D55)	✅ Confirmada
 D21	Acrescentar PUT e DELETE /admin/provas/{id} (só RASCUNHO) e DELETE /admin/questoes/{id} (só se nunca publicada; em versão rascunho, descarta o rascunho)	✅ Confirmada
-D22	Questão anulada fica fora da fase 1. Atenção: como a prova só publica com gabarito completo, uma anulada bloquearia a publicação; conferir como a banca trata, para prever um campo anulada	⏳ Pendência externa (P3)
+D22	Questão anulada fica fora da fase 1. Atenção: como a prova só publica com gabarito completo, uma anulada bloquearia a publicação; conferir como a banca trata, para prever um campo anulada	⏳ Pendência externa
 D23	GET /termos/vigente (pública) devolve {versao, url}. aceiteTermosVersao errada = 400. O register devolve 201 com o usuário, sem tokens	✅ Confirmada
-D24	Na fase 1, menor é só uma marca calculada, sem mudar comportamento. Antes do beta, definir idade mínima e consentimento do responsável com apoio jurídico	⏳ Pendência externa (P2)
+D24	Na fase 1, menor é só uma marca calculada, sem mudar comportamento. Antes do beta, definir idade mínima e consentimento do responsável com apoio jurídico	⏳ Pendência externa
 D25	Limites do 429: 10 requisições por minuto por IP em /auth/* e 5 tentativas de signin por minuto por e-mail, configuráveis por propriedade (números iniciais). Tokens: ver 3.1 e D39	✅ Confirmada
 D26	DELETE /me: e-mail vira removido-{uuid}@invalid (o original pode ser recadastrado); refresh revogados na hora; tentativas em andamento viram EXPIRADA; último ADMIN = 409. Bootstrap por ADMIN_EMAIL e ADMIN_SENHA só se não existir admin. O filtro consulta o banco a cada requisição	✅ Confirmada
 D27	Campos de saída (id, ativo...) são ignorados no corpo; campos de entrada que não mudam (materiaId, email, provaId...) dão 400 se o valor for diferente do atual; valor igual é aceito (refinada pelo D48)	✅ Confirmada
@@ -250,7 +254,7 @@ D35	POST /tentativas passa por podeIniciarTentativa(usuario, prova), que devolve
 D36	imagemUrl só aceita hosts de uma lista permitida (o armazenamento do projeto)	✅ Confirmada
 D37	409 no cadastro revela e-mail existente; o 429 é a mitigação. Não há envio de e-mail na fase 1	✅ Confirmada
 D38	Removido o 403 dos GET de matéria, subtópico e prova (só podem dar 401)	✅ Confirmada
-D39	Tokens (valores do Playbook): HS256; access de 15 min com claims sub (UUID), papel, tipo=access, jti e exp; refresh de 24 h (propriedade configurável), tipo=refresh, com jti guardado no banco; expiresIn em segundos (900). Cada /auth/refresh invalida o refresh usado; reuso de um refresh já invalidado revoga todos os refresh do usuário (D49); logout revoga só o refresh enviado	✅ Confirmada
+D39	Tokens: HS256; access de 15 min com claims sub (UUID), papel, tipo=access, jti e exp; refresh de 24 h (propriedade configurável), tipo=refresh, com jti guardado no banco; expiresIn em segundos (900). Cada /auth/refresh invalida o refresh usado; reuso de um refresh já invalidado revoga todos os refresh do usuário (D49); logout revoga só o refresh enviado	✅ Confirmada
 D40	Reimportar prova em RASCUNHO atualiza titulo, duracaoMinutos e fonteUrl. Questão já existente no mesmo numero com conteúdo diferente = 409 listando os números em conflito (nunca sobrescreve em silêncio); para editar, usa-se PUT /admin/questoes/{id}	✅ Confirmada
 D41	O filtro status de GET /admin/questoes aceita só RASCUNHO e PUBLICADA; a ARQUIVADA se lê por ?versao=n	✅ Confirmada
 D42	numero não muda no PUT de questão (valor diferente do atual = 400, como os demais campos imutáveis; igual é aceito, D48); número errado: descartar o rascunho e reimportar	✅ Confirmada
@@ -287,19 +291,86 @@ D72	A ordem dos campos de SAÍDA do JSON é fixa: a ordem em que os campos apare
 D73	Campos nulos dos DTOs de resposta saem sempre no JSON como null (por exemplo "descricao":null); no ErrorResponse, campos e detalhes são omitidos quando nulos	✅ Confirmada
 D74	O Content-Type das respostas com corpo é exatamente application/json, sem o parâmetro charset, mas o corpo é sempre UTF-8 (padrão do JSON); o 204 não tem Content-Type. O JSON sai compacto; os exemplos do documento são formatados para leitura	✅ Confirmada
 D75	Campo que o papel não pode ver não existe no JSON (não sai como null). Em particular, as questões da tentativa do aluno usam um DTO próprio, sem gabarito nem explicacao	✅ Confirmada
+D76	page começa em 0 (zero é válido); size zero, negativo ou não numérico = 400	✅ Confirmada (refina D29)
+D77	O sort de GET /admin/questoes só aceita numero, e o padrão é numero asc. O padrão de GET /subtopicos é nome asc. O criadoEm sai do sort das questões	✅ Confirmada
+D78	Toda rota das tabelas é relativa a /api/v1, exceto a seção 7; todo Location inclui o prefixo	✅ Confirmada
+D79	Ordem de validação final: 401/403, depois 400 de formato (corpo e id), depois 404, depois 409 de estado, depois 400 CAMPO_IMUTAVEL	✅ Confirmada (refina D17, D27, D42 e D48)
+D80	A criação e a importação de questão exigem subtopicoId (existente e ativo), enunciado e as 5 alternativas; o gabarito é opcional. O 409 do publish de questão fica só com: subtópico desativado e sem gabarito	✅ Confirmada
+D81	A regra do último ADMIN permanece; na fase 1 há um único admin, então ele nunca se exclui	✅ Confirmada
+D82	O ErrorResponse vale em toda a aplicação, exceto /actuator (formato do próprio framework) e a documentação OpenAPI. A seção 2 cita /actuator/health, /actuator/health/liveness e /actuator/health/readiness	✅ Confirmada
+D83	O contrato é rascunho até a aprovação; a v1.0 é a versão aprovada e a seção 10 registra as mudanças a partir dela	✅ Confirmada
+D84	Apêndice A, "Catálogo de códigos de erro", com os códigos já existentes ou nomeados; cada recurso novo acrescenta os seus códigos ao implementar	✅ Confirmada (refina D44)
+D85	"Não existe resposta fora do prazo" passa a "não existe resposta depois de prazoEm + 3 s"	✅ Confirmada
+D86	Corpo da requisição: campo desconhecido é ignorado; tipo errado ou JSON ilegível = 400; campo obrigatório ausente ou null = 400 com campos	✅ Confirmada
+D87	A autorização usa o papel do banco; o claim papel do token é só informativo	✅ Confirmada (refina D39)
+D88	Tentativa EXPIRADA: finalizadaEm = o menor entre prazoEm e o momento da expiração (na varredura é o prazoEm; na exclusão da conta antes do prazo é o momento da exclusão); o job de varredura roda a cada minuto (propriedade); tempoRestanteSegundos = null	✅ Confirmada
+D89	Resultado: questão em branco tem correta = false e alternativaMarcada = null; erros exclui emBranco; acertos + erros + emBranco = total; total é o número de questões do snapshot	✅ Confirmada
+D90	Hash de questão: SHA-256 de provaId, numero, textoApoio, grupoApoio, enunciado, imagemUrl e alternativas (ordenadas por letra), com espaços das pontas aparados e quebras de linha normalizadas; NÃO inclui subtopicoId, dificuldade, explicacao nem gabarito. A reimportação de questão que já existe com o mesmo hash, mas com subtopicoId, dificuldade, explicacao ou gabarito diferentes, é ignorada e contada em questoesIgnoradas, e a resposta informa isso (não é silencioso); para mudar esses campos o caminho é o PUT. A regra do gabarito ignorado vale só para questão que já existe: a questão nova criada na reimportação recebe o gabarito normalmente. Questões que existem e não vêm no payload ficam como estão. numero repetido no payload ou lista vazia = 400. As alternativas são A a E, cada uma uma vez, em qualquer ordem no payload	✅ Confirmada (refina D20, D40 e D51)
+D91	Bootstrap do admin: nome "Administrador", dataNascimento 2000-01-01, aceiteTermosVersao igual à versão vigente. ADMIN_EMAIL e ADMIN_SENHA são validados como num cadastro comum (senha de 8 a 72 bytes); inválidos em produção, a aplicação não sobe	✅ Confirmada (refina D45)
+D92	Anonimização do DELETE /me: nome = "Usuário removido"; e-mail = removido-{uuid}@invalid; senha inutilizada; dataNascimento = null, o que exige uma migration futura que torne a coluna anulável (a migration já aplicada não se edita); essa migration é pré-requisito da tarefa do DELETE /me e vem antes dela, na ordem da fila de migrations	✅ Confirmada (refina D26)
+D93	O desempate é pelo id numérico interno, crescente (nas questões, id interno e depois versao)	✅ Confirmada (refina D19 e D67)
+D94	GET /termos/vigente lê versao e url de propriedades por ambiente	✅ Confirmada
+D95	429: o IP vem do X-Forwarded-For só se o proxy for confiável por propriedade; contador em memória, janela fixa de 1 minuto; a chave do signin é o e-mail normalizado, mesmo inexistente; o 429 vem antes do 400 e do 401; Retry-After em segundos	✅ Confirmada (refina D25)
+D96	Corpos de sucesso: PATCH /me, disable/enable, publish (prova e questão), PUT /materias/{id}, PUT /subtopicos/{id}, PUT /admin/provas/{id} e PUT /admin/questoes/{id} devolvem 200 com o recurso completo (mesmo DTO do GET); POST /versoes devolve 201 com a nova versão; PUT .../respostas/{questaoId} devolve a resposta salva {questaoId, alternativa, tempoGastoMs}; refresh devolve o mesmo corpo do signin. Entradas: signin {email, senha}; refresh e logout {refreshToken}	✅ Confirmada
+D97	PUT de resposta: alternativa é obrigatória (A a E ou null, que é em branco); omitida = 400; tempoGastoMs ≥ 0 e ≤ duração da prova em milissegundos; omitido, mantém o valor salvo	✅ Confirmada (refina D30)
+D98	Formatação dos textos: só as marcas <b>, <u>, <i>, <sup>, <sub> e <br> exatas, em minúsculas e <br> sem barra; só as entidades &lt;, &gt; e &amp;; os limites contam pontos de código; o HTML só vale nos textos de questão (enunciado, textoApoio, alternativas[].texto, explicacao)	✅ Confirmada (refina D12 e D32)
+D99	/actuator/health/liveness responde sempre 200; só /actuator/health e /readiness dão 503 com o banco fora	✅ Confirmada
+D100	CORS: métodos GET, POST, PUT, PATCH, DELETE e OPTIONS; cabeçalhos Authorization e Content-Type; sem credenciais; max-age 3600; o preflight OPTIONS não exige autenticação	✅ Confirmada (refina D34)
+D101	Em página comum além do fim, pagina devolve a página pedida; mais de um sort = 400; o nome do campo do sort diferencia maiúsculas (NOME = 400); ativo aceita true ou false em qualquer caixa	✅ Confirmada (refina D64, D66 e D70)
+D102	O padrão de /provas (ano decrescente) com sort=ano sem direção valendo asc é intencional	✅ Confirmada
+D103	Filtro com enum inválido, ano não numérico ou materiaId malformado = 400; STUDENT filtrando por materiaId de matéria inativa recebe lista vazia; o STUDENT que busca por id uma matéria inativa recebe 404 MATERIA_NAO_ENCONTRADA, igual ao da matéria inexistente	✅ Confirmada
+D104	Todos os textos curtos (nome, descricao, titulo, banca...) têm os espaços das pontas aparados; a unicidade é pela collation (espaços internos contam; sem normalização Unicode própria); o subtópico ignora caixa e acento como a matéria	✅ Confirmada (refina D57)
+D105	O e-mail é aparado e convertido para minúsculas antes de validar e antes do 409; o CAMPO_IMUTAVEL do e-mail compara o valor normalizado	✅ Confirmada
+D106	dataNascimento: "no passado" em UTC, mínimo 1900-01-01; menor é calculado na leitura	✅ Confirmada
+D107	tokenType é "Bearer"; o logout responde 204 para qualquer texto presente (inclusive malformado ou de outro tipo) e 400 só se o refresh estiver ausente ou não for texto; um access token enviado ao refresh = 401	✅ Confirmada (refina D15 e D39)
+D108	A ordem da questão na tentativa é o numero dela na prova (buracos permitidos); quantidadeQuestoes é o número de questões da prova (uma por numero, qualquer status)	✅ Confirmada (refina D30)
+D109	Subtópico: a criação, e o enable que de fato ativaria um subtópico inativo, respondem 409 MATERIA_INATIVA se a matéria está desativada; enable em subtópico que já está ativo responde 200 sem efeito, mesmo de matéria desativada (D62); renomear (PUT) e desativar continuam permitidos	✅ Confirmada (refina D54)
+D110	Publish de questão já publicada e sem rascunho aberto = 200 sem efeito; o gabarito em lote é tudo ou nada (um item de questão publicada derruba o lote com 409); DELETE de prova em RASCUNHO apaga também as suas questões em rascunho (409 se alguma já foi publicada, D43)	✅ Confirmada
+D111	PUT é substituição total (D61), inclusive de gabarito, explicacao e fonteUrl; o contrato (seção 5) e o texto do Swagger dizem que um PUT de questão que omite o gabarito o apaga	✅ Confirmada (refina D61)
+D112	415: só application/json, com charset=utf-8 tolerado	✅ Confirmada
+D113	Outros caminhos de /actuator e /error: 401 para anônimo e 403 para autenticado, inclusive ADMIN; nunca 404	✅ Confirmada
+D114	Cache-Control: no-store vale para as respostas de signin e de refresh	✅ Confirmada
+D115	O contrato é autônomo: sem referências a outros documentos nem a numeração de pendências; a seção 11 descreve por extenso as duas pendências externas (D22 e D24)	✅ Confirmada
+D116	Em /api/v1, rota inexistente responde 401 a quem não está autenticado e 404 a quem está (rota nova nasce negada); o 404 de rota inexistente só vale após a autenticação	✅ Confirmada (refina D82 e D113)
 9. Fora da fase 1 (de propósito)
 
 Pagamento e planos, entitlements como API (na fase 1 é um serviço interno que libera tudo, por podeIniciarTentativa), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
 
 10. Registro de mudanças após a aprovação
 
+A v1.0 é a versão aprovada (D83). Toda mudança a partir dela entra aqui, com a decisão e o motivo.
+
 (vazio)
 
-11. Pendências abertas (só as externas)
+11. Pendências abertas e limitações conhecidas
 
-P2. Menores e LGPD (externa, D24): idade mínima e consentimento do responsável, com apoio jurídico, antes do beta.
-P3. Questão anulada (externa, D22): conferir como a banca trata a anulada e prever o campo anulada.
+Menores de idade e LGPD (externa, D24): na fase 1, menor é só uma marca calculada, sem mudar comportamento. Antes do beta, é preciso definir a idade mínima e o consentimento do responsável, com apoio jurídico.
+Questão anulada (externa, D22): fica fora da fase 1. Como a prova só publica com o gabarito completo, uma questão anulada bloquearia a publicação; é preciso conferir como a banca trata a anulada, para prever um campo anulada.
 
-As pendências técnicas P1 e P4 a P12 foram decididas na v0.6 (D39 a D47). A P9 (catálogo dos valores de codigo) ficou como tarefa de implementação (D44).
+Não há outra pendência de decisão aberta. O catálogo dos valores de codigo está no apêndice A (D84).
 
-Histórico do rascunho: v0.2 — D2 resolvida e correção da referência da seção de mudanças. v0.3 — D1 a D10 confirmadas; D3 muda: nota é a quantidade de acertos; duração da prova da ETEC (180 min) anotada. v0.4 — D11 a D13 confirmadas; novos campos textoApoio e grupoApoio; gabarito opcional no rascunho; nova rota PUT /admin/provas/{id}/gabarito; regra de formatação mínima nos textos (o servidor recusa outras marcações HTML). v0.5 — primeira sabotagem: D14 a D38 (25 respostas); logout anônimo; nova rota GET /termos/vigente; novas rotas PUT e DELETE /admin/provas/{id} e DELETE /admin/questoes/{id}; campo codigo no erro; nova ordem de validação (401/403 antes de 400); <br> na formatação; subseção 3.1 (JWT, proposta) e seção 11 (pendências abertas). v0.6 — D39 a D47 confirmadas (P1 corrigida com os valores do Playbook e P4 a P12 decididas); campo detalhes no ErrorResponse; tokens HS256 com claims definidos e refresh de 24 h; reimportação atualiza titulo, duracaoMinutos e fonteUrl e dá 409 em conflito de questão; numero imutável; filtro de status de questões só RASCUNHO e PUBLICADA; aluno com ativo=false ou status recebe 400; hosts de imagem por propriedade; bootstrap do admin por ambiente; seção 11 reduzida às pendências externas. v0.7 — D48 a D56 decididas; campo de entrada imutável aceita o valor igual ao atual e recusa o diferente com codigo CAMPO_IMUTAVEL (D27 e D42 refinadas); reuso de refresh invalidado revoga todos os refresh do usuário, sem conceito de família (D39 refinada); finalizar dentro da tolerância de 3 s encerra como FINALIZADA (D31 refinada); hash da questão imutável; POST /tentativas devolve a tentativa completa e finalizar devolve o resumo sem itens; questaoId alheio = 404 e letra inválida = 400; subtópico em matéria desativada = 409 (MATERIA_INATIVA); importação acima de 2 MB = 413 e acima de 100 questões = 400 (D20 refinada); filtro status de questões vale para a versão mais recente; linha Estado corrigida. v0.8 — D57 a D63 decididas; o servidor remove os espaços das pontas do nome antes de validar (D57); Location relativo e 201 com o recurso completo (D58); campos com no máximo uma mensagem por campo e texto de mensagem não contratual (D59); data inválida = 400 com campos e mensagem fixa (D60); PUT é substituição, com as exceções registradas na seção 1 (D61); disable/enable repetido não altera atualizadoEm (D62); datas com precisão de milissegundos, truncadas na origem (D63); exemplo de campos atualizado. v0.9 — D64 a D70 decididas (as regras da listagem implementada na Tarefa 07); sort sem direção vale asc e a direção aceita qualquer caixa (D64); nome em branco no filtro equivale a filtro ausente (D65); ativo só aceita true ou false (D66); desempate por id sempre crescente (D67); tamanho do envelope é o aplicado (D68); ordem alfabética segue a collation do MySQL (D69); página × tamanho acima de 2³¹-1 dá 200 vazia com o pagina limitado (D70); propagado na seção 1 (lista paginada) e em 4.1. v0.10 — D71 a D75 decididas (o formato da resposta, Tarefa 08): só JSON nas rotas de /api/v1, com 406 em JSON para qualquer outro Accept, e a documentação OpenAPI como exceção declarada (D71); ordem dos campos de saída fixa, a ordem em que aparecem escritos no contrato, inclusive nos objetos entre chaves, e ordem própria do ErrorResponse e do envelope (D72); nulos dos DTOs de resposta sempre presentes, e campos e detalhes do ErrorResponse omitidos quando nulos (D73); Content-Type exatamente application/json, sem charset e só em respostas com corpo, corpo sempre UTF-8 e JSON compacto (D74); campo que o papel não pode ver não existe no JSON, e as questões da tentativa do aluno usam um DTO próprio (D75); propagado na seção 1 (linhas Base e formato, Ordem e nulos e Erros que podem ocorrer em qualquer rota, ErrorResponse e lista paginada).
+Limitação conhecida (D95): o contador do limite de abuso (429) fica em memória e vale por instância. A fase 1 roda com uma instância só; antes de subir mais de uma réplica, o contador precisa ir para armazenamento compartilhado (tarefa do módulo de deploy).
+
+Apêndice A. Catálogo de códigos de erro (D84)
+
+Cada recurso novo acrescenta os seus códigos a este catálogo ao ser implementado. Os códigos de 401, 403, 413 e 429 entram quando as rotas que os produzem forem implementadas.
+
+Código	Status	Quando	Situação
+VALIDACAO_FALHOU	400	campos inválidos no corpo (traz campos)	Implementado
+CORPO_ILEGIVEL	400	JSON ilegível ou de tipo errado	Implementado
+PARAMETRO_AUSENTE	400	parâmetro obrigatório ausente	Implementado
+PARAMETRO_INVALIDO	400	parâmetro com valor inválido (page, size, ativo, id malformado...)	Implementado
+ORDENACAO_INVALIDA	400	sort com formato ou campo inválido	Implementado
+CAMPO_IMUTAVEL	400	campo de entrada que não muda, enviado com valor diferente do atual	Nomeado no contrato; a implementar
+RECURSO_NAO_ENCONTRADO	404	rota sem recurso mapeado, para quem passa na autenticação (o anônimo recebe 401)	Implementado
+MATERIA_NAO_ENCONTRADA	404	matéria inexistente (ou inativa para o STUDENT)	Implementado
+METODO_NAO_PERMITIDO	405	método HTTP não permitido na rota	Implementado
+FORMATO_NAO_ACEITO	406	Accept que não seja JSON	Implementado
+CONFLITO	409	conflito sem código próprio	Implementado
+MATERIA_NOME_DUPLICADO	409	já existe matéria com o nome	Implementado
+MATERIA_INATIVA	409	subtópico criado, ou inativo que seria reativado, em matéria desativada	Nomeado no contrato; a implementar
+TENTATIVA_EM_ANDAMENTO	409	já há tentativa em andamento nessa prova (traz detalhes.tentativaId)	Nomeado no contrato; a implementar
+TIPO_NAO_SUPORTADO	415	corpo que não é application/json	Implementado
+ERRO_INTERNO	500	erro inesperado (mensagem genérica)	Implementado
+
+Histórico das versões: o contrato nasceu como lista de rotas e foi refinado em rodadas de perguntas e respostas (v0.2 a v0.10). Elas fecharam as regras de tentativa e prazo (D3 a D6, D16, D31, D50), de importação e versões de questão (D7, D8, D13, D18 a D21, D40 a D43, D51, D55, D56), de autenticação e tokens (D15, D23 a D26, D37, D39, D45, D49), do formato de erro (D1, D33, D44, D59, D60), das convenções de dados (D57 a D63), da listagem (D29, D64 a D70) e do formato da resposta (D71 a D75). v1.0 — versão aprovada: D76 a D116 resolveram as contradições e lacunas apontadas na leitura independente do contrato (paginação, ordem de validação, regras de questão e importação, tentativa e resultado, autenticação, CORS, actuator, textos e e-mail), acrescentaram o catálogo de códigos de erro e tornaram o documento autônomo.

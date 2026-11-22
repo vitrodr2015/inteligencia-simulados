@@ -124,3 +124,15 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 - Aviso do Mockito (agent dinâmico) no JDK 25: só aviso por enquanto.
 - `duvida-CICD.md` fica para a fase de nuvem.
 - Módulos 10 e 11 (login com token, 401 e 403): vão reaproveitar a `AbstractIntegrationTest`; os testes de integração delas precisarão criar o próprio usuário e o token com nomes únicos. As propriedades do admin inicial (`ADMIN_EMAIL`/`ADMIN_SENHA`) ainda não existem e entram com a tarefa do admin inicial.
+
+## Ajustes de código pendentes da v1.0
+
+O contrato v1.0 (D76 a D116) mudou regras que o código já implementado não segue. Cada item diz em que tarefa entra:
+
+- **Tarefa do Subtópico:** aparar também a `descricao` em `MateriaRequest` (hoje só o `nome` é aparado), com teste (D104).
+- **Tarefa do Subtópico:** criar em `shared` uma validação de tamanho por pontos de código (o `@Size` conta unidades UTF-16) e aplicá-la ao `nome` e à `descricao` de Matéria e de Subtópico, com teste de emoji (D98).
+- **Tarefa do Subtópico:** teste que fixe "mais de um `sort` = 400" (D101). Hoje o 400 sai por acaso, porque o Spring junta os dois valores num texto que não casa com o formato.
+- **Segurança (Módulo 10):** os testes de 404 de `/nao-existe` e de `/api/v1/nao-existe` passam a autenticar, e sem credencial esperam 401 (D116).
+- **Tarefa do `DELETE /me`:** a migration que torna `usuario.data_nascimento` anulável vem ANTES dessa tarefa, numerada na ordem da fila de migrations; a V1 não se edita (D92).
+- **Tarefa da Importação:** implementar o D90 (hash SHA-256 sem `subtopicoId`, `dificuldade`, `explicacao` e `gabarito`; o gabarito ignorado vale só para questão que já existe, e a questão nova recebe o gabarito) e `questoesIgnoradas` como contagem, sem detalhar quais campos divergiram.
+- **Deploy (Módulo 18):** o contador do 429 fica em memória e vale por instância; antes de subir mais de uma réplica ele precisa ir para armazenamento compartilhado (D95).
