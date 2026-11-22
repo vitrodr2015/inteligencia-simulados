@@ -144,6 +144,23 @@ class AdminInicialIntegracaoTest {
 	}
 
 	@Test
+	void deve_recusar_senha_marcador_de_exemplo_sem_criar_admin_nem_mostrar_o_valor(CapturedOutput saida) throws SQLException {
+		String schema = novoSchema();
+		String marcador = "troque-a-senha-do-admin";
+		String email = "admin.marcador@exemplo.invalid";
+
+		try (var ctx = subir(schema, false, email, marcador)) {
+			assertThat(ctx.isRunning()).isTrue();
+		}
+		assertThat(usuarios(schema)).isEmpty();
+		assertThat(saida.getAll()).contains("ERROR").contains("marcador de exemplo").doesNotContain(marcador)
+				.doesNotContain(email);
+
+		assertThatThrownBy(() -> subir(schema, true, email, "<DEFINA-AQUI>")).hasStackTraceContaining("marcador de exemplo");
+		assertThat(usuarios(schema)).isEmpty();
+	}
+
+	@Test
 	void deve_nunca_promover_usuario_comum_existente_com_o_email_do_admin(CapturedOutput saida) throws SQLException {
 		String schema = novoSchema();
 		String email = "aluno." + UUID.randomUUID().toString().substring(0, 8) + "@exemplo.invalid";

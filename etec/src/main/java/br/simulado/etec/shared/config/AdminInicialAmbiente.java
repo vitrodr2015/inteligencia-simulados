@@ -113,6 +113,15 @@ public final class AdminInicialAmbiente {
 		return motivos;
 	}
 
+	/**
+	 * Placeholder do projeto ("troque-a-senha-do-admin", "<defina-aqui>"): começa com "troque-" ou tem "<" e ">", sem
+	 * diferenciar maiúsculas. Quem copia um exemplo sem trocar o valor não pode virar administrador.
+	 */
+	static boolean pareceMarcadorDeExemplo(String senha) {
+		String minuscula = senha.strip().toLowerCase(Locale.ROOT);
+		return minuscula.startsWith("troque-") || (minuscula.contains("<") && minuscula.contains(">"));
+	}
+
 	private static List<String> motivosDaSenha(String senha) {
 		List<String> motivos = new ArrayList<>();
 		int bytes = senha.getBytes(StandardCharsets.UTF_8).length;
@@ -127,6 +136,9 @@ public final class AdminInicialAmbiente {
 		}
 		if (senha.indexOf('\n') >= 0 || senha.indexOf('\r') >= 0) {
 			motivos.add(VARIAVEL_SENHA + " tem quebra de linha.");
+		}
+		if (pareceMarcadorDeExemplo(senha)) {
+			motivos.add(VARIAVEL_SENHA + " parece um marcador de exemplo (\"troque-...\" ou \"<...>\"), não uma senha real.");
 		}
 		return motivos;
 	}

@@ -67,6 +67,22 @@ class AdminInicialAmbienteTest {
 		assertThat(AdminInicialAmbiente.ler(ambiente("a@exemplo.invalid", "a".repeat(73)))).isInstanceOf(Invalida.class);
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = { "troque-a-senha-do-admin", "TROQUE-A-SENHA-DO-ADMIN", "Troque-qualquer-coisa-aqui", "<defina-aqui>",
+			"<DEFINA-AQUI>", "minha-<senha>-longa-1", "xx<yy>zzzzzzzzzz" })
+	void deve_recusar_senha_que_e_marcador_de_exemplo_com_motivo_fixo_sem_o_valor(String senha) {
+		Invalida invalida = invalida("admin@exemplo.invalid", senha);
+
+		assertThat(invalida.motivos()).singleElement().asString().contains("marcador de exemplo").doesNotContain(senha);
+		assertThat(invalida.resumo()).doesNotContain(senha);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Senha-troque-123456", "a<b-senha-longa-1", "b>a-senha-longa-1", "Troque_a_senha_123" })
+	void deve_aceitar_senha_real_que_so_lembra_um_marcador(String senha) {
+		assertThat(AdminInicialAmbiente.ler(ambiente("admin@exemplo.invalid", senha))).isInstanceOf(Valida.class);
+	}
+
 	@Test
 	void deve_contar_a_senha_em_bytes_utf8_e_nao_em_caracteres() {
 		assertThat(AdminInicialAmbiente.ler(ambiente("a@exemplo.invalid", "é".repeat(6)))).as("12 bytes")
