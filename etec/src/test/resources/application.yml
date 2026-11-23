@@ -40,6 +40,21 @@ app:
   termos:
     versao: v1-teste
     url: https://exemplo.invalid/termos
+  # Limites ALTOS: os 1000+ testes que passam pelo signin e pelo /auth/* não podem esbarrar no 429 (todos chegam do mesmo
+  # endereço de loopback). Os testes DEDICADOS do limite sobem o próprio contexto com os valores que querem provar. A
+  # limpeza agendada fica DESLIGADA (o teste chama o método direto, com o relógio de teste). Os valores reais são os do
+  # application.yml principal e são guardados por GuardasDeArquivosReaisTest.
+  rate-limit:
+    limpeza-ativa: false
+    auth-por-origem:
+      limite: 1000000
+      janela: 1m
+    signin-email-origem:
+      limite: 1000000
+      janela: 1m
+    signin-origem:
+      limite: 1000000
+      janela: 1m
 
 # Swagger desligado por padrão, como em produção; os testes do Swagger ligam por propriedade.
 server:

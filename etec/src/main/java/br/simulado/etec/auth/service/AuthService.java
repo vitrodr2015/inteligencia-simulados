@@ -16,6 +16,9 @@ import br.simulado.etec.shared.exception.InvalidTokenException;
 import br.simulado.etec.shared.security.JwtTokenProvider;
 import br.simulado.etec.shared.security.JwtTokenProvider.ClaimsDoToken;
 import br.simulado.etec.shared.security.JwtTokenProvider.TipoToken;
+import br.simulado.etec.shared.security.limite.Escopo;
+import br.simulado.etec.shared.security.limite.LimiteDeTentativas;
+import br.simulado.etec.shared.security.limite.RateLimitProperties;
 import br.simulado.etec.usuarios.model.Usuario;
 import br.simulado.etec.usuarios.service.UsuarioService;
 
@@ -27,6 +30,12 @@ import br.simulado.etec.usuarios.service.UsuarioService;
  * vazia e senha acima de 72 bytes terminam na mesma exceção, e TODAS passam por UMA comparação de BCrypt (com um
  * hash fictício quando não há usuário válido), para o tempo de resposta não revelar qual foi a falha. A senha acima
  * de 72 bytes nunca é comparada com o hash real: o BCrypt a truncaria em silêncio e um sufixo qualquer entraria.
+ *
+ * <p><b>Limite de tentativas (D128).</b> O signin CONTA ANTES de conferir a senha: primeiro e-mail+origem, depois a origem
+ * (só se o primeiro não estourou). Assim, mesmo com requisições simultâneas, no máximo {@code limite} chegam ao BCrypt. Cada
+ * contador grava numa transação própria (o 401 não o desfaz) e a exceção 429 sai ANTES de qualquer BCrypt. No sucesso, o
+ * contador de e-mail+origem é apagado e a origem recebe de volta a ocorrência (ela conta só falhas). A chave é o e-mail
+ * normalizado, exista ele ou não: a resposta e o tempo do 429 não dizem nada sobre a conta.
  */
 @Service
 public class AuthService {
@@ -46,13 +55,20 @@ public class AuthService {
 
 	private final JwtTokenProvider tokens;
 
+	private final LimiteDeTentativas limite;
+
+	private final RateLimitProperties limites;
+
 	/** Hash de uma senha aleatória descartada, gerado com o mesmo encoder (e portanto o mesmo custo) dos reais. */
 	private final String hashFicticio;
 
-	public AuthService(UsuarioService usuarios, PasswordEncoder encoder, JwtTokenProvider tokens) {
+	public AuthService(UsuarioService usuarios, PasswordEncoder encoder, JwtTokenProvider tokens,
+			LimiteDeTentativas limite, RateLimitProperties limites) {
 		this.usuarios = usuarios;
 		this.encoder = encoder;
 		this.tokens = tokens;
+		this.limite = limite;
+		this.limites = limites;
 		this.hashFicticio = encoder.encode(UUID.randomUUID().toString());
 	}
 
@@ -62,9 +78,18 @@ public class AuthService {
 				dados.aceiteTermosVersao());
 	}
 
-	public TokensResponse signin(SigninRequest dados) {
+	/**
+	 * @param origem a origem normalizada da requisição ({@code OrigemDaRequisicao}); nunca vai para log nem banco em claro
+	 * @throws br.simulado.etec.shared.exception.LimiteExcedidoException 429, antes de qualquer BCrypt
+	 */
+	public TokensResponse signin(SigninRequest dados, String origem) {
 		String email = dados.email();
 		String senha = dados.senha();
+
+		// A origem vem primeiro no valor: o corte de 255 caracteres do e-mail nunca a remove.
+		String emailEOrigem = origem + "|" + email;
+		limite.consumir(Escopo.SIGNIN_EMAIL_ORIGEM, emailEOrigem, limites.signinEmailOrigem());
+		limite.consumir(Escopo.SIGNIN_ORIGEM, origem, limites.signinOrigem());
 
 		Optional<Usuario> usuario = (email.length() > TAMANHO_MAXIMO_DO_EMAIL) ? Optional.empty()
 				: usuarios.buscarPorEmail(email);
@@ -80,6 +105,9 @@ public class AuthService {
 		if (!(comparaComOHashReal && confere)) {
 			throw new CredenciaisInvalidasException();
 		}
+		// Sucesso: zera o e-mail+origem e devolve a ocorrência à origem (que só conta falhas).
+		limite.zerar(Escopo.SIGNIN_EMAIL_ORIGEM, emailEOrigem);
+		limite.devolver(Escopo.SIGNIN_ORIGEM, origem);
 		return emitirPar(usuario.get());
 	}
 

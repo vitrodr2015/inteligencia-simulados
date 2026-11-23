@@ -14,6 +14,7 @@ import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.core.MethodParameter;
 import org.springframework.data.core.PropertyReferenceException;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -86,6 +87,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(AutenticacaoException.class)
 	ResponseEntity<Object> aoFalharAutenticacao(AutenticacaoException ex) {
 		return resposta(HttpStatus.UNAUTHORIZED, ex.getCodigo(), ex.getMessage(), null, null, null);
+	}
+
+	/** Limite de tentativas (429): Retry-After em segundos e no-store, igual ao 429 do filtro de origem (D129). */
+	@ExceptionHandler(LimiteExcedidoException.class)
+	ResponseEntity<Object> aoExcederLimite(LimiteExcedidoException ex) {
+		HttpHeaders cabecalhos = new HttpHeaders();
+		cabecalhos.set(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSegundos()));
+		cabecalhos.setCacheControl(CacheControl.noStore());
+		return resposta(HttpStatus.TOO_MANY_REQUESTS, ex.getCodigo(), ex.getMessage(), null, null, cabecalhos);
 	}
 
 	/** Autenticado sem permissão (403), por código que precisa do papel: defesa em profundidade além da cadeia. */

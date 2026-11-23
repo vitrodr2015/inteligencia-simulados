@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Autenticação — /api/v1/auth, /me e /termos",
-    "description": "Cadastro, signin, refresh, GET /me, termos vigentes, o negar por padrão, o que o STUDENT não pode, o firewall e o CORS. Rode na ordem (a pasta Cadastro cria o usuário e as seguintes o usam). Gerada a partir de chamadas reais. Nenhum segredo no arquivo: e-mail e senha são gerados a cada rodada por script e os tokens ficam só nas variáveis da coleção. Não há como apagar o usuário criado pela API ainda (DELETE /me é de outra tarefa): ele fica no banco local com e-mail @exemplo.invalid. Até o Módulo 13 o refresh usado NÃO é invalidado e não há logout nem limite de 429.",
+    "description": "Cadastro, signin, refresh, GET /me, termos vigentes, o negar por padrão, o que o STUDENT não pode, o firewall e o CORS. Rode na ordem (a pasta Cadastro cria o usuário e as seguintes o usam). Gerada a partir de chamadas reais. Nenhum segredo no arquivo: e-mail e senha são gerados a cada rodada por script e os tokens ficam só nas variáveis da coleção. Não há como apagar o usuário criado pela API ainda (DELETE /me é de outra tarefa): ele fica no banco local com e-mail @exemplo.invalid. O limite de tentativas (429, Módulo 13A) existe: a coleção faz poucas chamadas por rodada e fica longe dele, mas, se rodar muitas vezes seguidas e receber 429, espere o tempo do cabeçalho Retry-After. Até o Módulo 13B o refresh usado NÃO é invalidado e não há logout.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [

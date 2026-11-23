@@ -45,9 +45,19 @@ app:
     url: ${TERMOS_URL}
   imagens:
     hosts-permitidos: ${IMAGENS_HOSTS_PERMITIDOS:localhost}
+  # Limite de tentativas (429, D128 a D130). Janela fixa, expira sozinha; os contadores ficam no banco (compartilhados
+  # entre instâncias). O de signin conta só FALHAS; o de /auth/* conta toda requisição POST (só proteção contra enxurrada).
   rate-limit:
-    auth-por-ip-por-minuto: 10
-    signin-por-email-por-minuto: 5
+    limpeza-ativa: true
+    auth-por-origem:
+      limite: 120
+      janela: 1m
+    signin-email-origem:
+      limite: 5
+      janela: 15m
+    signin-origem:
+      limite: 50
+      janela: 15m
 
 # Inerte até a dependência do springdoc existir.
 springdoc:

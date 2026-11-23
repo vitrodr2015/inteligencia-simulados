@@ -19,6 +19,11 @@ import org.springframework.web.cors.CorsUtils;
 
 import jakarta.servlet.DispatcherType;
 
+import br.simulado.etec.shared.security.limite.LimiteDeOrigemFilter;
+import br.simulado.etec.shared.security.limite.LimiteDeTentativas;
+import br.simulado.etec.shared.security.limite.OrigemDaRequisicao;
+import br.simulado.etec.shared.security.limite.RateLimitProperties;
+
 /**
  * Cadeia de segurança e QUEM PODE O QUÊ, num lugar só (contrato, seções 1 e 2): stateless, CSRF desligado, sem
  * formulário, sem Basic, sem logout do Spring, e NEGAR POR PADRÃO: o que não tem regra aqui é negado ({@code denyAll}),
@@ -64,7 +69,8 @@ public class SecurityConfig {
 
 	@Bean
 	public SecurityFilterChain cadeiaDeSeguranca(HttpSecurity http, AutenticadorDeToken autenticador,
-			SecurityErrorWriter escritorDeErros, Environment ambiente) throws Exception {
+			SecurityErrorWriter escritorDeErros, Environment ambiente, LimiteDeTentativas limite,
+			RateLimitProperties limites, OrigemDaRequisicao origens) throws Exception {
 		boolean documentacaoLigada = ambiente.getProperty("springdoc.api-docs.enabled", Boolean.class, false)
 				|| ambiente.getProperty("springdoc.swagger-ui.enabled", Boolean.class, false);
 
@@ -80,6 +86,8 @@ public class SecurityConfig {
 						.accessDeniedHandler(escritorDeErros))
 				.addFilterBefore(new JwtTokenFilter(autenticador, escritorDeErros),
 						UsernamePasswordAuthenticationFilter.class)
+				// Limite por origem de /auth/* (D128): depois do CORS (o 429 leva os mesmos cabeçalhos) e antes do JWT e do corpo.
+				.addFilterBefore(new LimiteDeOrigemFilter(limite, limites, origens, escritorDeErros), JwtTokenFilter.class)
 				.authorizeHttpRequests(regras -> {
 					// Despacho de ERRO (o container repassando um erro real): mantém o status original. Quem pede
 					// /error direto é despacho normal e cai no denyAll abaixo.

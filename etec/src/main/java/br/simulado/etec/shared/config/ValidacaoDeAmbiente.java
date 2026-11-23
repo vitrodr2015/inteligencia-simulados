@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.springframework.core.env.ConfigurableEnvironment;
 
+import br.simulado.etec.shared.security.limite.ProxiesConfiaveis;
+
 /**
  * Recusa subir a aplicação com segredos ausentes ou malformados.
  *
@@ -44,6 +46,13 @@ public final class ValidacaoDeAmbiente {
 		if (Perfis.emProducao(ambiente)
 				&& AdminInicialAmbiente.ler(ambiente) instanceof AdminInicialAmbiente.Invalida invalida) {
 			problemas.add("Administrador inicial: " + invalida.resumo());
+		}
+		// Origem da requisição (D130): com a leitura do cabeçalho do proxy LIGADA, a lista de proxies confiáveis tem de ser
+		// explícita; vazia ou permissiva deixaria qualquer cliente inventar a própria origem. Só em produção, sem mostrar valor.
+		if (Perfis.emProducao(ambiente) && temTexto(ambiente.getProperty(ProxiesConfiaveis.CABECALHO))
+				&& ProxiesConfiaveis.permissiva(ambiente.getProperty(ProxiesConfiaveis.LISTA))) {
+			problemas.add("Proxy confiável: " + ProxiesConfiaveis.LISTA + " precisa listar os proxies de forma explícita "
+					+ "(vazia ou permissiva não é aceita quando " + ProxiesConfiaveis.CABECALHO + " está ligado).");
 		}
 		if (!problemas.isEmpty()) {
 			StringBuilder mensagem = new StringBuilder("Configuração inválida, a aplicação não vai subir:");

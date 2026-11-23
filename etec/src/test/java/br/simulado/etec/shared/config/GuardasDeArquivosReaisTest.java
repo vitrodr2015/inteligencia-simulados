@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -14,7 +15,10 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
+import org.springframework.boot.convert.DurationStyle;
 import org.springframework.core.io.FileSystemResource;
+
+import br.simulado.etec.shared.security.limite.ProxiesConfiaveis;
 
 /**
  * Guardas que leem os arquivos REAIS do projeto (yml, pom, migrations): o que pode abrir um caminho sensível ou deixar um
@@ -63,6 +67,61 @@ class GuardasDeArquivosReaisTest {
 		// O comportamento (a aplicação não sobe com *) está no CorsPropertiesTest; aqui, o arquivo real.
 		assertThat(yml().getProperty("app.cors.allowed-origins")).isNotNull().doesNotContain("*");
 		assertThat(valorSemVariaveis("app.cors.allowed-origins")).as("sem CORS por padrão").isEmpty();
+	}
+
+	// ----- limite de tentativas e proxy (Módulo 13A) -----
+
+	private static Duration janelaDoYml(Properties p, String chave) {
+		return DurationStyle.detectAndParse(p.getProperty(chave));
+	}
+
+	private static Properties ymlDe(Path arquivo) {
+		YamlPropertiesFactoryBean fabrica = new YamlPropertiesFactoryBean();
+		fabrica.setResources(new FileSystemResource(arquivo));
+		return fabrica.getObject();
+	}
+
+	@Test
+	void deve_manter_cada_limite_do_yml_real_numa_faixa_sa_e_a_janela_ate_1_hora() {
+		Properties p = yml();
+		String base = "app.rate-limit.";
+
+		int emailOrigem = Integer.parseInt(p.getProperty(base + "signin-email-origem.limite"));
+		int origem = Integer.parseInt(p.getProperty(base + "signin-origem.limite"));
+		int geral = Integer.parseInt(p.getProperty(base + "auth-por-origem.limite"));
+		assertThat(emailOrigem).as("signin e-mail+origem").isBetween(3, 10);
+		assertThat(origem).as("signin origem").isBetween(20, 200);
+		assertThat(geral).as("/auth/* por origem").isBetween(30, 600);
+
+		assertThat(janelaDoYml(p, base + "signin-email-origem.janela")).isBetween(Duration.ofMinutes(5), Duration.ofHours(1));
+		assertThat(janelaDoYml(p, base + "signin-origem.janela")).isBetween(Duration.ofMinutes(5), Duration.ofHours(1));
+		assertThat(janelaDoYml(p, base + "auth-por-origem.janela")).isBetween(Duration.ofSeconds(30), Duration.ofMinutes(5));
+		assertThat(origem).as("a origem é mais folgada que e-mail+origem").isGreaterThan(emailOrigem);
+	}
+
+	@Test
+	void deve_ter_a_limpeza_ligada_no_yml_real_e_desligada_no_de_teste_e_sem_os_placeholders_antigos() {
+		assertThat(yml().getProperty("app.rate-limit.limpeza-ativa")).isEqualTo("true");
+		assertThat(ymlDe(RaizDoProjeto.resolver("src/test/resources/application.yml")).getProperty("app.rate-limit.limpeza-ativa"))
+				.isEqualTo("false");
+		assertThat(yml().stringPropertyNames()).noneMatch(c -> c.equals("app.rate-limit.auth-por-ip-por-minuto"))
+				.noneMatch(c -> c.equals("app.rate-limit.signin-por-email-por-minuto"));
+	}
+
+	@Test
+	void deve_nunca_ter_proxy_confiavel_permissivo_nem_ligado_sem_lista_nos_yml_reais() throws IOException {
+		try (Stream<Path> arquivos = Files.list(RaizDoProjeto.resolver("src/main/resources"))) {
+			for (Path arquivo : arquivos.filter(a -> a.getFileName().toString().matches("application.*\\.yml")).toList()) {
+				Properties p = ymlDe(arquivo);
+				String cabecalho = p.getProperty(ProxiesConfiaveis.CABECALHO);
+				String lista = p.getProperty(ProxiesConfiaveis.LISTA);
+				assertThat(cabecalho).as("o proxy confiável nasce DESLIGADO em %s (só por variável de ambiente)", arquivo.getFileName())
+						.isNull();
+				if (lista != null) {
+					assertThat(ProxiesConfiaveis.permissiva(lista)).as("internal-proxies em %s", arquivo.getFileName()).isFalse();
+				}
+			}
+		}
 	}
 
 	// ----- detalhes de erro -----

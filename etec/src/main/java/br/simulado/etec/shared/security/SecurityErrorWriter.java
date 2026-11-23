@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ErrorResponse;
 import br.simulado.etec.shared.exception.GlobalExceptionHandler;
+import br.simulado.etec.shared.exception.LimiteExcedidoException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import tools.jackson.databind.json.JsonMapper;
@@ -78,8 +79,21 @@ public class SecurityErrorWriter implements AuthenticationEntryPoint, AccessDeni
 		escrever(resposta, HttpStatus.FORBIDDEN, CodigoErro.ACESSO_NEGADO, MENSAGEM_403);
 	}
 
+	/**
+	 * Limite de tentativas (D129): 429 LIMITE_EXCEDIDO com Retry-After em segundos e Cache-Control: no-store, no mesmo
+	 * formato do 429 que sai do controller. A mensagem é fixa e igual para qualquer escopo.
+	 */
+	public void limiteExcedido(HttpServletResponse resposta, long retryAfterSegundos) throws IOException {
+		if (resposta.isCommitted()) {
+			return;
+		}
+		resposta.setHeader("Retry-After", String.valueOf(Math.max(1, retryAfterSegundos)));
+		resposta.setHeader("Cache-Control", "no-store");
+		escrever(resposta, HttpStatus.TOO_MANY_REQUESTS, CodigoErro.LIMITE_EXCEDIDO, LimiteExcedidoException.MENSAGEM);
+	}
+
 	/** Falha inesperada dentro da cadeia (por exemplo, o banco fora do ar no filtro): 500 genérico, sem detalhes. */
-	void erroInterno(HttpServletResponse resposta) throws IOException {
+	public void erroInterno(HttpServletResponse resposta) throws IOException {
 		escrever(resposta, HttpStatus.INTERNAL_SERVER_ERROR, CodigoErro.ERRO_INTERNO,
 				GlobalExceptionHandler.MENSAGEM_ERRO_INTERNO);
 	}
