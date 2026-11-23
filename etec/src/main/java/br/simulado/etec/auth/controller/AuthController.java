@@ -16,8 +16,10 @@ import br.simulado.etec.auth.dto.RegistroRequest;
 import br.simulado.etec.auth.dto.SigninRequest;
 import br.simulado.etec.auth.dto.TokensResponse;
 import br.simulado.etec.auth.service.AuthService;
+import br.simulado.etec.shared.security.limite.OrigemDaRequisicao;
 import br.simulado.etec.usuarios.dto.UsuarioResponse;
 import br.simulado.etec.usuarios.mapper.UsuarioMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 /** Só HTTP: valida a entrada, chama o service e monta a resposta. A documentação fica em {@link AuthControllerDocs}. */
@@ -29,9 +31,12 @@ public class AuthController implements AuthControllerDocs {
 
 	private final Clock relogio;
 
-	public AuthController(AuthService servico, Clock relogio) {
+	private final OrigemDaRequisicao origens;
+
+	public AuthController(AuthService servico, Clock relogio, OrigemDaRequisicao origens) {
 		this.servico = servico;
 		this.relogio = relogio;
+		this.origens = origens;
 	}
 
 	/** 201 com o usuário, sem tokens e SEM Location: o recurso só existe em /me (D23). */
@@ -45,8 +50,9 @@ public class AuthController implements AuthControllerDocs {
 	/** Cache-Control: no-store (D114): a resposta traz credenciais e não pode ser guardada por ninguém. */
 	@Override
 	@PostMapping(path = "/signin", consumes = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<TokensResponse> signin(@Valid @RequestBody SigninRequest dados) {
-		return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(servico.signin(dados));
+	public ResponseEntity<TokensResponse> signin(@Valid @RequestBody SigninRequest dados, HttpServletRequest requisicao) {
+		return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+				.body(servico.signin(dados, origens.de(requisicao)));
 	}
 
 	@Override

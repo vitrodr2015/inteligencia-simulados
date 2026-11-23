@@ -67,6 +67,17 @@ public abstract class AbstractIntegrationTest {
 	@Autowired
 	protected JdbcTemplate jdbc;
 
+	/**
+	 * Os contadores do limite de tentativas (D128) vivem no banco COMPARTILHADO, e todos os testes chegam do mesmo endereço de
+	 * loopback. Os limites do application.yml de teste são altíssimos e a limpeza agendada fica desligada; mesmo assim cada teste
+	 * começa sem nenhum contador, para nenhum depender do que outro deixou. Os testes DEDICADOS do limite usam contextos e
+	 * schemas próprios.
+	 */
+	@org.junit.jupiter.api.BeforeEach
+	void limparContadoresDoLimite() {
+		jdbc.update("DELETE FROM limite_tentativa");
+	}
+
 	/** Um usuário de teste por papel (um só para a JVM; o banco é compartilhado), criado na primeira necessidade. */
 	private static final java.util.Map<Papel, Usuario> USUARIOS_POR_PAPEL = new java.util.concurrent.ConcurrentHashMap<>();
 

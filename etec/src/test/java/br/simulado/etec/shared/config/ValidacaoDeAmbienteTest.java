@@ -183,4 +183,47 @@ class ValidacaoDeAmbienteTest {
 				.hasMessageContaining("JWT_SECRET").hasMessageContaining("Administrador inicial");
 	}
 
+
+	// ----- origem da requisição: proxy confiável (D130) -----
+
+	private MockEnvironment producaoComProxy(String cabecalho, String lista) {
+		MockEnvironment ambiente = ambienteValido().withProperty("ADMIN_EMAIL", "admin@exemplo.invalid")
+				.withProperty("ADMIN_SENHA", "Senha-Do-Admin-123");
+		ambiente.setActiveProfiles(Perfis.PRODUCAO);
+		if (cabecalho != null) {
+			ambiente.setProperty("server.tomcat.remoteip.remote-ip-header", cabecalho);
+		}
+		if (lista != null) {
+			ambiente.setProperty("server.tomcat.remoteip.internal-proxies", lista);
+		}
+		return ambiente;
+	}
+
+	@Test
+	void deve_aceitar_em_producao_sem_proxy_configurado_so_com_aviso_no_log() {
+		assertThatCode(() -> ValidacaoDeAmbiente.validar(producaoComProxy(null, null))).doesNotThrowAnyException();
+	}
+
+	@Test
+	void deve_aceitar_em_producao_o_proxy_com_lista_explicita() {
+		assertThatCode(() -> ValidacaoDeAmbiente.validar(producaoComProxy("X-Forwarded-For", "10\\.0\\.0\\.1|10\\.0\\.0\\.2")))
+				.doesNotThrowAnyException();
+	}
+
+	@Test
+	void deve_recusar_em_producao_o_proxy_ligado_com_lista_vazia_ou_permissiva_sem_mostrar_o_valor() {
+		for (String lista : new String[] { null, "", ".*", "10\\.0\\.0\\.1|.*", "0.0.0.0/0" }) {
+			assertThatThrownBy(() -> ValidacaoDeAmbiente.validar(producaoComProxy("X-Forwarded-For", lista)))
+					.isInstanceOf(IllegalStateException.class).hasMessageContaining("Proxy confiável")
+					.hasMessageContaining("explícita");
+		}
+	}
+
+	@Test
+	void deve_nao_exigir_a_lista_fora_de_producao() {
+		MockEnvironment ambiente = ambienteValido().withProperty("server.tomcat.remoteip.remote-ip-header", "X-Forwarded-For");
+
+		assertThatCode(() -> ValidacaoDeAmbiente.validar(ambiente)).doesNotThrowAnyException();
+	}
+
 }

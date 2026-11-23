@@ -37,5 +37,7 @@ public enum CodigoErro {
 	ACESSO_NEGADO,
 	EMAIL_DUPLICADO,
 	// Firewall do Spring Security: URL malformada ou perigosa (D124)
-	REQUISICAO_INVALIDA
+	REQUISICAO_INVALIDA,
+	// Limite de tentativas (Módulo 13A, D129)
+	LIMITE_EXCEDIDO
 }
