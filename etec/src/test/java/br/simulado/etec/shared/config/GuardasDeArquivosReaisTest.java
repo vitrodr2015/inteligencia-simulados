@@ -112,6 +112,13 @@ class GuardasDeArquivosReaisTest {
 	}
 
 	@Test
+	void deve_ter_a_politica_de_entitlements_stub_no_yml_real_e_no_de_teste() {
+		assertThat(yml().getProperty("app.entitlements.politica")).as("yml real").isEqualTo("stub");
+		assertThat(ymlDe(RaizDoProjeto.resolver("src/test/resources/application.yml")).getProperty("app.entitlements.politica"))
+				.as("yml de teste").isEqualTo("stub");
+	}
+
+	@Test
 	void deve_ter_a_limpeza_das_sessoes_ligada_no_yml_real_e_desligada_no_de_teste() {
 		assertThat(yml().getProperty("app.sessoes.limpeza-ativa")).isEqualTo("true");
 		assertThat(ymlDe(RaizDoProjeto.resolver("src/test/resources/application.yml")).getProperty("app.sessoes.limpeza-ativa"))

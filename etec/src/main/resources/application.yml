@@ -62,6 +62,10 @@ app:
     troca-senha-usuario:
       limite: 5
       janela: 15m
+  # Política de entitlements (Tarefa 12, D140 a D142). SEM valor padrão no código: ausente ou desconhecida derruba a subida.
+  # "stub" libera, para STUDENT e ADMIN, só os recursos que ele conhece no programa ETEC; troque antes de cobrar.
+  entitlements:
+    politica: stub
   # Limpeza agendada dos refresh tokens vencidos há mais de 1 dia (Módulo 13B, D137).
   sessoes:
     limpeza-ativa: true

@@ -109,7 +109,15 @@ Rodar de dentro de `etec/` (no PowerShell/cmd use `mvnw.cmd`):
 - Web (MockMvc) para contrato.
 - Integração com Testcontainers (MySQL real) para fluxo e concorrência. Todo endpoint tem teste de integração.
 - Nome do teste pelo cenário: `deve_<resultado>_quando_<condição>`.
-- Comando: `./mvnw verify`.
+- Comando da suíte completa: `./mvnw clean verify` (a regra de quando rodá-la está logo abaixo).
+
+### Testes (regra de trabalho)
+
+1. Durante o desenvolvimento e nas sabotagens, rode só os testes afetados (`./mvnw -Dtest=...`), conferindo no log que não houve erro de compilação ("Unresolved compilation"). Nas sabotagens use `clean`. O que a sabotagem prova é que o teste certo falha por causa dela.
+2. Antes do commit, rode UMA vez `./mvnw clean verify` completo, sem `DB_PASSWORD`, `JWT_SECRET`, `DB_URL`, `ADMIN_EMAIL` e `ADMIN_SENHA` no ambiente, e informe no relatório a contagem de testes e as falhas. Isso nunca é pulado.
+3. Se a mudança tocar código compartilhado (segurança, autenticação, configuração, helpers de teste, migrations), rode a suíte completa também no meio do trabalho, não só no fim.
+4. Segurança e autenticação seguem com suíte completa várias vezes. A regra do subconjunto vale primeiro para as fatias de CRUD (Prova, Questão, Tentativa), onde o trabalho fica dentro do próprio pacote. Reavaliar depois de dois ou três módulos.
+5. Nenhum teste é removido ou enfraquecido para ganhar tempo. O CI roda a suíte inteira no PR, e só se mescla com o CI verde.
 
 ## 7. Regras do produto que não podem quebrar
 
@@ -135,7 +143,7 @@ Rodar de dentro de `etec/` (no PowerShell/cmd use `mvnw.cmd`):
 
 1. A prova do "Pronto quando" foi mostrada.
 2. A sabotagem foi feita e desfeita.
-3. A suíte inteira passa com os segredos fora do ambiente (como no CI).
+3. A suíte inteira passa (`./mvnw clean verify`, uma vez antes do commit, ver a regra da seção 6) com os segredos fora do ambiente (como no CI).
 4. A documentação da API, se mudou, está atualizada.
 5. Nada sensível entrou nos arquivos.
 6. A tarefa foi anotada.
@@ -145,7 +153,7 @@ Rodar de dentro de `etec/` (no PowerShell/cmd use `mvnw.cmd`):
 1. Ler este `CLAUDE.md` e a tarefa.
 2. Apresentar o plano antes de codar. Um passo por vez.
 3. Implementar em passos pequenos, com testes.
-4. Rodar `./mvnw verify`.
+4. Rodar os testes afetados a cada passo e, antes do commit, `./mvnw clean verify` completo (regra de trabalho da seção 6).
 5. Conferir os critérios de aceite e a definição de pronto; listar o que ficou pendente.
 
 ## 11. O que NÃO fazer
