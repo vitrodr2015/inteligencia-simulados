@@ -67,6 +67,13 @@ public class Usuario {
 	@Column(name = "excluido_em")
 	private Instant excluidoEm;
 
+	/**
+	 * Versão do token (D136). SÓ-LEITURA para a entidade ({@code updatable = false}): quem a incrementa é o UPDATE atômico do
+	 * repositório, para um {@code save} de outro campo nunca gravar de volta um valor velho.
+	 */
+	@Column(name = "versao_token", nullable = false, updatable = false)
+	private int versaoToken;
+
 	protected Usuario() {
 		// exigido pelo JPA
 	}
@@ -124,6 +131,15 @@ public class Usuario {
 
 	public Instant getExcluidoEm() {
 		return excluidoEm;
+	}
+
+	public int getVersaoToken() {
+		return versaoToken;
+	}
+
+	/** Troca o hash da senha (D139). A versão do token NÃO muda aqui: quem encerra as sessões é o serviço de sessões. */
+	public void trocarSenhaHash(String novoHash) {
+		this.senhaHash = novoHash;
 	}
 
 }

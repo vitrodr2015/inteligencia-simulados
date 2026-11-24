@@ -1,5 +1,6 @@
 package br.simulado.etec.usuarios.service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,6 +37,24 @@ public class UsuarioService {
 		this.repositorio = repositorio;
 		this.encoder = encoder;
 		this.termos = termos;
+	}
+
+	/**
+	 * Incrementa a versão do token do usuário (D136) de forma atômica. Participa da transação de quem chama (o serviço de
+	 * sessões a usa junto com a revogação dos refresh, para as duas coisas gravarem ou desfazerem juntas).
+	 */
+	@Transactional
+	public void incrementarVersaoDoToken(Long usuarioId, Instant agora) {
+		if (repositorio.incrementarVersaoDoToken(usuarioId, agora) != 1) {
+			throw new IllegalStateException("Usuário inexistente ao incrementar a versão do token.");
+		}
+	}
+
+	/** Troca o hash da senha (D139). Quem chama é a troca de senha, dentro da própria transação. */
+	@Transactional
+	public void trocarSenhaHash(Long usuarioId, String novoHash) {
+		repositorio.findById(usuarioId).orElseThrow(() -> new IllegalStateException("Usuário inexistente na troca de senha."))
+				.trocarSenhaHash(novoHash);
 	}
 
 	public TermosProperties termosVigentes() {

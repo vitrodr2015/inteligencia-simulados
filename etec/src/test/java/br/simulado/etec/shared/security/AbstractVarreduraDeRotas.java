@@ -35,7 +35,8 @@ abstract class AbstractVarreduraDeRotas {
 
 	/** As únicas rotas do nosso código que o anônimo pode chamar (D23, D94). */
 	private static final Set<String> PUBLICAS = Set.of("POST /api/v1/auth/register", "POST /api/v1/auth/signin",
-			"POST /api/v1/auth/refresh", "GET /api/v1/termos/vigente");
+			"POST /api/v1/auth/refresh", "POST /api/v1/auth/logout",
+			"GET /api/v1/termos/vigente");
 
 	/** Prefixos de classes de terceiros que a varredura sabe tratar. */
 	private static final String ERRO = "org.springframework.boot.webmvc.autoconfigure.error.";

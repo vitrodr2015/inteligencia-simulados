@@ -55,6 +55,14 @@ public class AuthController implements AuthControllerDocs {
 				.body(servico.signin(dados, origens.de(requisicao)));
 	}
 
+	/** 204 para qualquer texto presente (D15, D107, D135); 400 só se o refreshToken estiver ausente ou não for texto. */
+	@Override
+	@PostMapping(path = "/logout", consumes = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest dados) {
+		servico.logout(dados);
+		return ResponseEntity.noContent().build();
+	}
+
 	@Override
 	@PostMapping(path = "/refresh", consumes = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<TokensResponse> refresh(@Valid @RequestBody RefreshRequest dados) {

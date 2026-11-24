@@ -34,7 +34,7 @@ class SwaggerDesligadoTest {
 	private JwtTokenProvider provedorDeTokens;
 
 	private String autorizacao() {
-		return "Bearer " + provedorDeTokens.emitir(TipoToken.ACCESS, USUARIO_DE_EXEMPLO, "STUDENT").valor();
+		return "Bearer " + provedorDeTokens.emitir(TipoToken.ACCESS, USUARIO_DE_EXEMPLO, "STUDENT", 0).valor();
 	}
 
 	@Test

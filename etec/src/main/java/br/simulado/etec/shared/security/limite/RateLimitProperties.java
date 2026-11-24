@@ -13,11 +13,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param authPorOrigem toda requisição POST de /auth/* por origem (só proteção contra enxurrada)
  * @param signinEmailOrigem falhas de signin por e-mail e origem
  * @param signinOrigem falhas de signin por origem
+ * @param trocaSenhaUsuario erros da senha atual na troca de senha, por usuário (D139)
  * @param limpezaAtiva liga a limpeza agendada das linhas vencidas (desligada no perfil de teste)
  */
 @ConfigurationProperties("app.rate-limit")
 public record RateLimitProperties(Regra authPorOrigem, Regra signinEmailOrigem, Regra signinOrigem,
-		@DefaultValue("true") boolean limpezaAtiva) {
+		Regra trocaSenhaUsuario, @DefaultValue("true") boolean limpezaAtiva) {
 
 	public static final int LIMITE_MAXIMO = 1_000_000;
 
@@ -29,6 +30,7 @@ public record RateLimitProperties(Regra authPorOrigem, Regra signinEmailOrigem, 
 		exigir(authPorOrigem, "auth-por-origem");
 		exigir(signinEmailOrigem, "signin-email-origem");
 		exigir(signinOrigem, "signin-origem");
+		exigir(trocaSenhaUsuario, "troca-senha-usuario");
 	}
 
 	private static void exigir(Regra regra, String nome) {

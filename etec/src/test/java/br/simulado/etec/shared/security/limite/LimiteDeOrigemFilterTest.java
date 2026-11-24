@@ -36,7 +36,7 @@ class LimiteDeOrigemFilterTest {
 	@BeforeEach
 	void montar() {
 		RateLimitProperties props = new RateLimitProperties(REGRA, new Regra(5, Duration.ofMinutes(15)),
-				new Regra(50, Duration.ofMinutes(15)), false);
+				new Regra(50, Duration.ofMinutes(15)), new Regra(5, Duration.ofMinutes(15)), false);
 		filtro = new LimiteDeOrigemFilter(limite, props, new OrigemDaRequisicao(), escritor);
 	}
 

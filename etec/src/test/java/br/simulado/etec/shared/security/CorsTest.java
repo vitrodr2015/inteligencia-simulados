@@ -62,7 +62,7 @@ class CorsTest {
 	}
 
 	private String token() {
-		return provedorDeTokens.emitir(TipoToken.ACCESS, USUARIO_DE_EXEMPLO, "STUDENT").valor();
+		return provedorDeTokens.emitir(TipoToken.ACCESS, USUARIO_DE_EXEMPLO, "STUDENT", 0).valor();
 	}
 
 	private static String cabecalho(HttpResponse<?> resposta, String nome) {

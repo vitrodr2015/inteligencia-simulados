@@ -52,7 +52,7 @@ class JwtTokenProviderTests {
 	private JWTCreator.Builder base(TipoToken tipo) {
 		return JWT.create().withIssuer(EMISSOR).withSubject(usuario.toString()).withClaim("papel", "STUDENT")
 				.withClaim("tipo", tipo == TipoToken.ACCESS ? "access" : "refresh").withJWTId(UUID.randomUUID().toString())
-				.withIssuedAt(AGORA).withExpiresAt(AGORA.plus(ACCESS));
+				.withClaim("versao", 0).withIssuedAt(AGORA).withExpiresAt(AGORA.plus(ACCESS));
 	}
 
 	private Algorithm hs256() {
@@ -69,7 +69,7 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_emitir_e_validar_o_access_token_com_todos_os_claims() {
-		TokenEmitido emitido = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT");
+		TokenEmitido emitido = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0);
 
 		ClaimsDoToken claims = provedor.validar(emitido.valor(), TipoToken.ACCESS);
 
@@ -82,7 +82,7 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_emitir_o_refresh_com_24_horas_e_validar_como_refresh() {
-		TokenEmitido emitido = provedor.emitir(TipoToken.REFRESH, usuario, "ADMIN");
+		TokenEmitido emitido = provedor.emitir(TipoToken.REFRESH, usuario, "ADMIN", 0);
 
 		ClaimsDoToken claims = provedor.validar(emitido.valor(), TipoToken.REFRESH);
 
@@ -92,7 +92,7 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_gravar_emissor_e_emitido_em_no_token() {
-		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT").valor();
+		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0).valor();
 
 		var decodificado = JWT.decode(token);
 
@@ -103,8 +103,8 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_gerar_jti_diferente_a_cada_emissao() {
-		String a = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT").jti();
-		String b = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT").jti();
+		String a = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0).jti();
+		String b = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0).jti();
 
 		assertThat(a).isNotEqualTo(b);
 	}
@@ -116,7 +116,7 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_nunca_mostrar_o_token_no_texto_do_token_emitido() {
-		TokenEmitido emitido = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT");
+		TokenEmitido emitido = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0);
 
 		assertThat(emitido.toString()).doesNotContain(emitido.valor());
 	}
@@ -125,7 +125,7 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_recusar_token_vencido() {
-		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT").valor();
+		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0).valor();
 		JwtTokenProvider depois = provedor(segredo, EMISSOR, AGORA.plus(ACCESS).plusSeconds(1));
 
 		assertThatThrownBy(() -> depois.validar(token, TipoToken.ACCESS)).isInstanceOf(InvalidTokenException.class);
@@ -136,7 +136,7 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_recusar_token_adulterado_no_corpo_ou_na_assinatura() {
-		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT").valor();
+		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0).valor();
 		String[] partes = token.split("\\.");
 
 		deveRecusar(partes[0] + "." + trocarUmCaractere(partes[1]) + "." + partes[2], TipoToken.ACCESS);
@@ -169,8 +169,8 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_recusar_refresh_como_access_e_access_como_refresh() {
-		String refresh = provedor.emitir(TipoToken.REFRESH, usuario, "STUDENT").valor();
-		String access = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT").valor();
+		String refresh = provedor.emitir(TipoToken.REFRESH, usuario, "STUDENT", 0).valor();
+		String access = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0).valor();
 
 		deveRecusar(refresh, TipoToken.ACCESS);
 		deveRecusar(access, TipoToken.REFRESH);
@@ -190,7 +190,7 @@ class JwtTokenProviderTests {
 
 	@Test
 	void deve_recusar_papel_trocado_sem_reassinar_o_token() {
-		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT").valor();
+		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 0).valor();
 		String[] partes = token.split("\\.");
 		String corpo = new String(Base64.getUrlDecoder().decode(partes[1]), StandardCharsets.UTF_8);
 		assertThat(corpo).contains("\"papel\":\"STUDENT\"");
@@ -290,4 +290,20 @@ class JwtTokenProviderTests {
 		return texto.substring(0, texto.length() / 2) + outro + texto.substring(texto.length() / 2 + 1);
 	}
 
+
+	@Test
+	void deve_levar_a_versao_no_claim_e_devolve_la_na_validacao() {
+		String token = provedor.emitir(TipoToken.ACCESS, usuario, "STUDENT", 5).valor();
+
+		assertThat(provedor.validar(token, TipoToken.ACCESS).versao()).isEqualTo(5);
+	}
+
+	@Test
+	void deve_recusar_o_token_sem_o_claim_de_versao() {
+		String semVersao = JWT.create().withIssuer(EMISSOR).withSubject(usuario.toString()).withClaim("papel", "STUDENT")
+				.withClaim("tipo", "access").withJWTId(UUID.randomUUID().toString()).withIssuedAt(AGORA)
+				.withExpiresAt(AGORA.plus(ACCESS)).sign(hs256());
+
+		deveRecusar(semVersao, TipoToken.ACCESS);
+	}
 }

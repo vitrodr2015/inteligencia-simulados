@@ -39,5 +39,7 @@ public enum CodigoErro {
 	// Firewall do Spring Security: URL malformada ou perigosa (D124)
 	REQUISICAO_INVALIDA,
 	// Limite de tentativas (Módulo 13A, D129)
-	LIMITE_EXCEDIDO
+	LIMITE_EXCEDIDO,
+	// Troca de senha (Módulo 13B, D139): a senha atual não confere
+	SENHA_ATUAL_INCORRETA
 }

@@ -37,12 +37,14 @@ import br.simulado.etec.auth.dto.RefreshRequest;
 import br.simulado.etec.auth.dto.RegistroRequest;
 import br.simulado.etec.auth.dto.SigninRequest;
 import br.simulado.etec.auth.dto.TokensResponse;
+import br.simulado.etec.auth.model.MotivoRevogacao;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.CredenciaisInvalidasException;
 import br.simulado.etec.shared.exception.InvalidTokenException;
 import br.simulado.etec.shared.exception.LimiteExcedidoException;
 import br.simulado.etec.shared.security.JwtProperties;
 import br.simulado.etec.shared.security.JwtTokenProvider;
+import br.simulado.etec.shared.security.JwtTokenProvider.ClaimsDoToken;
 import br.simulado.etec.shared.security.JwtTokenProvider.TipoToken;
 import br.simulado.etec.shared.security.SegredoDeTeste;
 import br.simulado.etec.shared.security.limite.Escopo;
@@ -74,12 +76,16 @@ class AuthServiceTest {
 	@Mock
 	private LimiteDeTentativas limite;
 
+	@Mock
+	private SessaoService sessoes;
+
 	private static final String ORIGEM = "v4:127.0.0.1";
 
 	private final RateLimitProperties limites = new RateLimitProperties(
 			new RateLimitProperties.Regra(120, Duration.ofMinutes(1)),
 			new RateLimitProperties.Regra(5, Duration.ofMinutes(15)),
-			new RateLimitProperties.Regra(50, Duration.ofMinutes(15)), false);
+			new RateLimitProperties.Regra(50, Duration.ofMinutes(15)), new RateLimitProperties.Regra(5, Duration.ofMinutes(15)),
+			false);
 
 	private final JwtTokenProvider tokens = new JwtTokenProvider(
 			new JwtProperties(SegredoDeTeste.gerar(), "etec-teste", Duration.ofMinutes(15), Duration.ofHours(24)),
@@ -92,9 +98,12 @@ class AuthServiceTest {
 	@BeforeEach
 	void montar() {
 		when(encoder.encode(anyString())).thenReturn(HASH_FICTICIO);
-		servico = new AuthService(usuarios, encoder, tokens, limite, limites);
+		servico = new AuthService(usuarios, encoder, tokens, limite, limites, sessoes);
 		aluno = new Usuario("Ana", "ana@exemplo.invalid", HASH_REAL, LocalDate.of(2008, 5, 10), "v1", Papel.STUDENT);
+		ReflectionTestUtils.setField(aluno, "id", 7L);
 	}
+
+	private static final TokensResponse PAR = new TokensResponse("acesso", "refresh", "Bearer", 900);
 
 	private void deveRecusarComOMesmo401(SigninRequest dados) {
 		assertThatThrownBy(() -> servico.signin(dados, ORIGEM)).isExactlyInstanceOf(CredenciaisInvalidasException.class)
@@ -109,15 +118,11 @@ class AuthServiceTest {
 	void deve_devolver_o_par_de_tokens_quando_as_credenciais_conferem() {
 		when(usuarios.buscarPorEmail("ana@exemplo.invalid")).thenReturn(Optional.of(aluno));
 		when(encoder.matches("senha-correta", HASH_REAL)).thenReturn(true);
+		when(sessoes.iniciar(aluno)).thenReturn(PAR);
 
 		TokensResponse resposta = servico.signin(new SigninRequest("  ANA@exemplo.invalid ", "senha-correta"), ORIGEM);
 
-		assertThat(resposta.tokenType()).isEqualTo("Bearer");
-		assertThat(resposta.expiresIn()).isEqualTo(900);
-		assertThat(tokens.validar(resposta.accessToken(), TipoToken.ACCESS).usuarioId()).isEqualTo(aluno.getPublicId());
-		assertThat(tokens.validar(resposta.refreshToken(), TipoToken.REFRESH).usuarioId()).isEqualTo(aluno.getPublicId());
-		assertThat(tokens.validar(resposta.accessToken(), TipoToken.ACCESS).papel()).isEqualTo("STUDENT");
-		assertThat(resposta.accessToken()).isNotEqualTo(resposta.refreshToken());
+		assertThat(resposta).as("o par e a gravação do refresh vêm da sessão").isSameAs(PAR);
 	}
 
 	// ----- signin: limite de tentativas (D128) -----
@@ -251,6 +256,7 @@ class AuthServiceTest {
 		when(usuarios.buscarPorEmail("ana@exemplo.invalid")).thenReturn(Optional.of(aluno));
 		String com36Acentuados = "é".repeat(36); // 72 bytes: ainda cabe
 		when(encoder.matches(com36Acentuados, HASH_REAL)).thenReturn(true);
+		when(sessoes.iniciar(aluno)).thenReturn(PAR);
 
 		assertThat(servico.signin(new SigninRequest("ana@exemplo.invalid", com36Acentuados), ORIGEM).tokenType())
 				.isEqualTo("Bearer");
@@ -287,43 +293,78 @@ class AuthServiceTest {
 		verify(encoder, times(1)).matches(anyString(), eq(HASH_FICTICIO));
 	}
 
-	// ----- refresh -----
+	// ----- refresh: rotação, reuso, versão (D133 a D136) -----
 
-	@Test
-	void deve_emitir_um_par_novo_quando_o_refresh_e_valido_e_o_usuario_existe() {
-		String refresh = tokens.emitir(TipoToken.REFRESH, aluno.getPublicId(), "STUDENT").valor();
-		when(usuarios.buscarAtivoPorPublicId(aluno.getPublicId())).thenReturn(Optional.of(aluno));
-
-		TokensResponse resposta = servico.refresh(new RefreshRequest(refresh));
-
-		assertThat(resposta.tokenType()).isEqualTo("Bearer");
-		assertThat(resposta.expiresIn()).isEqualTo(900);
-		assertThat(tokens.validar(resposta.accessToken(), TipoToken.ACCESS).usuarioId()).isEqualTo(aluno.getPublicId());
-		assertThat(tokens.validar(resposta.refreshToken(), TipoToken.REFRESH).jti())
-				.isNotEqualTo(tokens.validar(refresh, TipoToken.REFRESH).jti());
+	private ClaimsDoToken claimsDe(String refresh) {
+		return tokens.validar(refresh, TipoToken.REFRESH);
 	}
 
 	@Test
-	void deve_usar_o_papel_do_banco_e_nao_o_do_refresh_no_par_novo() {
-		String refresh = tokens.emitir(TipoToken.REFRESH, aluno.getPublicId(), "ADMIN").valor();
+	void deve_devolver_o_par_da_rotacao_quando_o_refresh_e_valido_e_o_usuario_existe() {
+		String refresh = tokens.emitir(TipoToken.REFRESH, aluno.getPublicId(), "STUDENT", 0).valor();
+		when(usuarios.buscarAtivoPorPublicId(aluno.getPublicId())).thenReturn(Optional.of(aluno));
+		when(sessoes.rotacionar(claimsDe(refresh), aluno)).thenReturn(Optional.of(PAR));
+
+		assertThat(servico.refresh(new RefreshRequest(refresh))).isSameAs(PAR);
+
+		verify(sessoes, never()).encerrarTodasAsSessoes(any(), any());
+	}
+
+	@Test
+	void deve_dar_401_sem_revogacao_em_massa_quando_nao_rotaciona_e_o_refresh_nao_foi_rotacionado() {
+		String refresh = tokens.emitir(TipoToken.REFRESH, aluno.getPublicId(), "STUDENT", 0).valor();
+		when(usuarios.buscarAtivoPorPublicId(aluno.getPublicId())).thenReturn(Optional.of(aluno));
+		when(sessoes.rotacionar(any(), eq(aluno))).thenReturn(Optional.empty());
+		when(sessoes.foiRotacionado(claimsDe(refresh).jti())).thenReturn(false);
+
+		assertThatThrownBy(() -> servico.refresh(new RefreshRequest(refresh))).isExactlyInstanceOf(InvalidTokenException.class);
+
+		verify(sessoes, never()).encerrarTodasAsSessoes(any(), any());
+	}
+
+	@Test
+	void deve_revogar_tudo_por_reuso_e_so_depois_dar_401_quando_o_refresh_ja_foi_rotacionado() {
+		String refresh = tokens.emitir(TipoToken.REFRESH, aluno.getPublicId(), "STUDENT", 0).valor();
+		when(usuarios.buscarAtivoPorPublicId(aluno.getPublicId())).thenReturn(Optional.of(aluno));
+		when(sessoes.rotacionar(any(), eq(aluno))).thenReturn(Optional.empty());
+		when(sessoes.foiRotacionado(claimsDe(refresh).jti())).thenReturn(true);
+
+		assertThatThrownBy(() -> servico.refresh(new RefreshRequest(refresh))).isExactlyInstanceOf(InvalidTokenException.class);
+
+		verify(sessoes).encerrarTodasAsSessoes(7L, MotivoRevogacao.REUSO);
+	}
+
+	@Test
+	void deve_dar_401_sem_rotacionar_quando_a_versao_do_token_nao_e_a_do_usuario() {
+		String refreshAntigo = tokens.emitir(TipoToken.REFRESH, aluno.getPublicId(), "STUDENT", 3).valor();
 		when(usuarios.buscarAtivoPorPublicId(aluno.getPublicId())).thenReturn(Optional.of(aluno));
 
-		TokensResponse resposta = servico.refresh(new RefreshRequest(refresh));
+		assertThatThrownBy(() -> servico.refresh(new RefreshRequest(refreshAntigo))).isExactlyInstanceOf(InvalidTokenException.class);
 
-		assertThat(tokens.validar(resposta.accessToken(), TipoToken.ACCESS).papel()).isEqualTo("STUDENT");
+		verify(sessoes, never()).rotacionar(any(), any());
+		verify(sessoes, never()).encerrarTodasAsSessoes(any(), any());
 	}
 
 	@Test
 	void deve_dar_401_no_refresh_quando_o_usuario_foi_excluido_ou_nao_existe() {
-		String refresh = tokens.emitir(TipoToken.REFRESH, UUID.randomUUID(), "STUDENT").valor();
+		String refresh = tokens.emitir(TipoToken.REFRESH, UUID.randomUUID(), "STUDENT", 0).valor();
 		when(usuarios.buscarAtivoPorPublicId(org.mockito.ArgumentMatchers.any())).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> servico.refresh(new RefreshRequest(refresh))).isInstanceOf(InvalidTokenException.class);
+
+		verify(sessoes, never()).rotacionar(any(), any());
+	}
+
+	@Test
+	void deve_delegar_o_logout_a_sessao() {
+		servico.logout(new RefreshRequest("qualquer-texto"));
+
+		verify(sessoes).logout("qualquer-texto");
 	}
 
 	@Test
 	void deve_dar_401_no_refresh_quando_o_token_e_um_access_vazio_ou_lixo() {
-		String access = tokens.emitir(TipoToken.ACCESS, aluno.getPublicId(), "STUDENT").valor();
+		String access = tokens.emitir(TipoToken.ACCESS, aluno.getPublicId(), "STUDENT", 0).valor();
 
 		assertThatThrownBy(() -> servico.refresh(new RefreshRequest(access))).isInstanceOf(InvalidTokenException.class);
 		assertThatThrownBy(() -> servico.refresh(new RefreshRequest(""))).isInstanceOf(InvalidTokenException.class);

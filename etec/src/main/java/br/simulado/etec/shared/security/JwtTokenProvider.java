@@ -31,6 +31,9 @@ public class JwtTokenProvider {
 
 	static final String CLAIM_TIPO = "tipo";
 
+	/** A versão do token do usuário no momento da emissão (D136, D118). Token sem ela é recusado. */
+	static final String CLAIM_VERSAO = "versao";
+
 	private final Algorithm algoritmo;
 
 	private final JWTVerifier verificador;
@@ -55,7 +58,8 @@ public class JwtTokenProvider {
 				.withClaimPresence("exp")
 				.withClaimPresence("sub")
 				.withClaimPresence("jti")
-				.withClaimPresence(CLAIM_TIPO))
+				.withClaimPresence(CLAIM_TIPO)
+				.withClaimPresence(CLAIM_VERSAO))
 				.build(relogio);
 	}
 
@@ -85,10 +89,13 @@ public class JwtTokenProvider {
 	}
 
 	/** Claims de um token válido. */
-	public record ClaimsDoToken(UUID usuarioId, TipoToken tipo, String jti, String papel, Instant expiraEm) {
+	public record ClaimsDoToken(UUID usuarioId, TipoToken tipo, String jti, String papel, Instant expiraEm, int versao) {
 	}
 
-	public TokenEmitido emitir(TipoToken tipo, UUID usuarioId, String papel) {
+	/**
+	 * @param versao a versão do token do usuário (coluna {@code usuario.versao_token}) no momento da emissão
+	 */
+	public TokenEmitido emitir(TipoToken tipo, UUID usuarioId, String papel, int versao) {
 		Instant agora = relogio.instant();
 		Instant expiraEm = agora.plus(tipo == TipoToken.ACCESS ? validadeDoAccess : validadeDoRefresh);
 		String jti = UUID.randomUUID().toString();
@@ -97,6 +104,7 @@ public class JwtTokenProvider {
 				.withSubject(usuarioId.toString())
 				.withClaim(CLAIM_PAPEL, papel)
 				.withClaim(CLAIM_TIPO, tipo.valor())
+				.withClaim(CLAIM_VERSAO, versao)
 				.withJWTId(jti)
 				.withIssuedAt(agora)
 				.withExpiresAt(expiraEm)
@@ -127,8 +135,12 @@ public class JwtTokenProvider {
 			if (jti == null || jti.isBlank() || decodificado.getExpiresAtAsInstant() == null) {
 				throw new InvalidTokenException();
 			}
+			Integer versao = decodificado.getClaim(CLAIM_VERSAO).asInt();
+			if (versao == null) {
+				throw new InvalidTokenException();
+			}
 			return new ClaimsDoToken(usuarioId, esperado, jti, decodificado.getClaim(CLAIM_PAPEL).asString(),
-					decodificado.getExpiresAtAsInstant());
+					decodificado.getExpiresAtAsInstant(), versao);
 		}
 		catch (InvalidTokenException e) {
 			throw e;

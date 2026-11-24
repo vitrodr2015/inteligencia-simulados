@@ -74,6 +74,9 @@ public final class MatrizDeAutorizacao {
 				c -> "{\"email\":\"ninguem@exemplo.invalid\",\"senha\":\"qualquer-123\"}", 401, 401, 401, 401);
 		linha("refresh inválido", "POST", "/api/v1/auth/refresh", c -> "/api/v1/auth/refresh",
 				c -> "{\"refreshToken\":\"lixo\"}", 401, 401, 401, 401);
+		linha("logout com um texto qualquer", "POST", "/api/v1/auth/logout", c -> "/api/v1/auth/logout",
+				c -> "{\"refreshToken\":\"lixo\"}", 204, 204, 204, 204);
+		linha("logout sem o refresh", "POST", "/api/v1/auth/logout", c -> "/api/v1/auth/logout", c -> "{}", 400, 400, 400, 400);
 		linha("register com corpo vazio", "POST", "/api/v1/auth/register", c -> "/api/v1/auth/register", c -> "{}", 400,
 				400, 400, 400);
 		fixa("GET", "/api/v1/termos/vigente", 200, 200, 200, 200);
@@ -89,6 +92,10 @@ public final class MatrizDeAutorizacao {
 		fixa("GET", "/api/v1/me", 401, 403, 200, 200);
 		fixa("HEAD", "/api/v1/me", 401, 403, 200, 200);
 		fixa("PATCH", "/api/v1/me", 401, 403, 403, 403);
+		// troca de senha (D139): STUDENT e ADMIN; GUARDIAN 403; corpo vazio = 400 do service (depois do 429)
+		linha("trocar a senha com corpo vazio", "POST", "/api/v1/me/senha", c -> "/api/v1/me/senha", c -> "{}", 401, 403, 400, 400);
+		linha("GET em /me/senha", "GET", null, c -> "/api/v1/me/senha", null, 401, 403, 403, 403);
+		linha("PUT em /me/senha", "PUT", null, c -> "/api/v1/me/senha", c -> "{}", 401, 403, 403, 403);
 		fixa("DELETE", "/api/v1/me", 401, 403, 403, 403);
 
 		// ----- catálogo: leitura (STUDENT e ADMIN) -----

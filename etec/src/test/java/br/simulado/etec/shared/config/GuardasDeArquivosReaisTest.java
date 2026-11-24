@@ -97,6 +97,9 @@ class GuardasDeArquivosReaisTest {
 		assertThat(janelaDoYml(p, base + "signin-origem.janela")).isBetween(Duration.ofMinutes(5), Duration.ofHours(1));
 		assertThat(janelaDoYml(p, base + "auth-por-origem.janela")).isBetween(Duration.ofSeconds(30), Duration.ofMinutes(5));
 		assertThat(origem).as("a origem é mais folgada que e-mail+origem").isGreaterThan(emailOrigem);
+		assertThat(Integer.parseInt(p.getProperty(base + "troca-senha-usuario.limite"))).as("troca de senha por usuário")
+				.isBetween(3, 10);
+		assertThat(janelaDoYml(p, base + "troca-senha-usuario.janela")).isBetween(Duration.ofMinutes(5), Duration.ofHours(1));
 	}
 
 	@Test
@@ -106,6 +109,13 @@ class GuardasDeArquivosReaisTest {
 				.isEqualTo("false");
 		assertThat(yml().stringPropertyNames()).noneMatch(c -> c.equals("app.rate-limit.auth-por-ip-por-minuto"))
 				.noneMatch(c -> c.equals("app.rate-limit.signin-por-email-por-minuto"));
+	}
+
+	@Test
+	void deve_ter_a_limpeza_das_sessoes_ligada_no_yml_real_e_desligada_no_de_teste() {
+		assertThat(yml().getProperty("app.sessoes.limpeza-ativa")).isEqualTo("true");
+		assertThat(ymlDe(RaizDoProjeto.resolver("src/test/resources/application.yml")).getProperty("app.sessoes.limpeza-ativa"))
+				.isEqualTo("false");
 	}
 
 	@Test

@@ -55,6 +55,12 @@ app:
     signin-origem:
       limite: 1000000
       janela: 1m
+    troca-senha-usuario:
+      limite: 1000000
+      janela: 1m
+  # A limpeza agendada dos refresh tokens fica DESLIGADA nos testes (o teste chama o método direto, com o relógio de teste).
+  sessoes:
+    limpeza-ativa: false
 
 # Swagger desligado por padrão, como em produção; os testes do Swagger ligam por propriedade.
 server:

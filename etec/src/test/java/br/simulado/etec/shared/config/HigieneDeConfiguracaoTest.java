@@ -49,7 +49,9 @@ class HigieneDeConfiguracaoTest {
 	 */
 	private static final Map<String, String> NAO_SAO_SEGREDO = Map.of(
 			"security.jwt.access-token-expiration", "tempo de vida do access token (uma duração), não o token",
-			"security.jwt.refresh-token-expiration", "tempo de vida do refresh token (uma duração), não o token");
+			"security.jwt.refresh-token-expiration", "tempo de vida do refresh token (uma duração), não o token",
+			"app.rate-limit.troca-senha-usuario.limite", "quantas vezes se pode errar a senha atual (um número), não uma senha",
+			"app.rate-limit.troca-senha-usuario.janela", "janela do limite de erros da senha atual (uma duração), não uma senha");
 
 	private static final Pattern DURACAO = Pattern.compile("^\\d+(ms|s|m|h|d)$");
 
@@ -148,6 +150,26 @@ class HigieneDeConfiguracaoTest {
 
 		assertThat(violacoesDoYml(propriedades, "security.jwt.secret: ${JWT_SECRET:abc}")).isNotEmpty()
 				.anyMatch(v -> v.contains("security.jwt.secret"));
+	}
+
+	@Test
+	void deve_aceitar_numero_so_nas_chaves_nomeadas_da_lista_de_excecoes_e_nao_afrouxar_as_demais() {
+		Properties propriedades = new Properties();
+		propriedades.setProperty("app.rate-limit.troca-senha-usuario.limite", "5");
+		propriedades.setProperty("app.rate-limit.troca-senha-usuario.janela", "15m");
+		assertThat(violacoesDoYml(propriedades, "")).as("as duas chaves nomeadas, com número e duração").isEmpty();
+
+		// a exceção é POR CHAVE: um número em outra chave sensível continua reprovado
+		Properties outras = new Properties();
+		outras.setProperty("spring.datasource.password", "12345678");
+		outras.setProperty("app.admin.senha", "5");
+		outras.setProperty("security.jwt.secret", "123456789012345678901234567890123");
+		assertThat(violacoesDoYml(outras, "")).as("número em chave não nomeada").hasSize(3);
+
+		// e a chave nomeada só aceita número ou duração, nunca texto
+		Properties texto = new Properties();
+		texto.setProperty("app.rate-limit.troca-senha-usuario.limite", "minha-senha-secreta");
+		assertThat(violacoesDoYml(texto, "")).as("texto na chave nomeada").hasSize(1);
 	}
 
 	@Test
@@ -264,8 +286,8 @@ class HigieneDeConfiguracaoTest {
 		for (String chave : chavesSensiveis(propriedades)) {
 			String valor = propriedades.getProperty(chave).strip();
 			if (NAO_SAO_SEGREDO.containsKey(chave)) {
-				if (!DURACAO.matcher(valor).matches()) {
-					violacoes.add(chave + " está na lista de exceções (tempo) mas o valor não é uma duração");
+				if (!DURACAO.matcher(valor).matches() && !valor.matches("\\d+")) {
+					violacoes.add(chave + " está na lista de exceções (tempo ou contagem) mas o valor não é uma duração nem um número");
 				}
 			}
 			else if (!PLACEHOLDER_SEM_PADRAO.matcher(valor).matches()) {
