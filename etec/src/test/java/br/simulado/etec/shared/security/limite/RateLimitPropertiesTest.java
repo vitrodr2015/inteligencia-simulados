@@ -37,9 +37,10 @@ class RateLimitPropertiesTest {
 
 	@Test
 	void deve_recusar_regra_ausente() {
-		assertThatThrownBy(() -> new RateLimitProperties(null, OK, OK, true)).hasMessageContaining("auth-por-origem");
-		assertThatThrownBy(() -> new RateLimitProperties(OK, null, OK, true)).hasMessageContaining("signin-email-origem");
-		assertThatThrownBy(() -> new RateLimitProperties(OK, OK, null, true)).hasMessageContaining("signin-origem");
+		assertThatThrownBy(() -> new RateLimitProperties(null, OK, OK, OK, true)).hasMessageContaining("auth-por-origem");
+		assertThatThrownBy(() -> new RateLimitProperties(OK, null, OK, OK, true)).hasMessageContaining("signin-email-origem");
+		assertThatThrownBy(() -> new RateLimitProperties(OK, OK, null, OK, true)).hasMessageContaining("signin-origem");
+		assertThatThrownBy(() -> new RateLimitProperties(OK, OK, OK, null, true)).hasMessageContaining("troca-senha-usuario");
 	}
 
 	@Test
@@ -47,13 +48,15 @@ class RateLimitPropertiesTest {
 		var fonte = new MapConfigurationPropertySource(java.util.Map.of(
 				"app.rate-limit.auth-por-origem.limite", "120", "app.rate-limit.auth-por-origem.janela", "1m",
 				"app.rate-limit.signin-email-origem.limite", "5", "app.rate-limit.signin-email-origem.janela", "15m",
-				"app.rate-limit.signin-origem.limite", "50", "app.rate-limit.signin-origem.janela", "15m"));
+				"app.rate-limit.signin-origem.limite", "50", "app.rate-limit.signin-origem.janela", "15m",
+				"app.rate-limit.troca-senha-usuario.limite", "5", "app.rate-limit.troca-senha-usuario.janela", "15m"));
 
 		RateLimitProperties p = new Binder(fonte).bind("app.rate-limit", RateLimitProperties.class).get();
 
 		assertThat(p.authPorOrigem()).isEqualTo(new Regra(120, Duration.ofMinutes(1)));
 		assertThat(p.signinEmailOrigem()).isEqualTo(new Regra(5, Duration.ofMinutes(15)));
 		assertThat(p.signinOrigem()).isEqualTo(new Regra(50, Duration.ofMinutes(15)));
+		assertThat(p.trocaSenhaUsuario()).isEqualTo(new Regra(5, Duration.ofMinutes(15)));
 		assertThat(p.limpezaAtiva()).as("padrão").isTrue();
 	}
 
@@ -62,7 +65,8 @@ class RateLimitPropertiesTest {
 		var fonte = new MapConfigurationPropertySource(java.util.Map.of(
 				"app.rate-limit.auth-por-origem.limite", "0", "app.rate-limit.auth-por-origem.janela", "1m",
 				"app.rate-limit.signin-email-origem.limite", "5", "app.rate-limit.signin-email-origem.janela", "15m",
-				"app.rate-limit.signin-origem.limite", "50", "app.rate-limit.signin-origem.janela", "15m"));
+				"app.rate-limit.signin-origem.limite", "50", "app.rate-limit.signin-origem.janela", "15m",
+				"app.rate-limit.troca-senha-usuario.limite", "5", "app.rate-limit.troca-senha-usuario.janela", "15m"));
 
 		assertThatThrownBy(() -> new Binder(fonte).bind("app.rate-limit", RateLimitProperties.class))
 				.hasRootCauseInstanceOf(IllegalArgumentException.class);

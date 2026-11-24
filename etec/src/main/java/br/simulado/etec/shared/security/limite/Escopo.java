@@ -13,6 +13,9 @@ public enum Escopo {
 	SIGNIN_EMAIL_ORIGEM,
 
 	/** Falhas de signin por origem (qualquer e-mail). */
-	SIGNIN_ORIGEM
+	SIGNIN_ORIGEM,
+
+	/** Erros da senha atual na troca de senha, por usuário (D139). */
+	TROCA_SENHA_USUARIO
 
 }

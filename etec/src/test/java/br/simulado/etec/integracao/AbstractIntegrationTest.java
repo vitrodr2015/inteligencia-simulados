@@ -128,7 +128,11 @@ public abstract class AbstractIntegrationTest {
 
 	/** Token de acesso de verdade (assinado com o segredo do contexto) para o usuário dado. */
 	protected String tokenDeAcesso(Usuario usuario) {
-		return provedorDeTokens.emitir(TipoToken.ACCESS, usuario.getPublicId(), usuario.getPapel().name()).valor();
+		// O token leva a versão ATUAL do usuário no banco (D136): a checagem do filtro continua exata, e o teste que a muda
+		// (troca de senha, reuso de refresh) recebe tokens da versão nova se pedir outro depois.
+		int versao = jdbc.queryForObject("SELECT versao_token FROM usuario WHERE public_id = UUID_TO_BIN(?)", Integer.class,
+				usuario.getPublicId().toString());
+		return provedorDeTokens.emitir(TipoToken.ACCESS, usuario.getPublicId(), usuario.getPapel().name(), versao).valor();
 	}
 
 	/** Grava um usuário de teste no banco, com e-mail único e hash falso (o login real é provado em outro teste). */

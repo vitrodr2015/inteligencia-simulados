@@ -43,7 +43,11 @@ import br.simulado.etec.shared.security.limite.RateLimitProperties;
 public class SecurityConfig {
 
 	/** Rotas públicas de autenticação (todas POST). */
-	static final String[] PUBLICAS_POST = { "/api/v1/auth/register", "/api/v1/auth/signin", "/api/v1/auth/refresh" };
+	static final String[] PUBLICAS_POST = { "/api/v1/auth/register", "/api/v1/auth/signin", "/api/v1/auth/refresh",
+			"/api/v1/auth/logout" };
+
+	/** Troca de senha do próprio usuário logado (D139): STUDENT e ADMIN; GUARDIAN não (D122). */
+	static final String[] TROCA_DE_SENHA = { "/api/v1/me/senha" };
 
 	/** Os três caminhos de saúde do actuator (a liveness e a readiness vêm das probes, D99). */
 	static final String[] SAUDE = { "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness" };
@@ -106,6 +110,8 @@ public class SecurityConfig {
 					leitura(regras, ME, url -> url.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN));
 					leitura(regras, CATALOGO_LEITURA,
 							url -> url.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN));
+					regras.requestMatchers(HttpMethod.POST, TROCA_DE_SENHA)
+							.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN);
 					// ----- só ADMIN (escrita do catálogo) -----
 					regras.requestMatchers(HttpMethod.POST, CATALOGO_CRIACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					regras.requestMatchers(HttpMethod.PUT, CATALOGO_ITEM).hasAuthority(Authorities.ROLE_ADMIN);

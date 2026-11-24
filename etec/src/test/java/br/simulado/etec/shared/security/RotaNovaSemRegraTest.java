@@ -65,7 +65,7 @@ class RotaNovaSemRegraTest {
 	private String tokenDe(Papel papel) {
 		Usuario usuario = usuarios.saveAndFlush(new Usuario("Teste " + papel, papel.name().toLowerCase() + "."
 				+ System.nanoTime() + "@exemplo.invalid", "hash-falso-nao-e-real", LocalDate.of(2000, 1, 1), "v1", papel));
-		return provedorDeTokens.emitir(TipoToken.ACCESS, usuario.getPublicId(), papel.name()).valor();
+		return provedorDeTokens.emitir(TipoToken.ACCESS, usuario.getPublicId(), papel.name(), usuario.getVersaoToken()).valor();
 	}
 
 	private HttpResponse<String> enviar(String metodo, String caminho, String token) throws Exception {

@@ -11,6 +11,7 @@ import br.simulado.etec.auth.dto.RefreshRequest;
 import br.simulado.etec.auth.dto.RegistroRequest;
 import br.simulado.etec.auth.dto.SigninRequest;
 import br.simulado.etec.auth.dto.TokensResponse;
+import br.simulado.etec.auth.model.MotivoRevogacao;
 import br.simulado.etec.shared.exception.CredenciaisInvalidasException;
 import br.simulado.etec.shared.exception.InvalidTokenException;
 import br.simulado.etec.shared.security.JwtTokenProvider;
@@ -23,8 +24,12 @@ import br.simulado.etec.usuarios.model.Usuario;
 import br.simulado.etec.usuarios.service.UsuarioService;
 
 /**
- * Cadastro, signin e refresh (contrato, seção 3). Sem persistência de refresh: a rotação, o logout e a revogação
- * por reuso (D39, D49, D15) são do Módulo 13; até lá o refresh usado NÃO é invalidado.
+ * Cadastro, signin, refresh e logout (contrato, seção 3). O refresh é guardado e rotacionado pelo {@link SessaoService}
+ * (D133 a D137).
+ *
+ * <p><b>Este service NÃO pode ser {@code @Transactional}</b> (nem os seus chamadores). No refresh, a revogação em massa do
+ * REUSO precisa GRAVAR mesmo com a resposta 401: ela roda e termina a sua transação no {@link SessaoService}, e só DEPOIS
+ * a exceção sai daqui, fora de qualquer transação. O mesmo vale para os contadores do limite (REQUIRES_NEW).
  *
  * <p><b>Signin sem pistas.</b> Usuário inexistente, conta excluída, e-mail de formato inválido, senha errada, senha
  * vazia e senha acima de 72 bytes terminam na mesma exceção, e TODAS passam por UMA comparação de BCrypt (com um
@@ -62,8 +67,11 @@ public class AuthService {
 	/** Hash de uma senha aleatória descartada, gerado com o mesmo encoder (e portanto o mesmo custo) dos reais. */
 	private final String hashFicticio;
 
+	private final SessaoService sessoes;
+
 	public AuthService(UsuarioService usuarios, PasswordEncoder encoder, JwtTokenProvider tokens,
-			LimiteDeTentativas limite, RateLimitProperties limites) {
+			LimiteDeTentativas limite, RateLimitProperties limites, SessaoService sessoes) {
+		this.sessoes = sessoes;
 		this.usuarios = usuarios;
 		this.encoder = encoder;
 		this.tokens = tokens;
@@ -108,24 +116,40 @@ public class AuthService {
 		// Sucesso: zera o e-mail+origem e devolve a ocorrência à origem (que só conta falhas).
 		limite.zerar(Escopo.SIGNIN_EMAIL_ORIGEM, emailEOrigem);
 		limite.devolver(Escopo.SIGNIN_ORIGEM, origem);
-		return emitirPar(usuario.get());
+		return sessoes.iniciar(usuario.get());
 	}
 
 	/**
-	 * Troca um refresh válido por um par novo. O usuário é recarregado do banco (excluído = 401) e o papel do novo
-	 * token vem dele. Um access token enviado aqui dá 401 (D107).
+	 * Troca um refresh válido por um par novo, com ROTAÇÃO (D133): o refresh usado é revogado por UPDATE condicional, na mesma
+	 * transação que insere o novo. Todo caso de falha é o mesmo 401 TOKEN_INVALIDO. O usuário é recarregado do banco (excluído
+	 * = 401), a versão do token tem de ser a dele (D136) e um access token enviado aqui dá 401 (D107).
+	 *
+	 * <p><b>Reuso (D134):</b> se o refresh já foi ROTACIONADO, é sinal de roubo: revoga TODOS os refresh do usuário e
+	 * incrementa a versão do token (derruba os access vivos), numa transação própria que TERMINA antes de a exceção sair
+	 * daqui, e só então responde 401. Refresh vencido, desconhecido ou revogado por outro motivo dá só 401.
 	 */
 	public TokensResponse refresh(RefreshRequest dados) {
 		ClaimsDoToken claims = tokens.validar(dados.refreshToken(), TipoToken.REFRESH);
 		Usuario usuario = usuarios.buscarAtivoPorPublicId(claims.usuarioId()).orElseThrow(InvalidTokenException::new);
-		return emitirPar(usuario);
+		if (claims.versao() != usuario.getVersaoToken()) {
+			throw new InvalidTokenException();
+		}
+		Optional<TokensResponse> par = sessoes.rotacionar(claims, usuario);
+		if (par.isPresent()) {
+			return par.get();
+		}
+		if (sessoes.foiRotacionado(claims.jti())) {
+			sessoes.encerrarTodasAsSessoes(usuario.getId(), MotivoRevogacao.REUSO);
+		}
+		throw new InvalidTokenException();
 	}
 
-	private TokensResponse emitirPar(Usuario usuario) {
-		String papel = usuario.getPapel().name();
-		String access = tokens.emitir(TipoToken.ACCESS, usuario.getPublicId(), papel).valor();
-		String refresh = tokens.emitir(TipoToken.REFRESH, usuario.getPublicId(), papel).valor();
-		return new TokensResponse(access, refresh, TokensResponse.TIPO, tokens.validadeDoAccessEmSegundos());
+	/**
+	 * Logout (D15, D107, D135): 204 para qualquer texto, e revoga só o refresh enviado, quando a assinatura é válida. Não
+	 * derruba o access token vivo (no máximo 15 minutos).
+	 */
+	public void logout(RefreshRequest dados) {
+		sessoes.logout(dados.refreshToken());
 	}
 
 }

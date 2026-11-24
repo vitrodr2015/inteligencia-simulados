@@ -167,8 +167,8 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 		Usuario aluno = criarUsuarioNoBanco(Papel.STUDENT);
 		Usuario admin = criarUsuarioNoBanco(Papel.ADMIN);
 		// Token legítimo (segredo certo), mas com o claim papel contrariando o banco.
-		String alunoComClaimDeAdmin = provedorDeTokens.emitir(TipoToken.ACCESS, aluno.getPublicId(), "ADMIN").valor();
-		String adminComClaimDeAluno = provedorDeTokens.emitir(TipoToken.ACCESS, admin.getPublicId(), "STUDENT").valor();
+		String alunoComClaimDeAdmin = provedorDeTokens.emitir(TipoToken.ACCESS, aluno.getPublicId(), "ADMIN", 0).valor();
+		String adminComClaimDeAluno = provedorDeTokens.emitir(TipoToken.ACCESS, admin.getPublicId(), "STUDENT", 0).valor();
 
 		assertThat(tentarEscrever(alunoComClaimDeAdmin)).isEqualTo(403);
 		assertThat(tentarEscrever(adminComClaimDeAluno)).isEqualTo(201);

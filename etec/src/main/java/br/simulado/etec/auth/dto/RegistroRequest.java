@@ -5,6 +5,7 @@ import java.util.Locale;
 
 import br.simulado.etec.shared.validacao.DataDeNascimento;
 import br.simulado.etec.shared.validacao.EmailAscii;
+import br.simulado.etec.shared.validacao.PoliticaDeSenha;
 import br.simulado.etec.shared.validacao.TamanhoEmBytes;
 import br.simulado.etec.shared.validacao.TamanhoEmPontosDeCodigo;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -31,7 +32,7 @@ public record RegistroRequest(
 
 		@Schema(description = "Senha de 8 a 72 bytes (UTF-8). Só entra; nunca sai.")
 		@NotNull(message = "A senha é obrigatória.")
-		@TamanhoEmBytes(min = 8, max = 72, message = "A senha deve ter de 8 a 72 bytes.")
+		@TamanhoEmBytes(min = PoliticaDeSenha.MINIMO_DO_ALUNO_EM_BYTES, max = PoliticaDeSenha.MAXIMO_EM_BYTES, message = "A senha deve ter de 8 a 72 bytes.")
 		String senha,
 
 		@Schema(description = "Data de nascimento (aaaa-mm-dd), no passado (UTC) e a partir de 1900-01-01.", example = "2008-05-10")

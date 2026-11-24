@@ -58,13 +58,13 @@ public interface AuthControllerDocs {
 	ResponseEntity<TokensResponse> signin(SigninRequest dados, HttpServletRequest requisicao);
 
 	@Operation(summary = "Troca o refresh token por um par novo",
-			description = "O refresh vai só no corpo. Um access token enviado aqui dá 401. Até o Módulo 13 o refresh usado NÃO é invalidado. A resposta leva Cache-Control: no-store.")
+			description = "O refresh vai só no corpo. Um access token enviado aqui dá 401. Cada refresh vale uma vez só: o usado é revogado. A resposta leva Cache-Control: no-store.")
 	@ApiResponse(responseCode = "200", description = "Par de tokens novo.",
 			content = @Content(schema = @Schema(implementation = TokensResponse.class)))
 	@ApiResponse(responseCode = "400", description = "Refresh token ausente, nulo ou que não é texto.",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	@ApiResponse(responseCode = "401",
-			description = "Refresh inválido, vencido, de outro tipo ou de usuário excluído (TOKEN_INVALIDO).",
+			description = "Refresh inválido, vencido, revogado (rotação, logout, troca de senha ou reuso), de outro tipo, de versão antiga ou de usuário excluído (TOKEN_INVALIDO). Reapresentar um refresh JÁ ROTACIONADO revoga todas as sessões do usuário (D49).",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	@ApiResponse(responseCode = "429",
 			description = "Limite de tentativas excedido (LIMITE_EXCEDIDO). Espere o tempo do cabeçalho Retry-After (segundos) e tente de novo; o bloqueio expira sozinho. A resposta é a mesma para e-mail existente e inexistente.",
@@ -72,5 +72,17 @@ public interface AuthControllerDocs {
 					schema = @Schema(type = "integer")),
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<TokensResponse> refresh(RefreshRequest dados);
+
+	@Operation(summary = "Encerra uma sessão (logout)",
+			description = "Anônimo: o refresh token no corpo é a credencial. Responde 204 para qualquer texto presente (malformado, desconhecido, vencido, já revogado ou de outro tipo) e revoga SÓ o refresh enviado, quando a assinatura é válida. NÃO derruba o access token vivo: ele vale até vencer (no máximo 15 minutos).")
+	@ApiResponse(responseCode = "204", description = "Sessão encerrada (ou nada a encerrar).")
+	@ApiResponse(responseCode = "400", description = "Refresh token ausente, nulo ou que não é texto.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "429",
+			description = "Limite de tentativas excedido (LIMITE_EXCEDIDO). Espere o tempo do cabeçalho Retry-After (segundos).",
+			headers = @Header(name = "Retry-After", description = "Segundos até poder tentar de novo.",
+					schema = @Schema(type = "integer")),
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<Void> logout(RefreshRequest dados);
 
 }

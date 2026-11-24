@@ -36,18 +36,18 @@ public final class TokensForjados {
 
 	/** Válido em tudo: segredo da execução, emissor certo, prazo no futuro. */
 	public static String valido(UUID usuario, String papel, TipoToken tipo) {
-		return provedor(SegredoDeTeste.DA_EXECUCAO, Instant.now()).emitir(tipo, usuario, papel).valor();
+		return provedor(SegredoDeTeste.DA_EXECUCAO, Instant.now()).emitir(tipo, usuario, papel, 0).valor();
 	}
 
 	/** Assinado com o segredo certo, mas já vencido (emitido há duas horas, com validade de 15 minutos). */
 	public static String vencido(UUID usuario, String papel) {
 		return provedor(SegredoDeTeste.DA_EXECUCAO, Instant.now().minus(Duration.ofHours(2)))
-				.emitir(TipoToken.ACCESS, usuario, papel).valor();
+				.emitir(TipoToken.ACCESS, usuario, papel, 0).valor();
 	}
 
 	/** Mesma estrutura de um token válido, mas assinado com OUTRO segredo. */
 	public static String deOutroSegredo(UUID usuario, String papel) {
-		return provedor(SegredoDeTeste.gerar(), Instant.now()).emitir(TipoToken.ACCESS, usuario, papel).valor();
+		return provedor(SegredoDeTeste.gerar(), Instant.now()).emitir(TipoToken.ACCESS, usuario, papel, 0).valor();
 	}
 
 	/** Emissor diferente do da aplicação, assinado com o segredo certo. */

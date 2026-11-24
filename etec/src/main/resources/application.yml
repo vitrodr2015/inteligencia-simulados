@@ -58,6 +58,13 @@ app:
     signin-origem:
       limite: 50
       janela: 15m
+    # Erros da senha atual na troca de senha, por usuário (Módulo 13B, D139).
+    troca-senha-usuario:
+      limite: 5
+      janela: 15m
+  # Limpeza agendada dos refresh tokens vencidos há mais de 1 dia (Módulo 13B, D137).
+  sessoes:
+    limpeza-ativa: true
 
 # Inerte até a dependência do springdoc existir.
 springdoc:

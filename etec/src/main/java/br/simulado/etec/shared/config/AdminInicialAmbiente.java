@@ -8,6 +8,7 @@ import java.util.Locale;
 import org.springframework.core.env.Environment;
 
 import br.simulado.etec.shared.validacao.EmailAsciiValidator;
+import br.simulado.etec.shared.validacao.PoliticaDeSenha;
 
 /**
  * Lê e valida as variáveis do administrador inicial ({@code ADMIN_EMAIL} e {@code ADMIN_SENHA}, D45 e D91) pelo
@@ -28,9 +29,9 @@ public final class AdminInicialAmbiente {
 
 	public static final String VARIAVEL_SENHA = "ADMIN_SENHA";
 
-	public static final int SENHA_MINIMA_EM_BYTES = 12;
+	public static final int SENHA_MINIMA_EM_BYTES = PoliticaDeSenha.MINIMO_DO_ADMIN_EM_BYTES;
 
-	public static final int SENHA_MAXIMA_EM_BYTES = 72;
+	public static final int SENHA_MAXIMA_EM_BYTES = PoliticaDeSenha.MAXIMO_EM_BYTES;
 
 	static final int EMAIL_MAXIMO = 255;
 
@@ -113,32 +114,18 @@ public final class AdminInicialAmbiente {
 		return motivos;
 	}
 
-	/**
-	 * Placeholder do projeto ("troque-a-senha-do-admin", "<defina-aqui>"): começa com "troque-" ou tem "<" e ">", sem
-	 * diferenciar maiúsculas. Quem copia um exemplo sem trocar o valor não pode virar administrador.
-	 */
-	static boolean pareceMarcadorDeExemplo(String senha) {
-		String minuscula = senha.strip().toLowerCase(Locale.ROOT);
-		return minuscula.startsWith("troque-") || (minuscula.contains("<") && minuscula.contains(">"));
-	}
-
+	/** Os motivos da recusa da senha do admin: a política é a MESMA da troca de senha ({@link PoliticaDeSenha}, D125). */
 	private static List<String> motivosDaSenha(String senha) {
 		List<String> motivos = new ArrayList<>();
-		int bytes = senha.getBytes(StandardCharsets.UTF_8).length;
-		if (bytes < SENHA_MINIMA_EM_BYTES) {
-			motivos.add(VARIAVEL_SENHA + " tem menos de " + SENHA_MINIMA_EM_BYTES + " bytes.");
-		}
-		else if (bytes > SENHA_MAXIMA_EM_BYTES) {
-			motivos.add(VARIAVEL_SENHA + " tem mais de " + SENHA_MAXIMA_EM_BYTES + " bytes.");
-		}
-		if (Character.isWhitespace(senha.charAt(0)) || Character.isWhitespace(senha.charAt(senha.length() - 1))) {
-			motivos.add(VARIAVEL_SENHA + " tem espaço, tabulação ou quebra de linha no início ou no fim.");
-		}
-		if (senha.indexOf('\n') >= 0 || senha.indexOf('\r') >= 0) {
-			motivos.add(VARIAVEL_SENHA + " tem quebra de linha.");
-		}
-		if (pareceMarcadorDeExemplo(senha)) {
-			motivos.add(VARIAVEL_SENHA + " parece um marcador de exemplo (\"troque-...\" ou \"<...>\"), não uma senha real.");
+		for (PoliticaDeSenha.Violacao violacao : PoliticaDeSenha.verificarDoAdmin(senha)) {
+			motivos.add(switch (violacao) {
+				case MUITO_CURTA -> VARIAVEL_SENHA + " tem menos de " + SENHA_MINIMA_EM_BYTES + " bytes.";
+				case MUITO_LONGA -> VARIAVEL_SENHA + " tem mais de " + SENHA_MAXIMA_EM_BYTES + " bytes.";
+				case ESPACO_NAS_PONTAS -> VARIAVEL_SENHA + " tem espaço, tabulação ou quebra de linha no início ou no fim.";
+				case QUEBRA_DE_LINHA -> VARIAVEL_SENHA + " tem quebra de linha.";
+				case MARCADOR_DE_EXEMPLO -> VARIAVEL_SENHA
+						+ " parece um marcador de exemplo (\"troque-...\" ou \"<...>\"), não uma senha real.";
+			});
 		}
 		return motivos;
 	}

@@ -31,6 +31,11 @@ public class AutenticadorDeToken {
 	public UsuarioAutenticado autenticar(String accessToken) {
 		ClaimsDoToken claims = tokens.validar(accessToken, TipoToken.ACCESS);
 		Usuario usuario = usuarios.buscarAtivoPorPublicId(claims.usuarioId()).orElseThrow(InvalidTokenException::new);
+		// D136: a versão do token tem de ser a do usuário AGORA. Troca de senha, reuso de refresh e "encerrar sessões"
+		// incrementam a versão e derrubam, de uma vez, os access tokens ainda vivos. Sem relógio e sem iat.
+		if (claims.versao() != usuario.getVersaoToken()) {
+			throw new InvalidTokenException();
+		}
 		return new UsuarioAutenticado(usuario.getPublicId(), usuario.getPapel());
 	}
 
