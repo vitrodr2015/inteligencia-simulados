@@ -131,4 +131,38 @@ class SwaggerLigadoTest {
 				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='requisicao')]").isEmpty());
 	}
 
+	@Test
+	void deve_documentar_as_tres_rotas_da_prova_e_o_schema_de_saida_sem_o_programa() throws Exception {
+		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/provas'].post.responses.201").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/provas'].post.responses.400").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/provas'].post.responses.409").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/provas'].get.responses.200").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/provas'].get.responses.400").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/provas/{id}'].get.responses.200").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/provas/{id}'].get.responses.400").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/provas/{id}'].get.responses.404").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/provas/{id}'].get.responses.401").doesNotExist())
+				.andExpect(jsonPath("$.paths['/api/v1/provas/{id}'].get.responses.403").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.ProvaResponse").exists())
+				.andExpect(jsonPath("$.components.schemas.ProvaResponse.properties.programa").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.ProvaResponse.properties.quantidadeQuestoes").exists())
+				.andExpect(jsonPath("$.components.schemas.ProvaRequest").exists())
+				.andExpect(jsonPath("$.components.schemas.PaginaResponseProvaResponse").exists());
+	}
+
+	@Test
+	void deve_documentar_os_filtros_e_o_sort_da_listagem_de_provas_sem_example() throws Exception {
+		String listagem = "$.paths['/api/v1/provas'].get";
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='ano')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='semestre')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='status')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='page')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='size')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='sort')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='requisicao')]").isEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.example)]").isEmpty());
+	}
+
 }

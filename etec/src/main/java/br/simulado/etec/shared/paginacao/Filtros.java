@@ -47,6 +47,40 @@ public final class Filtros {
 		return (raiz, consulta, construtor) -> construtor.equal(raiz.get(campo), valor);
 	}
 
+	/**
+	 * Lê um inteiro estrito de um filtro: só dígitos ASCII (sem sinal, espaço, decimal ou letra), dentro de
+	 * {@code [minimo, maximo]}; ausente = {@code null}; qualquer outra coisa = 400 PARAMETRO_INVALIDO.
+	 */
+	public static Integer inteiro(String parametro, String valor, int minimo, int maximo) {
+		if (valor == null) {
+			return null;
+		}
+		if (valor.length() <= 9 && valor.matches("[0-9]+")) {
+			int numero = Integer.parseInt(valor);
+			if (numero >= minimo && numero <= maximo) {
+				return numero;
+			}
+		}
+		throw new InvalidRequestException(CodigoErro.PARAMETRO_INVALIDO,
+				"O parâmetro '" + parametro + "' deve ser um inteiro de " + minimo + " a " + maximo + ".");
+	}
+
+	/** Lê um valor de enum pelo nome EXATO (maiúsculas); ausente = {@code null}; outro valor = 400 PARAMETRO_INVALIDO. */
+	public static <E extends Enum<E>> E enumerado(String parametro, String valor, Class<E> tipo) {
+		if (valor == null) {
+			return null;
+		}
+		for (E constante : tipo.getEnumConstants()) {
+			if (constante.name().equals(valor)) {
+				return constante;
+			}
+		}
+		String aceitos = java.util.Arrays.stream(tipo.getEnumConstants()).map(Enum::name)
+				.collect(java.util.stream.Collectors.joining(", "));
+		throw new InvalidRequestException(CodigoErro.PARAMETRO_INVALIDO,
+				"O parâmetro '" + parametro + "' deve ser um destes valores: " + aceitos + ".");
+	}
+
 	/** Lê um booleano estrito: só {@code true} ou {@code false}; ausente = {@code null}; outro valor = 400. */
 	public static Boolean booleano(String parametro, String valor) {
 		if (valor == null) {

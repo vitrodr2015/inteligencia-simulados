@@ -32,6 +32,32 @@ class CoercaoDeTextoJacksonTest {
 		assertThat(jsonMapper.readValue("{\"texto\":\"\"}", Entrada.class).texto()).isEmpty();
 	}
 
+	record EntradaInteira(Integer numero) {
+	}
+
+	@Test
+	void deve_ler_o_inteiro_e_o_nulo_normalmente() {
+		assertThat(jsonMapper.readValue("{\"numero\":2024}", EntradaInteira.class).numero()).isEqualTo(2024);
+		assertThat(jsonMapper.readValue("{\"numero\":null}", EntradaInteira.class).numero()).isNull();
+		assertThat(jsonMapper.readValue("{}", EntradaInteira.class).numero()).isNull();
+	}
+
+	@Test
+	void deve_recusar_texto_decimal_booleano_lista_e_objeto_no_lugar_do_inteiro() {
+		java.util.List<String> aceitosPorEngano = new java.util.ArrayList<>();
+		for (String json : new String[] { "{\"numero\":\"2024\"}", "{\"numero\":\"\"}", "{\"numero\":2024.5}",
+				"{\"numero\":2024.0}", "{\"numero\":true}", "{\"numero\":[1]}", "{\"numero\":{\"x\":1}}" }) {
+			try {
+				jsonMapper.readValue(json, EntradaInteira.class);
+				aceitosPorEngano.add(json);
+			}
+			catch (JacksonException esperado) {
+				// recusado: é o que se quer
+			}
+		}
+		assertThat(aceitosPorEngano).as("entradas que o mapper aceitou em vez de recusar").isEmpty();
+	}
+
 	@Test
 	void deve_recusar_numero_booleano_lista_e_objeto_no_lugar_do_texto() {
 		for (String json : new String[] { "{\"texto\":123}", "{\"texto\":1.5}", "{\"texto\":true}", "{\"texto\":[\"a\"]}",
