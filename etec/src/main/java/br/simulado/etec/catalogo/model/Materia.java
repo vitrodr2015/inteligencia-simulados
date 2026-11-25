@@ -11,18 +11,21 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 /**
  * Matéria (contrato, seção 4.1). O {@code id} é interno e nunca sai pela API; o recurso é
- * exposto por {@code publicId}. O nome é único no banco (a collation utf8mb4_unicode_ci ignora
- * maiúsculas e acentos). Nasce ativa; só muda por {@link #desativar()} e {@link #ativar()}.
+ * exposto por {@code publicId}. O nome é único DENTRO do programa (D144; a collation utf8mb4_unicode_ci ignora
+ * maiúsculas e acentos). O programa é interno e nunca sai pela API (D143). Nasce ativa; só muda por {@link #desativar()} e {@link #ativar()}.
  */
 @Entity
 @EntityListeners(AuditingEntityListener.class)
-@Table(name = "materia")
+@Table(name = "materia", uniqueConstraints = @jakarta.persistence.UniqueConstraint(name = "uk_materia_programa_nome", columnNames = { "programa_id", "nome" }))
 public class Materia {
 
 	@Id
@@ -33,7 +36,11 @@ public class Materia {
 	@Column(name = "public_id", nullable = false, updatable = false, unique = true)
 	private UUID publicId;
 
-	@Column(name = "nome", nullable = false, length = 100, unique = true)
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "programa_id", nullable = false, updatable = false)
+	private ProgramaDeProva programa;
+
+	@Column(name = "nome", nullable = false, length = 100)
 	private String nome;
 
 	@Column(name = "descricao", length = 255)
@@ -54,8 +61,9 @@ public class Materia {
 		// exigido pelo JPA
 	}
 
-	public Materia(String nome, String descricao) {
+	public Materia(ProgramaDeProva programa, String nome, String descricao) {
 		this.publicId = UUID.randomUUID();
+		this.programa = programa;
 		this.nome = nome;
 		this.descricao = descricao;
 		this.ativo = true;
@@ -81,6 +89,10 @@ public class Materia {
 
 	public UUID getPublicId() {
 		return publicId;
+	}
+
+	public ProgramaDeProva getPrograma() {
+		return programa;
 	}
 
 	public String getNome() {

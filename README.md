@@ -101,6 +101,8 @@ Deve aparecer `linhas_alteradas` com **1** (se for **0**, o e-mail não existe).
 
 **Entitlements (Tarefa 12, D140 a D142).** Todo endpoint que será premium passa pelo `EntitlementsService` (pacote `assinatura`), que consulta uma política substituível escolhida por `app.entitlements.politica` (hoje só `stub`, sem valor padrão: ausente ou desconhecida derruba a subida). O stub libera `INICIAR_TENTATIVA` no programa ETEC para STUDENT e ADMIN e nega o GUARDIAN; o que não está na lista dele é negado. Nenhum endpoint premium existe ainda, e `GET /entitlements` não existe na fase 1. A negação é `403 ENTITLEMENT_NEGADO`. **Antes de cobrar, o stub tem de ser trocado por regras reais.**
 
+**Programa de prova (Sprint 2, D143 e D144).** A migration V7 cria a tabela `programa` com uma linha, `ETEC`, e a matéria passa a ter `programa_id` (obrigatório): o nome da matéria é único **por programa**. O programa é interno: não aparece em rota, corpo nem resposta, e o código dele casa com `Programa.ETEC` (pacote `shared.programa`). Se você já tem um banco local com matérias, a V7 as coloca no ETEC sozinha ao subir.
+
 **CORS.** A variável `CORS_ALLOWED_ORIGINS` (propriedade `app.cors.allowed-origins`) lista as origens de navegador permitidas, separadas por vírgula, no formato `http(s)://domínio[:porta]` (sem barra nem caminho). **Vazia (o padrão) = sem CORS.** A aplicação não sobe com `*` nem com origem fora do formato, e, com o perfil `prod`, só aceita `https`. Exemplo para um front local: `CORS_ALLOWED_ORIGINS=http://localhost:5173`. Origem, método ou cabeçalho não permitido recebe 403 `ACESSO_NEGADO`. Os relatórios das chamadas reais estão em `etec/docs/relatorio-chamadas-auth.md` e `etec/docs/relatorio-chamadas-autorizacao.md`.
 
 ## Como rodar os testes

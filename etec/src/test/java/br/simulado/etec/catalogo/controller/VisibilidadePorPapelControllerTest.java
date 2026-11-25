@@ -17,7 +17,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import br.simulado.etec.catalogo.model.Materia;
 import br.simulado.etec.catalogo.model.Subtopico;
+import br.simulado.etec.catalogo.model.ProgramaDeProva;
 import br.simulado.etec.catalogo.repository.MateriaRepository;
+import br.simulado.etec.catalogo.repository.ProgramaRepository;
 import br.simulado.etec.catalogo.repository.SubtopicoRepository;
 import br.simulado.etec.shared.security.ComPrincipal;
 import br.simulado.etec.usuarios.model.Papel;
@@ -35,6 +37,9 @@ class VisibilidadePorPapelControllerTest {
 	private MateriaRepository materias;
 
 	@Autowired
+	private ProgramaRepository programas;
+
+	@Autowired
 	private SubtopicoRepository subtopicos;
 
 	private Materia ativa;
@@ -50,8 +55,9 @@ class VisibilidadePorPapelControllerTest {
 	@BeforeEach
 	void montar() {
 		limpar();
-		ativa = materias.saveAndFlush(new Materia("Ativa", null));
-		inativa = materias.saveAndFlush(new Materia("Inativa", null));
+		ProgramaDeProva etec = programas.findByCodigo("ETEC").orElseThrow();
+		ativa = materias.saveAndFlush(new Materia(etec, "Ativa", null));
+		inativa = materias.saveAndFlush(new Materia(etec, "Inativa", null));
 		subAtivoEmMateriaAtiva = subtopicos.saveAndFlush(new Subtopico(ativa, "Sub ativo"));
 		subInativoEmMateriaAtiva = new Subtopico(ativa, "Sub inativo");
 		subInativoEmMateriaAtiva.desativar();

@@ -1,7 +1,7 @@
 package br.simulado.etec.assinatura.service;
 
 import br.simulado.etec.assinatura.model.Decisao;
-import br.simulado.etec.assinatura.model.Programa;
+import br.simulado.etec.shared.programa.Programa;
 import br.simulado.etec.assinatura.model.Recurso;
 import br.simulado.etec.shared.security.UsuarioAutenticado;
 

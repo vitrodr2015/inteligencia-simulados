@@ -77,4 +77,18 @@ class RestricoesTest {
 		assertThat(Restricoes.ehUnicidade(embrulhado)).isTrue();
 	}
 
+	@Test
+	void deve_reconhecer_a_unicidade_pelo_nome_da_restricao_com_ou_sem_o_prefixo_da_tabela() {
+		assertThat(Restricoes.ehUnicidade(erro(ConstraintKind.UNIQUE, "materia.uk_materia_programa_nome"), "uk_materia_programa_nome")).isTrue();
+		assertThat(Restricoes.ehUnicidade(erro(ConstraintKind.UNIQUE, "UK_MATERIA_PROGRAMA_NOME"), "uk_materia_programa_nome")).isTrue();
+		assertThat(Restricoes.ehUnicidade(erro(ConstraintKind.UNIQUE, null), "uk_materia_programa_nome")).isTrue();
+	}
+
+	@Test
+	void deve_nao_reconhecer_outra_restricao_unica_nem_outro_tipo_pelo_nome() {
+		assertThat(Restricoes.ehUnicidade(erro(ConstraintKind.UNIQUE, "materia.uk_materia_nome"), "uk_materia_programa_nome")).isFalse();
+		assertThat(Restricoes.ehUnicidade(erro(ConstraintKind.FOREIGN_KEY, "uk_materia_programa_nome"), "uk_materia_programa_nome")).isFalse();
+		assertThat(Restricoes.ehUnicidade(erro(ConstraintKind.NOT_NULL, "programa_id"), "uk_materia_programa_nome")).isFalse();
+	}
+
 }

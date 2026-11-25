@@ -23,6 +23,20 @@ public final class Restricoes {
 	}
 
 	/**
+	 * Violação de índice ou restrição ÚNICA de nome {@code nomeEsperado} (sem distinguir caixa; o MySQL informa o nome com o prefixo da
+	 * tabela, como {@code materia.uk_materia_programa_nome}). Se o banco não informar o nome, vale o tipo. Outra restrição única
+	 * NÃO é reconhecida: ela sobe como erro, em vez de virar o 409 que não é o dela.
+	 */
+	public static boolean ehUnicidade(Throwable erro, String nomeEsperado) {
+		ConstraintViolationException violacao = procurar(erro);
+		if (violacao == null || violacao.getKind() != ConstraintKind.UNIQUE) {
+			return false;
+		}
+		String nome = violacao.getConstraintName();
+		return nome == null || nome.toLowerCase().contains(nomeEsperado.toLowerCase());
+	}
+
+	/**
 	 * Violação de chave estrangeira da restrição de nome {@code nomeEsperado} (sem distinguir caixa). Se o banco
 	 * não informar o nome da restrição, vale o tipo: a restrição é de chave estrangeira.
 	 */

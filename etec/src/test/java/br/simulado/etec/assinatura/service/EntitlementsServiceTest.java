@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import br.simulado.etec.assinatura.model.Decisao;
 import br.simulado.etec.assinatura.model.MotivoDaNegacao;
-import br.simulado.etec.assinatura.model.Programa;
+import br.simulado.etec.shared.programa.Programa;
 import br.simulado.etec.assinatura.model.Recurso;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.EntitlementNegadoException;

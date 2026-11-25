@@ -8,6 +8,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import br.simulado.etec.shared.programa.Programa;
+
 class ModeloDeEntitlementsTest {
 
 	@Test
