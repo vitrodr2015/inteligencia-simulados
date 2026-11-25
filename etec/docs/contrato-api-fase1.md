@@ -2,7 +2,7 @@ Contrato da API — Fase 1 (v1.0, aprovada)
 
 O contrato é revisado e aprovado antes de qualquer código. Ele é rascunho até a aprovação; a v1.0 é a versão aprovada (D83), e depois dela qualquer mudança é registrada na seção 10. Este é o documento completo da API da fase 1 e não depende de outros.
 
-Estado: versão aprovada (v1.0). Decisões D1 a D142 decididas, exceto D22 e D24 (pendências externas).
+Estado: versão aprovada (v1.0). Decisões D1 a D144 e D148 decididas (D145 a D147: aprovadas e ainda não implementadas, ver memoria.md), exceto D22 e D24 (pendências externas).
 
 1. Convenções gerais (valem para todas as rotas)
 Tema	Decisão
@@ -104,7 +104,7 @@ A anonimização grava nome = "Usuário removido", e-mail = removido-{uuid}@inva
 4.1 Matéria
 Campo	Tipo	Regra	Quem preenche
 id	UUID	gerado	saída
-nome	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 2 a 100 caracteres (vazio = 400, D57); único (ignora maiúsculas e acentos)	entrada e saída
+nome	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 2 a 100 caracteres (vazio = 400, D57); único POR PROGRAMA (ignora maiúsculas e acentos; hoje só existe o programa ETEC, interno e invisível na API, D143, D144)	entrada e saída
 descricao	texto	opcional, até 255; omitida no PUT, vira nula (D61)	entrada e saída
 ativo	booleano	nasce true; só muda por disable/enable. Desativar uma matéria não desativa os subtópicos em cascata	saída
 criadoEm, atualizadoEm	data/hora	UTC, com precisão de milissegundos (D63). atualizadoEm não muda quando disable/enable é repetido (D62)	saída
@@ -368,6 +368,9 @@ D139	Troca de senha: POST /api/v1/me/senha, corpo {senhaAtual, novaSenha}, 204 s
 D140	Serviço de entitlements, ponto único de consulta (refina D35): o domínio assinatura tem o EntitlementsService (decidir e exigir), que consulta uma PoliticaDeEntitlements, a peça SUBSTITUÍVEL. A consulta recebe o usuário (UsuarioAutenticado, que o filtro monta do banco, D87), o recurso (enum Recurso; hoje só INICIAR_TENTATIVA) e o programa (Programa, um código como ETEC; a tabela exam_program ainda não existe). A fase 1 usa o stub PoliticaStubLiberaTudo, uma política EXPLÍCITA e não a ausência de checagem: libera INICIAR_TENTATIVA no programa ETEC para STUDENT e ADMIN, nega o GUARDIAN (D122), nega programa desconhecido e nega todo recurso que não está na sua lista (negar por padrão); todo Recurso novo exige decisão explícita (liberado ou negado de propósito). Argumento nulo é erro de programação (IllegalArgumentException, 500 genérico) e nunca vira "permitido". Quem chama conhece só o serviço: trocar o stub por regras reais é trocar a implementação. A Tentativa chamará exigir(usuario, INICIAR_TENTATIVA, programa), com o programa da prova quando houver (ETEC até lá). Fora desta decisão: explicação da questão, cota de simulados curtos e histórico; GET /entitlements não existe na fase 1	✅ Confirmada (refina D35)
 D141	Negação do entitlement: 403 com codigo ENTITLEMENT_NEGADO, mensagem fixa "Este recurso não está disponível no seu plano." e detalhes opcional { recurso, programa } (D44), igual para qualquer motivo (o motivo só vai para o log e o teste). Nada de 402	✅ Confirmada
 D142	Escolha da política: a propriedade app.entitlements.politica (hoje só stub), SEM valor padrão no código; ausente, em branco ou desconhecida derruba a subida; existe exatamente um bean de política. Em produção com o stub ativo, só um aviso (WARN) por subida, sem derrubar: o stub tem de ser trocado antes de cobrar (checklist do memoria.md)	✅ Confirmada
+D143	Programa de prova, INTERNO: a tabela programa (migration V7) tem uma linha, ETEC, e o código dela casa com Programa.ETEC (shared.programa; o CHECK da coluna tem o mesmo formato e um teste de integração prova a igualdade). Só as RAÍZES carregam programa_id: matéria agora, prova depois; o subtópico deriva o programa pela matéria e a questão pela prova (nenhuma coluna redundante). Nada de programa em rota, corpo ou resposta da API v1, e nenhum caminho de código para outro programa: o serviço de matéria atribui o ETEC lendo a tabela	✅ Confirmada
+D144	O nome da matéria é único POR PROGRAMA (índice uk_materia_programa_nome em programa_id + nome, sem distinguir maiúsculas e acentos), e não mais globalmente (refina a seção 4.1 e a D104). Como só existe o ETEC, nada muda para a API v1: a mesma matéria continua dando 409 MATERIA_NOME_DUPLICADO. A tradução do 409 reconhece SÓ a restrição desse índice; qualquer outra violação sobe como erro	✅ Confirmada (refina D104)
+D148	Numeração das migrations: a Sprint 2 usa a V7 e as seguintes; a migration do D92 (data_nascimento anulável) passa para a próxima numeração livre, na ordem da fila, e continua sendo pré-requisito da tarefa do DELETE /me. Nenhuma numeração é reservada com antecedência	✅ Confirmada (refina D92)
 9. Fora da fase 1 (de propósito)
 
 Pagamento e planos, entitlements como API (não existe GET /entitlements na fase 1; é um serviço interno com política stub explícita, D140), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
@@ -390,6 +393,8 @@ A v1.0 é a versão aprovada (D83). Toda mudança a partir dela entra aqui, com 
 
 2026-11-24 — Tarefa 12 (serviço de entitlements, stub). D140 (ponto único de consulta, política explícita e substituível, refina D35), D141 (403 ENTITLEMENT_NEGADO) e D142 (escolha da política por app.entitlements.politica, aviso em produção). Seção 2 (anotação da rota premium), seção 6 (POST /tentativas), seção 9 (sem GET /entitlements), seção 11 (o stub) e apêndice A (ENTITLEMENT_NEGADO) atualizados. Nenhum endpoint e nenhuma migration novos. Motivo: implementação da Tarefa 12.
 
+2026-11-24 — Sprint 2, fatia 1 (programa). D143 (programa interno, só em matéria e prova, derivado nos demais), D144 (nome da matéria único POR PROGRAMA: mudança posterior à v1.0, refina a seção 4.1 e a D104) e D148 (numeração das migrations; o D92 passa à próxima livre). Migration V7; seção 4.1 atualizada. Nenhum endpoint novo e nenhuma mudança visível na API. Motivo: preparar o catálogo para outros programas sem custo agora.
+
 11. Pendências abertas e limitações conhecidas
 
 Menores de idade e LGPD (externa, D24): na fase 1, menor é só uma marca calculada, sem mudar comportamento. Antes do beta, é preciso definir a idade mínima e o consentimento do responsável, com apoio jurídico.
@@ -402,6 +407,8 @@ Limites de abuso (D128 a D131), limitações conhecidas: (a) redes com NAT, como
 Ciclo de vida do token (D133 a D139), riscos conhecidos: (a) PWA em rede ruim: se a resposta de um refresh se perde e o cliente repete o mesmo token, ou se duas abas renovam ao mesmo tempo, o perdedor é indistinguível de um reuso (D49) e a revogação em massa desloga o usuário de todos os aparelhos; a rever na Sprint do front (por exemplo, renovação única entre abas); (b) depois do logout o access token vivo continua válido até vencer (no máximo 15 minutos); a troca de senha, o reuso e o encerramento de todas as sessões o derrubam pela versão; (c) os tokens emitidos antes do 13B não têm o claim versao e deixam de valer na subida (todos entram de novo); (d) o encerramento de todas as sessões ainda não tem rota própria (só serviço); o DELETE /me, quando existir, deve chamá-lo com o motivo EXCLUSAO.
 
 Entitlements (D140 a D142), limitações conhecidas: (a) o stub libera tudo o que conhece (INICIAR_TENTATIVA no ETEC) para STUDENT e ADMIN e PRECISA ser trocado por regras reais antes de cobrar; (b) só existe o recurso INICIAR_TENTATIVA e o programa ETEC: explicação da questão, cota de simulados curtos e histórico entram com o primeiro endpoint que os usa (cota e histórico pedem estado, e a Decisao deixa a porta aberta); (c) o programa é só um código até existir exam_program, na Sprint 2.
+
+Programa (D143, D144), limitações conhecidas: (a) só existe o programa ETEC, e a listagem de matérias não filtra por programa (não há o que filtrar); (b) a prova ganha programa_id quando a tabela dela nascer, e o subtópico e a questão derivam o programa pela matéria e pela prova; (c) a origem das questões e os direitos autorais precisam estar decididos antes do primeiro conteúdo real no banco (um campo de origem entra depois, por migration aditiva).
 
 Apêndice A. Catálogo de códigos de erro (D84)
 

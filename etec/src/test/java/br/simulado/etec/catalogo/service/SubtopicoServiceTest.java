@@ -25,6 +25,8 @@ import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.catalogo.dto.SubtopicoAtualizacaoRequest;
 import br.simulado.etec.catalogo.dto.SubtopicoCriacaoRequest;
 import br.simulado.etec.catalogo.model.Materia;
+import br.simulado.etec.catalogo.model.ProgramaDeProva;
+import br.simulado.etec.shared.programa.Programa;
 import br.simulado.etec.catalogo.model.Subtopico;
 import br.simulado.etec.catalogo.repository.MateriaRepository;
 import br.simulado.etec.catalogo.repository.SubtopicoRepository;
@@ -46,7 +48,9 @@ class SubtopicoServiceTest {
 	@InjectMocks
 	private SubtopicoService servico;
 
-	private final Materia materia = new Materia("Matemática", null);
+	private final ProgramaDeProva etec = new ProgramaDeProva(Programa.ETEC, "ETEC");
+
+	private final Materia materia = new Materia(etec, "Matemática", null);
 
 	private Subtopico subtopico(String nome) {
 		return new Subtopico(materia, nome);
@@ -333,7 +337,7 @@ class SubtopicoServiceTest {
 	void deve_dar_404_do_inexistente_quando_o_student_busca_subtopico_inativo_ou_de_materia_inativa() {
 		Subtopico inativo = subtopico("Inativo");
 		inativo.desativar();
-		Materia materiaInativa = new Materia("Materia inativa", null);
+		Materia materiaInativa = new Materia(etec, "Materia inativa", null);
 		Subtopico emMateriaInativa = new Subtopico(materiaInativa, "Em materia inativa");
 		materiaInativa.desativar();
 		when(repositorio.findByPublicId(inativo.getPublicId())).thenReturn(Optional.of(inativo));

@@ -23,10 +23,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.catalogo.dto.MateriaRequest;
 import br.simulado.etec.catalogo.model.Materia;
+import br.simulado.etec.catalogo.model.ProgramaDeProva;
 import br.simulado.etec.catalogo.repository.MateriaRepository;
+import br.simulado.etec.catalogo.repository.ProgramaRepository;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
+import br.simulado.etec.shared.programa.Programa;
 
 @ExtendWith(MockitoExtension.class)
 class MateriaServiceTest {
@@ -34,8 +37,13 @@ class MateriaServiceTest {
 	@Mock
 	private MateriaRepository repositorio;
 
+	@Mock
+	private ProgramaRepository programas;
+
 	@InjectMocks
 	private MateriaService servico;
+
+	private final ProgramaDeProva etec = new ProgramaDeProva(Programa.ETEC, "ETEC");
 
 	private static MateriaRequest dados(String nome) {
 		return new MateriaRequest(nome, "Descrição de teste");
@@ -45,7 +53,8 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_criar_a_materia_ativa_quando_o_nome_e_novo() {
-		when(repositorio.existsByNome("Matemática")).thenReturn(false);
+		when(programas.findByCodigo("ETEC")).thenReturn(Optional.of(etec));
+		when(repositorio.existsByProgramaAndNome(etec, "Matemática")).thenReturn(false);
 		when(repositorio.saveAndFlush(any(Materia.class))).thenAnswer(chamada -> chamada.getArgument(0));
 
 		Materia criada = servico.criar(dados("Matemática"));
@@ -54,11 +63,13 @@ class MateriaServiceTest {
 		assertThat(criada.getDescricao()).isEqualTo("Descrição de teste");
 		assertThat(criada.isAtivo()).isTrue();
 		assertThat(criada.getPublicId()).isNotNull();
+		assertThat(criada.getPrograma()).as("a matéria nasce no programa ETEC (D143)").isSameAs(etec);
 	}
 
 	@Test
 	void deve_recusar_com_409_quando_o_nome_ja_existe_na_checagem_previa() {
-		when(repositorio.existsByNome("Matemática")).thenReturn(true);
+		when(programas.findByCodigo("ETEC")).thenReturn(Optional.of(etec));
+		when(repositorio.existsByProgramaAndNome(etec, "Matemática")).thenReturn(true);
 
 		assertThatThrownBy(() -> servico.criar(dados("Matemática")))
 				.isInstanceOfSatisfying(ConflictException.class,
@@ -68,19 +79,44 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_recusar_com_409_quando_o_indice_unico_barra_a_corrida() {
-		when(repositorio.existsByNome("Matemática")).thenReturn(false);
-		when(repositorio.saveAndFlush(any(Materia.class))).thenThrow(new DataIntegrityViolationException("índice único"));
+		when(programas.findByCodigo("ETEC")).thenReturn(Optional.of(etec));
+		when(repositorio.existsByProgramaAndNome(etec, "Matemática")).thenReturn(false);
+		when(repositorio.saveAndFlush(any(Materia.class)))
+				.thenThrow(violacao(ConstraintKind.UNIQUE, "materia.uk_materia_programa_nome"));
 
 		assertThatThrownBy(() -> servico.criar(dados("Matemática")))
 				.isInstanceOfSatisfying(ConflictException.class,
 						erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.MATERIA_NOME_DUPLICADO));
 	}
 
+	@Test
+	void deve_deixar_subir_sem_traduzir_a_violacao_que_nao_e_a_do_nome_da_materia() {
+		when(programas.findByCodigo("ETEC")).thenReturn(Optional.of(etec));
+		when(repositorio.existsByProgramaAndNome(etec, "Matemática")).thenReturn(false);
+		DataIntegrityViolationException naoNulo = violacao(ConstraintKind.NOT_NULL, "programa_id");
+		DataIntegrityViolationException outraUnica = violacao(ConstraintKind.UNIQUE, "materia.uk_materia_public_id");
+
+		when(repositorio.saveAndFlush(any(Materia.class))).thenThrow(naoNulo);
+		assertThatThrownBy(() -> servico.criar(dados("Matemática"))).isSameAs(naoNulo);
+
+		when(repositorio.saveAndFlush(any(Materia.class))).thenThrow(outraUnica);
+		assertThatThrownBy(() -> servico.criar(dados("Matemática"))).isSameAs(outraUnica);
+	}
+
+	@Test
+	void deve_falhar_com_erro_claro_quando_o_programa_etec_nao_existe_na_tabela() {
+		when(programas.findByCodigo("ETEC")).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.criar(dados("Matemática"))).isInstanceOf(IllegalStateException.class)
+				.hasMessageContaining("ETEC");
+		verify(repositorio, never()).saveAndFlush(any());
+	}
+
 	// ----- buscar -----
 
 	@Test
 	void deve_devolver_a_materia_quando_o_id_existe() {
-		Materia materia = new Materia("Física", null);
+		Materia materia = new Materia(etec, "Física", null);
 		when(repositorio.findByPublicId(materia.getPublicId())).thenReturn(Optional.of(materia));
 
 		assertThat(servico.buscar(materia.getPublicId(), EscopoDeLeitura.TUDO)).isSameAs(materia);
@@ -100,10 +136,10 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_trocar_nome_e_descricao_sem_mexer_no_ativo_quando_atualiza() {
-		Materia materia = new Materia("Fisica", "antiga");
+		Materia materia = new Materia(etec, "Fisica", "antiga");
 		materia.desativar();
 		when(repositorio.findByPublicId(materia.getPublicId())).thenReturn(Optional.of(materia));
-		when(repositorio.existsByNomeAndPublicIdNot("Física", materia.getPublicId())).thenReturn(false);
+		when(repositorio.existsByProgramaAndNomeAndPublicIdNot(etec, "Física", materia.getPublicId())).thenReturn(false);
 		when(repositorio.saveAndFlush(materia)).thenReturn(materia);
 
 		Materia atualizada = servico.atualizar(materia.getPublicId(), new MateriaRequest("Física", "nova"));
@@ -115,10 +151,10 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_permitir_o_proprio_nome_quando_atualiza_o_mesmo_registro() {
-		Materia materia = new Materia("Física", "antiga");
+		Materia materia = new Materia(etec, "Física", "antiga");
 		when(repositorio.findByPublicId(materia.getPublicId())).thenReturn(Optional.of(materia));
 		// outro registro com o mesmo nome: não existe (o próprio registro é excluído da checagem)
-		when(repositorio.existsByNomeAndPublicIdNot("Física", materia.getPublicId())).thenReturn(false);
+		when(repositorio.existsByProgramaAndNomeAndPublicIdNot(etec, "Física", materia.getPublicId())).thenReturn(false);
 		when(repositorio.saveAndFlush(materia)).thenReturn(materia);
 
 		Materia atualizada = servico.atualizar(materia.getPublicId(), new MateriaRequest("Física", "outra"));
@@ -129,9 +165,9 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_recusar_com_409_quando_outro_registro_ja_tem_o_nome() {
-		Materia materia = new Materia("Física", null);
+		Materia materia = new Materia(etec, "Física", null);
 		when(repositorio.findByPublicId(materia.getPublicId())).thenReturn(Optional.of(materia));
-		when(repositorio.existsByNomeAndPublicIdNot("Química", materia.getPublicId())).thenReturn(true);
+		when(repositorio.existsByProgramaAndNomeAndPublicIdNot(etec, "Química", materia.getPublicId())).thenReturn(true);
 
 		assertThatThrownBy(() -> servico.atualizar(materia.getPublicId(), dados("Química")))
 				.isInstanceOfSatisfying(ConflictException.class,
@@ -141,10 +177,10 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_recusar_com_409_quando_o_indice_unico_barra_a_corrida_na_atualizacao() {
-		Materia materia = new Materia("Física", null);
+		Materia materia = new Materia(etec, "Física", null);
 		when(repositorio.findByPublicId(materia.getPublicId())).thenReturn(Optional.of(materia));
-		when(repositorio.existsByNomeAndPublicIdNot("Química", materia.getPublicId())).thenReturn(false);
-		when(repositorio.saveAndFlush(materia)).thenThrow(new DataIntegrityViolationException("índice único"));
+		when(repositorio.existsByProgramaAndNomeAndPublicIdNot(etec, "Química", materia.getPublicId())).thenReturn(false);
+		when(repositorio.saveAndFlush(materia)).thenThrow(violacao(ConstraintKind.UNIQUE, "materia.uk_materia_programa_nome"));
 
 		assertThatThrownBy(() -> servico.atualizar(materia.getPublicId(), dados("Química")))
 				.isInstanceOfSatisfying(ConflictException.class,
@@ -164,7 +200,7 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_devolver_o_mesmo_resultado_quando_desativa_duas_vezes() {
-		Materia materia = new Materia("Física", null);
+		Materia materia = new Materia(etec, "Física", null);
 		when(repositorio.findByPublicId(materia.getPublicId())).thenReturn(Optional.of(materia));
 		when(repositorio.saveAndFlush(materia)).thenReturn(materia);
 
@@ -177,7 +213,7 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_devolver_o_mesmo_resultado_quando_ativa_duas_vezes() {
-		Materia materia = new Materia("Física", null);
+		Materia materia = new Materia(etec, "Física", null);
 		materia.desativar();
 		when(repositorio.findByPublicId(materia.getPublicId())).thenReturn(Optional.of(materia));
 		when(repositorio.saveAndFlush(materia)).thenReturn(materia);
@@ -270,7 +306,7 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_dar_404_da_inexistente_quando_o_student_busca_materia_inativa() {
-		Materia inativa = new Materia("Inativa", null);
+		Materia inativa = new Materia(etec, "Inativa", null);
 		inativa.desativar();
 		when(repositorio.findByPublicId(inativa.getPublicId())).thenReturn(Optional.of(inativa));
 
@@ -282,7 +318,7 @@ class MateriaServiceTest {
 
 	@Test
 	void deve_devolver_a_materia_ativa_ao_student() {
-		Materia ativa = new Materia("Ativa", null);
+		Materia ativa = new Materia(etec, "Ativa", null);
 		when(repositorio.findByPublicId(ativa.getPublicId())).thenReturn(Optional.of(ativa));
 
 		assertThat(servico.buscar(ativa.getPublicId(), EscopoDeLeitura.SO_ATIVOS)).isSameAs(ativa);

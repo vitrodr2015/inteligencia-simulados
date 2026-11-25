@@ -329,8 +329,8 @@ class MateriaListagemIntegracaoTest extends AbstractMateriaIntegrationTest {
 		UUID publicId = UUID.randomUUID();
 		byte[] bytes = ByteBuffer.allocate(16).putLong(publicId.getMostSignificantBits())
 				.putLong(publicId.getLeastSignificantBits()).array();
-		jdbc.update("insert into materia (public_id, nome, descricao, ativo, criado_em, atualizado_em)"
-				+ " values (?, ?, null, true, ?, ?)", bytes, nome, criadoEm, criadoEm);
+		jdbc.update("insert into materia (public_id, programa_id, nome, descricao, ativo, criado_em, atualizado_em)"
+				+ " values (?, (select id from programa where codigo = 'ETEC'), ?, null, true, ?, ?)", bytes, nome, criadoEm, criadoEm);
 	}
 
 	// ----- filtro nome -----

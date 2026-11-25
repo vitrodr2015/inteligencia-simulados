@@ -1,11 +1,12 @@
-package br.simulado.etec.assinatura.model;
+package br.simulado.etec.shared.programa;
 
 import java.util.regex.Pattern;
 
 /**
- * O programa de prova (ETEC hoje; ENEM e OAB no futuro), como PARÂMETRO da consulta de entitlements (D140). É só um código:
- * a tabela {@code exam_program} ainda não existe, e quando nascer ela terá uma coluna {@code codigo} com este valor. Assim
- * nenhum domínio depende de outro por causa do programa. Código fora do formato é erro de programação.
+ * O programa de prova (ETEC hoje; ENEM e OAB no futuro), como PARÂMETRO da consulta de entitlements (D140) e como o código da tabela
+ * {@code programa} do catálogo (D143). Mora em {@code shared} para nenhum domínio depender de outro por causa dele. O formato é o
+ * mesmo do CHECK da coluna {@code programa.codigo} (migration V7), e um teste de integração prova que os dois concordam. Código
+ * fora do formato é erro de programação.
  */
 public record Programa(String codigo) {
 

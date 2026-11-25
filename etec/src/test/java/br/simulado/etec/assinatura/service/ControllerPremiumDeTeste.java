@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import br.simulado.etec.assinatura.model.Programa;
+import br.simulado.etec.shared.programa.Programa;
 import br.simulado.etec.assinatura.model.Recurso;
 import br.simulado.etec.shared.security.UsuarioAutenticado;
 

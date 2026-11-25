@@ -5,7 +5,7 @@ import java.util.Set;
 
 import br.simulado.etec.assinatura.model.Decisao;
 import br.simulado.etec.assinatura.model.MotivoDaNegacao;
-import br.simulado.etec.assinatura.model.Programa;
+import br.simulado.etec.shared.programa.Programa;
 import br.simulado.etec.assinatura.model.Recurso;
 import br.simulado.etec.shared.security.UsuarioAutenticado;
 import br.simulado.etec.usuarios.model.Papel;

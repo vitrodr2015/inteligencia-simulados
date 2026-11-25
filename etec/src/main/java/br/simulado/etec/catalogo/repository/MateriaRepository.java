@@ -10,16 +10,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import br.simulado.etec.catalogo.model.Materia;
+import br.simulado.etec.catalogo.model.ProgramaDeProva;
 
 public interface MateriaRepository extends JpaRepository<Materia, Long>, JpaSpecificationExecutor<Materia> {
 
 	Optional<Materia> findByPublicId(UUID publicId);
 
-	/** No MySQL a comparação usa a collation da coluna (ignora maiúsculas e acentos). */
-	boolean existsByNome(String nome);
+	/** O nome é único POR PROGRAMA (D144). No MySQL a comparação usa a collation da coluna (ignora maiúsculas e acentos). */
+	boolean existsByProgramaAndNome(ProgramaDeProva programa, String nome);
 
 	/** Para o PUT: o mesmo registro com o próprio nome é permitido. */
-	boolean existsByNomeAndPublicIdNot(String nome, UUID publicId);
+	boolean existsByProgramaAndNomeAndPublicIdNot(ProgramaDeProva programa, String nome, UUID publicId);
 
 	/**
 	 * Apaga numa única instrução (atômico): nunca ler e depois apagar, senão pedidos simultâneos

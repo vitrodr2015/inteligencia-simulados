@@ -40,6 +40,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.simulado.etec.catalogo.model.Materia;
+import br.simulado.etec.catalogo.model.ProgramaDeProva;
+import br.simulado.etec.shared.programa.Programa;
 import br.simulado.etec.catalogo.service.MateriaService;
 import br.simulado.etec.shared.config.JacksonConfig;
 import br.simulado.etec.shared.config.SomenteJsonConfig;
@@ -110,7 +112,7 @@ class MateriaFormatoWebTest {
 	}
 
 	private static Materia materia(String id, String nome, String descricao, boolean ativo) {
-		Materia materia = new Materia(nome, descricao);
+		Materia materia = new Materia(new ProgramaDeProva(Programa.ETEC, "ETEC"), nome, descricao);
 		ReflectionTestUtils.setField(materia, "publicId", UUID.fromString(id));
 		ReflectionTestUtils.setField(materia, "criadoEm", CRIADO_EM);
 		ReflectionTestUtils.setField(materia, "atualizadoEm", ATUALIZADO_EM);

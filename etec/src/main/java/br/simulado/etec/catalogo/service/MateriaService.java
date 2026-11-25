@@ -12,7 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.simulado.etec.catalogo.dto.MateriaRequest;
 import br.simulado.etec.catalogo.model.Materia;
+import br.simulado.etec.catalogo.model.ProgramaDeProva;
 import br.simulado.etec.catalogo.repository.MateriaRepository;
+import br.simulado.etec.catalogo.repository.ProgramaRepository;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
@@ -20,6 +22,7 @@ import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
 import br.simulado.etec.shared.paginacao.Filtros;
 import br.simulado.etec.shared.security.EscopoDeLeitura;
 import br.simulado.etec.shared.persistencia.Restricoes;
+import br.simulado.etec.shared.programa.Programa;
 
 /** Regras da matéria (contrato, seção 4.1). Leituras em transação somente leitura. */
 @Service
@@ -30,25 +33,36 @@ public class MateriaService {
 	public static final CamposOrdenaveis CAMPOS_ORDENAVEIS = CamposOrdenaveis.de(Sort.by(Sort.Order.asc("nome")), "nome",
 			"criadoEm");
 
+	/** O índice único do nome da matéria, que vale POR PROGRAMA (D144). Só a violação DELE vira 409 de nome duplicado. */
+	public static final String UK_NOME = "uk_materia_programa_nome";
+
 	private final MateriaRepository repositorio;
 
-	public MateriaService(MateriaRepository repositorio) {
+	private final ProgramaRepository programas;
+
+	public MateriaService(MateriaRepository repositorio, ProgramaRepository programas) {
 		this.repositorio = repositorio;
+		this.programas = programas;
 	}
 
 	@Transactional
 	public Materia criar(MateriaRequest dados) {
+		// O programa é interno (D143): na fase 1 toda matéria nasce no ETEC, lido da tabela a cada criação (sem cache).
+		ProgramaDeProva programa = programaEtec();
 		// Checagem prévia: dá a mensagem amigável no caso comum.
-		if (repositorio.existsByNome(dados.nome())) {
+		if (repositorio.existsByProgramaAndNome(programa, dados.nome())) {
 			throw nomeDuplicado();
 		}
 		try {
-			return repositorio.saveAndFlush(new Materia(dados.nome(), dados.descricao()));
+			return repositorio.saveAndFlush(new Materia(programa, dados.nome(), dados.descricao()));
 		}
 		catch (DataIntegrityViolationException ex) {
-			// Corrida: dois pedidos passaram pela checagem e o índice único barrou o segundo.
-			// As demais restrições da tabela já são garantidas pela validação do DTO.
-			throw nomeDuplicado();
+			// Corrida: dois pedidos passaram pela checagem e o índice único barrou o segundo. Só ESSA restrição vira 409;
+			// qualquer outra (programa_id nulo, por exemplo) sobe como erro e não é escondida.
+			if (Restricoes.ehUnicidade(ex, UK_NOME)) {
+				throw nomeDuplicado();
+			}
+			throw ex;
 		}
 	}
 
@@ -83,7 +97,7 @@ public class MateriaService {
 	@Transactional
 	public Materia atualizar(UUID id, MateriaRequest dados) {
 		Materia materia = carregar(id);
-		if (repositorio.existsByNomeAndPublicIdNot(dados.nome(), id)) {
+		if (repositorio.existsByProgramaAndNomeAndPublicIdNot(materia.getPrograma(), dados.nome(), id)) {
 			throw nomeDuplicado();
 		}
 		materia.atualizar(dados.nome(), dados.descricao());
@@ -91,7 +105,10 @@ public class MateriaService {
 			return repositorio.saveAndFlush(materia);
 		}
 		catch (DataIntegrityViolationException ex) {
-			throw nomeDuplicado();
+			if (Restricoes.ehUnicidade(ex, UK_NOME)) {
+				throw nomeDuplicado();
+			}
+			throw ex;
 		}
 	}
 
@@ -132,6 +149,11 @@ public class MateriaService {
 		if (apagadas == 0) {
 			throw naoEncontrada();
 		}
+	}
+
+	private ProgramaDeProva programaEtec() {
+		return programas.findByCodigo(Programa.ETEC.codigo()).orElseThrow(
+				() -> new IllegalStateException("O programa ETEC não existe na tabela programa (migration V7)."));
 	}
 
 	private static ConflictException nomeDuplicado() {
