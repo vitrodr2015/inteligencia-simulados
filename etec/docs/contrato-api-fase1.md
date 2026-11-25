@@ -2,7 +2,7 @@ Contrato da API — Fase 1 (v1.0, aprovada)
 
 O contrato é revisado e aprovado antes de qualquer código. Ele é rascunho até a aprovação; a v1.0 é a versão aprovada (D83), e depois dela qualquer mudança é registrada na seção 10. Este é o documento completo da API da fase 1 e não depende de outros.
 
-Estado: versão aprovada (v1.0). Decisões D1 a D139 decididas, exceto D22 e D24 (pendências externas).
+Estado: versão aprovada (v1.0). Decisões D1 a D142 decididas, exceto D22 e D24 (pendências externas).
 
 1. Convenções gerais (valem para todas as rotas)
 Tema	Decisão
@@ -56,6 +56,7 @@ Outros caminhos de /actuator e /error	❌ (401)	❌ (403)	❌ (403)
 
 Anotação da tabela quem pode o quê:
 - O que não consta da tabela é NEGADO (D121): rota ou método sem regra responde 401 ao anônimo e 403 a quem está autenticado, inclusive ADMIN, mesmo que a rota nem exista. O 404 é só para recurso inexistente, depois da autorização.
+- Rota PREMIUM (futura): além do papel, passa pelo serviço de entitlements; sem o recurso no plano, 403 ENTITLEMENT_NEGADO (D140, D141). Nenhuma rota premium existe ainda.
 - GUARDIAN não tem nenhuma permissão na fase 1 (D122): 403 em tudo que exige papel, inclusive GET /me; as rotas públicas funcionam.
 - O HEAD segue a regra do GET da mesma rota.
 - O OPTIONS de preflight de CORS (com Origin e Access-Control-Request-Method) é público (D100); um OPTIONS comum é negado.
@@ -206,7 +207,7 @@ respostas	lista	{questaoId, alternativa, tempoGastoMs} já salvas
 Resposta (entrada): alternativa é obrigatória (uma das letras A a E, ou null para deixar em branco), e omitida dá 400 (D97); tempoGastoMs (inteiro ≥ 0 e ≤ a duração da prova em milissegundos, opcional) é o total acumulado da questão e, se for omitido, mantém o valor já salvo (D30, D97).
 
 Verbo	Rota	Sucesso	Erros
-POST	/tentativas ({provaId}); passa por podeIniciarTentativa(usuario, prova), que devolve sempre verdadeiro na fase 1 (D35)	201 + Location, com a tentativa completa (mesmo corpo de GET /tentativas/{id}, D52); fixa as questões (última versão publicada de cada uma) e o prazoEm (snapshot)	400 (prova inexistente ou não publicada, a mesma resposta para as duas, D14), 401, 403, 409 (já há tentativa em andamento nessa prova, D4; detalhes.tentativaId informa o id da tentativa aberta, D31, D44)
+POST	/tentativas ({provaId}); passa pelo serviço de entitlements: o serviço de tentativas chama exigir(usuario, INICIAR_TENTATIVA, programa), com o programa da prova (ETEC até a prova ter programa); na fase 1 o stub libera STUDENT e ADMIN no ETEC, e a negação é 403 ENTITLEMENT_NEGADO (D35, D140, D141)	201 + Location, com a tentativa completa (mesmo corpo de GET /tentativas/{id}, D52); fixa as questões (última versão publicada de cada uma) e o prazoEm (snapshot)	400 (prova inexistente ou não publicada, a mesma resposta para as duas, D14), 401, 403, 409 (já há tentativa em andamento nessa prova, D4; detalhes.tentativaId informa o id da tentativa aberta, D31, D44)
 GET	/tentativas/{id}	200	400, 401, 403, 404
 PUT	/tentativas/{id}/respostas/{questaoId}	200 com a resposta salva {questaoId, alternativa, tempoGastoMs} (D96), idempotente (vale a última)	400 (alternativa fora de A a E, D53; alternativa omitida ou tempoGastoMs fora de 0 até a duração da prova, D97), 401, 403, 404 (tentativa inexistente, de outro aluno, ou questaoId que não pertence à tentativa, D53), 409 (tentativa encerrada ou prazo vencido além da tolerância, D5)
 POST	/tentativas/{id}/finalizar	200 {id, status, finalizadaEm, nota, total, acertos, erros, emBranco}, sem itens (D52); repetir devolve o mesmo. Entre prazoEm e prazoEm + 3 s encerra como FINALIZADA; passada a tolerância, devolve 200 com status EXPIRADA (D31, D50)	400, 401, 403, 404
@@ -259,7 +260,7 @@ D31	O aluno pode refazer a prova sem limite na fase 1. O 409 informa o id da ten
 D32	Texto: <, > e & se escrevem &lt;, &gt;, &amp;. Atributos nas tags e tags mal fechadas ou mal aninhadas = 400. <br> entra na lista. Limite de 10.000 conta caracteres	✅ Confirmada
 D33	ErrorResponse ganha o campo codigo estável (ex.: TENTATIVA_EM_ANDAMENTO)	✅ Confirmada
 D34	Origens do CORS por configuração por ambiente. Swagger ligado em desenvolvimento e homologação, desligado em produção	✅ Confirmada
-D35	POST /tentativas passa por podeIniciarTentativa(usuario, prova), que devolve sempre verdadeiro na fase 1	✅ Confirmada
+D35	POST /tentativas passa por podeIniciarTentativa(usuario, prova), que devolve sempre verdadeiro na fase 1	✅ Confirmada (refinada pela D140: podeIniciarTentativa vira só um nome dentro da Tentativa, que chama exigir(usuario, INICIAR_TENTATIVA, programa))
 D36	imagemUrl só aceita hosts de uma lista permitida (o armazenamento do projeto)	✅ Confirmada
 D37	409 no cadastro revela e-mail existente; o 429 é a mitigação. Não há envio de e-mail na fase 1	✅ Confirmada
 D38	Removido o 403 dos GET de matéria, subtópico e prova (só podem dar 401)	✅ Confirmada
@@ -364,9 +365,12 @@ D136	Versão do token (refina D118): a coluna usuario.versao_token (INT, começa
 D137	Limpeza dos refresh: de hora em hora, em lotes, só as linhas vencidas há mais de 1 dia. A linha revogada e ainda não vencida fica, porque é ela que detecta o reuso	✅ Confirmada
 D138	Política de senha compartilhada: uma classe só (PoliticaDeSenha) vale para o cadastro (aluno, 8 a 72 bytes, D91), para o bootstrap do administrador (12 a 72 bytes, sem espaço nas pontas, sem quebra de linha e sem marcador de exemplo, D125) e para a troca de senha	✅ Confirmada (refina D91 e D125)
 D139	Troca de senha: POST /api/v1/me/senha, corpo {senhaAtual, novaSenha}, 204 sem corpo e sem tokens, com Cache-Control: no-store; STUDENT e ADMIN (GUARDIAN = 403, D122; anônimo = 401). Ordem: autenticação e papel, 429 (bucket próprio POR USUÁRIO, 5 erros da senha atual em 15 minutos, mesmo mecanismo da D128: conta antes, zera no sucesso, fora da transação principal), 400 de formato (campo ausente ou nova senha fora da política do papel, com campos), senha atual (400 SENHA_ATUAL_INCORRETA, com UMA comparação de BCrypt, o mesmo custo de um signin falho), nova igual à atual (400 VALIDACAO_FALHOU com campos[novaSenha]) e, por fim, a alteração numa transação: novo hash e encerrar todas as sessões com o motivo TROCA_SENHA. O corpo não leva @Valid: o 429 vem antes do 400 de formato (JSON ilegível ainda é 400 antes do 429)	✅ Confirmada
+D140	Serviço de entitlements, ponto único de consulta (refina D35): o domínio assinatura tem o EntitlementsService (decidir e exigir), que consulta uma PoliticaDeEntitlements, a peça SUBSTITUÍVEL. A consulta recebe o usuário (UsuarioAutenticado, que o filtro monta do banco, D87), o recurso (enum Recurso; hoje só INICIAR_TENTATIVA) e o programa (Programa, um código como ETEC; a tabela exam_program ainda não existe). A fase 1 usa o stub PoliticaStubLiberaTudo, uma política EXPLÍCITA e não a ausência de checagem: libera INICIAR_TENTATIVA no programa ETEC para STUDENT e ADMIN, nega o GUARDIAN (D122), nega programa desconhecido e nega todo recurso que não está na sua lista (negar por padrão); todo Recurso novo exige decisão explícita (liberado ou negado de propósito). Argumento nulo é erro de programação (IllegalArgumentException, 500 genérico) e nunca vira "permitido". Quem chama conhece só o serviço: trocar o stub por regras reais é trocar a implementação. A Tentativa chamará exigir(usuario, INICIAR_TENTATIVA, programa), com o programa da prova quando houver (ETEC até lá). Fora desta decisão: explicação da questão, cota de simulados curtos e histórico; GET /entitlements não existe na fase 1	✅ Confirmada (refina D35)
+D141	Negação do entitlement: 403 com codigo ENTITLEMENT_NEGADO, mensagem fixa "Este recurso não está disponível no seu plano." e detalhes opcional { recurso, programa } (D44), igual para qualquer motivo (o motivo só vai para o log e o teste). Nada de 402	✅ Confirmada
+D142	Escolha da política: a propriedade app.entitlements.politica (hoje só stub), SEM valor padrão no código; ausente, em branco ou desconhecida derruba a subida; existe exatamente um bean de política. Em produção com o stub ativo, só um aviso (WARN) por subida, sem derrubar: o stub tem de ser trocado antes de cobrar (checklist do memoria.md)	✅ Confirmada
 9. Fora da fase 1 (de propósito)
 
-Pagamento e planos, entitlements como API (na fase 1 é um serviço interno que libera tudo, por podeIniciarTentativa), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
+Pagamento e planos, entitlements como API (não existe GET /entitlements na fase 1; é um serviço interno com política stub explícita, D140), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
 
 10. Registro de mudanças após a aprovação
 
@@ -384,6 +388,8 @@ A v1.0 é a versão aprovada (D83). Toda mudança a partir dela entra aqui, com 
 
 2026-11-23 — Módulo 13B (ciclo de vida do token). D133 (refresh guardado e rotação, refina D39), D134 (reuso revoga tudo, refina D49), D135 (logout e "sair de todos" só como serviço), D136 (versão do token: coluna usuario.versao_token e claim versao, refina D118), D137 (limpeza), D138 (política de senha compartilhada), D139 (troca de senha). Seção 1 (Cache-Control), seção 2 (POST /me/senha), seção 3 (refresh, troca de senha e a nota da 3.1), seção 11 (riscos) e apêndice A (SENHA_ATUAL_INCORRETA; TOKEN_INVALIDO inclui o revogado e a versão antiga) atualizados. Migrations V5 (refresh_token) e V6 (usuario.versao_token). Motivo: implementação do Módulo 13B.
 
+2026-11-24 — Tarefa 12 (serviço de entitlements, stub). D140 (ponto único de consulta, política explícita e substituível, refina D35), D141 (403 ENTITLEMENT_NEGADO) e D142 (escolha da política por app.entitlements.politica, aviso em produção). Seção 2 (anotação da rota premium), seção 6 (POST /tentativas), seção 9 (sem GET /entitlements), seção 11 (o stub) e apêndice A (ENTITLEMENT_NEGADO) atualizados. Nenhum endpoint e nenhuma migration novos. Motivo: implementação da Tarefa 12.
+
 11. Pendências abertas e limitações conhecidas
 
 Menores de idade e LGPD (externa, D24): na fase 1, menor é só uma marca calculada, sem mudar comportamento. Antes do beta, é preciso definir a idade mínima e o consentimento do responsável, com apoio jurídico.
@@ -394,6 +400,8 @@ Não há outra pendência de decisão aberta. O catálogo dos valores de codigo 
 Limites de abuso (D128 a D131), limitações conhecidas: (a) redes com NAT, como as escolas, dividem a origem: 120 requisições por minuto e 50 falhas de signin por 15 minutos valem para todos que saem pelo mesmo endereço; (b) atrás de um balanceador sem proxy confiável configurado, todos os usuários dividem a origem do balanceador (item do checklist do Módulo 17); (c) o contador por e-mail e origem não cobre um ataque distribuído por muitos IPs contra uma única conta (o contador só por e-mail ficou de fora de propósito, para ninguém trancar a conta alheia); (d) /auth/logout já conta no limite por origem, mas a rota só passa a existir no Módulo 13B. O contador em memória por instância (D95) deixou de existir: o contador é compartilhado pelo banco.
 
 Ciclo de vida do token (D133 a D139), riscos conhecidos: (a) PWA em rede ruim: se a resposta de um refresh se perde e o cliente repete o mesmo token, ou se duas abas renovam ao mesmo tempo, o perdedor é indistinguível de um reuso (D49) e a revogação em massa desloga o usuário de todos os aparelhos; a rever na Sprint do front (por exemplo, renovação única entre abas); (b) depois do logout o access token vivo continua válido até vencer (no máximo 15 minutos); a troca de senha, o reuso e o encerramento de todas as sessões o derrubam pela versão; (c) os tokens emitidos antes do 13B não têm o claim versao e deixam de valer na subida (todos entram de novo); (d) o encerramento de todas as sessões ainda não tem rota própria (só serviço); o DELETE /me, quando existir, deve chamá-lo com o motivo EXCLUSAO.
+
+Entitlements (D140 a D142), limitações conhecidas: (a) o stub libera tudo o que conhece (INICIAR_TENTATIVA no ETEC) para STUDENT e ADMIN e PRECISA ser trocado por regras reais antes de cobrar; (b) só existe o recurso INICIAR_TENTATIVA e o programa ETEC: explicação da questão, cota de simulados curtos e histórico entram com o primeiro endpoint que os usa (cota e histórico pedem estado, e a Decisao deixa a porta aberta); (c) o programa é só um código até existir exam_program, na Sprint 2.
 
 Apêndice A. Catálogo de códigos de erro (D84)
 
@@ -424,6 +432,7 @@ EMAIL_DUPLICADO	409	já existe usuário com o e-mail (normalizado, D105; D37)	Im
 TENTATIVA_EM_ANDAMENTO	409	já há tentativa em andamento nessa prova (traz detalhes.tentativaId)	Nomeado no contrato; a implementar
 REQUISICAO_INVALIDA	400	URL recusada pelo firewall de segurança (barra dupla, ;jsessionid, %2e e semelhantes), mensagem fixa (D124)	Implementado
 SENHA_ATUAL_INCORRETA	400	a senha atual enviada na troca de senha não confere (D139); conta no limite por usuário	Implementado
+ENTITLEMENT_NEGADO	403	o recurso não está no plano do usuário, pela política de entitlements (D140, D141); mensagem fixa e detalhes { recurso, programa }	Nomeado no contrato; a implementar (o primeiro endpoint premium o produz)
 LIMITE_EXCEDIDO	429	limite de tentativas excedido (D128, D129): requisições POST demais em /auth/* por origem, ou falhas de signin demais por e-mail e origem ou por origem; traz o cabeçalho Retry-After (segundos) e é a mesma resposta para e-mail existente e inexistente	Implementado
 TIPO_NAO_SUPORTADO	415	corpo que não é application/json	Implementado
 ERRO_INTERNO	500	erro inesperado (mensagem genérica)	Implementado

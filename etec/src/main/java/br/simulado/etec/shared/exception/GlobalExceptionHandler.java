@@ -89,6 +89,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return resposta(HttpStatus.UNAUTHORIZED, ex.getCodigo(), ex.getMessage(), null, null, null);
 	}
 
+	/** O recurso não está no plano do usuário (403 ENTITLEMENT_NEGADO, D141): mensagem fixa, detalhes com recurso e programa. */
+	@ExceptionHandler(EntitlementNegadoException.class)
+	ResponseEntity<Object> aoNegarEntitlement(EntitlementNegadoException ex) {
+		return resposta(HttpStatus.FORBIDDEN, ex.getCodigo(), ex.getMessage(), null, ex.getDetalhes(), null);
+	}
+
 	/** Limite de tentativas (429): Retry-After em segundos e no-store, igual ao 429 do filtro de origem (D129). */
 	@ExceptionHandler(LimiteExcedidoException.class)
 	ResponseEntity<Object> aoExcederLimite(LimiteExcedidoException ex) {

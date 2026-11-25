@@ -58,6 +58,8 @@ app:
     troca-senha-usuario:
       limite: 1000000
       janela: 1m
+  entitlements:
+    politica: stub
   # A limpeza agendada dos refresh tokens fica DESLIGADA nos testes (o teste chama o método direto, com o relógio de teste).
   sessoes:
     limpeza-ativa: false

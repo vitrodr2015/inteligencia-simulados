@@ -41,5 +41,7 @@ public enum CodigoErro {
 	// Limite de tentativas (Módulo 13A, D129)
 	LIMITE_EXCEDIDO,
 	// Troca de senha (Módulo 13B, D139): a senha atual não confere
-	SENHA_ATUAL_INCORRETA
+	SENHA_ATUAL_INCORRETA,
+	// Entitlements (Tarefa 12, D141): o recurso não está no plano do usuário
+	ENTITLEMENT_NEGADO
 }
