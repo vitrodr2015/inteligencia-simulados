@@ -356,11 +356,20 @@ class QuestaoIntegracaoTest extends AbstractQuestaoIntegrationTest {
 				materia);
 		String prova = criarProva(10);
 
-		Response resposta = cadastrar(prova, corpo(subtopicoDeOutro, 1, "Enunciado"));
+		try {
+			Response resposta = cadastrar(prova, corpo(subtopicoDeOutro, 1, "Enunciado"));
 
-		verificarErro(resposta, 400, "Bad Request", "VALIDACAO_FALHOU");
-		resposta.then().body("campos[0].campo", equalTo("subtopicoId")).body("campos", hasSize(1));
-		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM questao WHERE prova_id = ?", Integer.class, idInternoDaProva(prova))).isZero();
+			verificarErro(resposta, 400, "Bad Request", "VALIDACAO_FALHOU");
+			resposta.then().body("campos[0].campo", equalTo("subtopicoId")).body("campos", hasSize(1));
+			assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM questao WHERE prova_id = ?", Integer.class, idInternoDaProva(prova)))
+					.isZero();
+		}
+		finally {
+			// O banco é COMPARTILHADO: o programa extra NÃO pode ficar (o ProgramaIntegracaoTest exige só a ETEC na tabela).
+			jdbc.update("DELETE FROM subtopico WHERE materia_id = ?", materia);
+			jdbc.update("DELETE FROM materia WHERE id = ?", materia);
+			jdbc.update("DELETE FROM programa WHERE id = ?", outroPrograma);
+		}
 	}
 
 	// ----- a FK do subtópico: DELETE /subtopicos/{id} (D146) -----
