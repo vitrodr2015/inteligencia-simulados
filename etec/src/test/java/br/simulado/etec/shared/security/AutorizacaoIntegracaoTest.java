@@ -38,29 +38,47 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 				.flatMap(caso -> Stream.of(Perfil.values()).map(perfil -> Arguments.of(caso, perfil)));
 	}
 
-	/** Cria, como ADMIN, os recursos que a linha pode usar (cada execução tem os seus). */
-	private Ctx novoContexto() {
-		String sufixo = sufixo();
-		String materia = requisicaoComo(Papel.ADMIN).body("{\"nome\":\"Matéria base " + sufixo + "\"}").post(MATERIAS)
-				.then().statusCode(201).extract().path("id");
-		String subtopico = requisicaoComo(Papel.ADMIN)
-				.body("{\"materiaId\":\"" + materia + "\",\"nome\":\"Subtópico base " + sufixo + "\"}")
-				.post("/api/v1/subtopicos").then().statusCode(201).extract().path("id");
-		String materiaVazia = requisicaoComo(Papel.ADMIN).body("{\"nome\":\"Matéria vazia " + sufixo + "\"}").post(MATERIAS)
-				.then().statusCode(201).extract().path("id");
-		String prova = requisicaoComo(Papel.ADMIN)
-				.body("{\"titulo\":\"Prova base " + sufixo + "\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}")
-				.post("/api/v1/admin/provas").then().statusCode(201).extract().path("id");
-		// a questão fica num subtópico PRÓPRIO: um subtópico com questão não pode ser apagado (409), e a matriz apaga o subtopicoId
-		String subtopicoDaQuestao = requisicaoComo(Papel.ADMIN)
-				.body("{\"materiaId\":\"" + materia + "\",\"nome\":\"Subtópico da questão " + sufixo + "\"}")
-				.post("/api/v1/subtopicos").then().statusCode(201).extract().path("id");
-		String questao = requisicaoComo(Papel.ADMIN)
-				.body("{\"numero\":1,\"subtopicoId\":\"" + subtopicoDaQuestao + "\",\"enunciado\":\"Enunciado\",\"alternativas\":["
-						+ "{\"letra\":\"A\",\"texto\":\"a\"},{\"letra\":\"B\",\"texto\":\"b\"},{\"letra\":\"C\",\"texto\":\"c\"},"
-						+ "{\"letra\":\"D\",\"texto\":\"d\"},{\"letra\":\"E\",\"texto\":\"e\"}]}")
-				.post("/api/v1/admin/provas/" + prova + "/questoes").then().statusCode(201).extract().path("id");
-		return new Ctx(materia, subtopico, materiaVazia, prova, questao, MatrizDeAutorizacao.uuidInexistente(), sufixo);
+	/** POST de preparo, como ADMIN: exige o 201 e devolve o id do recurso criado. */
+	private String criar(String rota, String corpo) {
+		return requisicaoComo(Papel.ADMIN).body(corpo).post(rota).then().statusCode(201).extract().path("id");
+	}
+
+	/** Como criar cada recurso de uma execução; o {@link MarcadoresDaMatriz} só chama o que a linha usa. */
+	private MarcadoresDaMatriz.Fabrica fabrica(String sufixo) {
+		return new MarcadoresDaMatriz.Fabrica() {
+			@Override
+			public String materia() {
+				return criar(MATERIAS, "{\"nome\":\"Matéria base " + sufixo + "\"}");
+			}
+
+			@Override
+			public String subtopico(String materiaId) {
+				return criar("/api/v1/subtopicos", "{\"materiaId\":\"" + materiaId + "\",\"nome\":\"Subtópico base " + sufixo + "\"}");
+			}
+
+			@Override
+			public String materiaVazia() {
+				return criar(MATERIAS, "{\"nome\":\"Matéria vazia " + sufixo + "\"}");
+			}
+
+			@Override
+			public String prova() {
+				return criar("/api/v1/admin/provas",
+						"{\"titulo\":\"Prova base " + sufixo + "\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}");
+			}
+
+			@Override
+			public String questao(String provaId, String materiaId) {
+				// a questão fica num subtópico PRÓPRIO: um subtópico com questão não pode ser apagado (409), e a matriz apaga o
+				// subtopicoId
+				String subtopicoDaQuestao = criar("/api/v1/subtopicos",
+						"{\"materiaId\":\"" + materiaId + "\",\"nome\":\"Subtópico da questão " + sufixo + "\"}");
+				return criar("/api/v1/admin/provas/" + provaId + "/questoes",
+						"{\"numero\":1,\"subtopicoId\":\"" + subtopicoDaQuestao + "\",\"enunciado\":\"Enunciado\",\"alternativas\":["
+								+ "{\"letra\":\"A\",\"texto\":\"a\"},{\"letra\":\"B\",\"texto\":\"b\"},{\"letra\":\"C\",\"texto\":\"c\"},"
+								+ "{\"letra\":\"D\",\"texto\":\"d\"},{\"letra\":\"E\",\"texto\":\"e\"}]}");
+			}
+		};
 	}
 
 	private RequestSpecification comoPerfil(Perfil perfil) {
@@ -72,14 +90,23 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 		};
 	}
 
-	/** Dispara a requisição da linha como o perfil dado. */
-	private Response disparar(Caso caso, Perfil perfil, Ctx ctx) {
+	/**
+	 * Dispara a requisição da linha como o perfil dado. Primeiro resolve os marcadores do caminho e do corpo (criando só os recursos
+	 * que a linha usa, e errando se sobrar algum), e só então monta e envia a requisição testada. Cada chamada é uma execução com
+	 * recursos próprios.
+	 */
+	private Response disparar(Caso caso, Perfil perfil) {
+		String sufixo = sufixo();
+		Ctx ctx = MarcadoresDaMatriz.contexto(MatrizDeAutorizacao.uuidInexistente(), sufixo);
+		MarcadoresDaMatriz recursos = new MarcadoresDaMatriz(fabrica(sufixo));
+		String corpo = recursos.resolver((caso.corpo() != null) ? caso.corpo().apply(ctx) : null);
+		String caminho = recursos.resolver(caso.caminho().apply(ctx));
+
 		RequestSpecification requisicao = comoPerfil(perfil);
-		String corpo = (caso.corpo() != null) ? caso.corpo().apply(ctx) : null;
 		if (corpo != null) {
 			requisicao = requisicao.body(corpo);
 		}
-		return requisicao.request(Method.valueOf(caso.metodo()), caso.caminho().apply(ctx));
+		return requisicao.request(Method.valueOf(caso.metodo()), caminho);
 	}
 
 	private static boolean ehRotaPublica(Caso caso) {
@@ -91,9 +118,7 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 	@ParameterizedTest(name = "{1} em {0}")
 	@MethodSource("matriz")
 	void deve_responder_o_status_da_matriz_para_cada_perfil_e_rota(Caso caso, Perfil perfil) {
-		Ctx ctx = novoContexto();
-
-		Response resposta = disparar(caso, perfil, ctx);
+		Response resposta = disparar(caso, perfil);
 
 		assertThat(resposta.statusCode()).as("%s como %s", caso, perfil).isEqualTo(caso.esperado(perfil));
 		// O 401 e o 403 da cadeia saem no ErrorResponse, em JSON puro, e sem corpo no HEAD.
