@@ -1,6 +1,8 @@
 package br.simulado.etec.catalogo.controller;
 
 import java.net.URI;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -46,7 +48,8 @@ public class ProvaController implements ProvaControllerDocs {
 	public ResponseEntity<ProvaResponse> criar(@Valid @RequestBody ProvaRequest dados) {
 		Prova criada = servico.criar(dados);
 		URI local = URI.create("/api/v1/provas/" + criada.getPublicId());
-		return ResponseEntity.created(local).body(ProvaMapper.paraResponse(criada));
+		// uma prova que acabou de nascer não tem questão: 0, sem consultar
+		return ResponseEntity.created(local).body(ProvaMapper.paraResponse(criada, 0));
 	}
 
 	@Override
@@ -62,13 +65,17 @@ public class ProvaController implements ProvaControllerDocs {
 		Integer filtroSemestre = Filtros.inteiro("semestre", semestre, 1, 2);
 		StatusProva filtroStatus = Filtros.enumerado("status", status, StatusProva.class);
 		Page<Prova> pagina = servico.listar(filtroAno, filtroSemestre, filtroStatus, paginacao);
-		return ResponseEntity.ok(PaginaResponse.de(pagina, ProvaMapper::paraResponse));
+		Map<Long, Long> cadastradas = servico.contarQuestoes(pagina.getContent());
+		return ResponseEntity.ok(PaginaResponse.de(pagina,
+				prova -> ProvaMapper.paraResponse(prova, cadastradas.getOrDefault(prova.getId(), 0L))));
 	}
 
 	@Override
 	@GetMapping("/provas/{id}")
 	public ResponseEntity<ProvaResponse> buscar(@PathVariable UUID id) {
-		return ResponseEntity.ok(ProvaMapper.paraResponse(servico.buscar(id)));
+		Prova prova = servico.buscar(id);
+		return ResponseEntity.ok(ProvaMapper.paraResponse(prova,
+				servico.contarQuestoes(List.of(prova)).getOrDefault(prova.getId(), 0L)));
 	}
 
 }

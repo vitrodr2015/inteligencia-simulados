@@ -7,8 +7,11 @@ import org.springframework.http.ResponseEntity;
 import br.simulado.etec.catalogo.dto.QuestaoRequest;
 import br.simulado.etec.catalogo.dto.QuestaoResponse;
 import br.simulado.etec.shared.exception.ErrorResponse;
+import br.simulado.etec.shared.paginacao.PaginaResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import jakarta.servlet.http.HttpServletRequest;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,6 +35,20 @@ public interface QuestaoControllerDocs {
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<QuestaoResponse> cadastrar(@Parameter(description = "Id público da prova (UUID).") UUID id,
 			QuestaoRequest dados);
+
+	@Operation(summary = "Lista as questões (só ADMIN)",
+			description = "Lista paginada. De cada questão vem só a versão mais recente: o rascunho aberto, se houver, senão a última publicada. Os filtros são opcionais e agem sobre essa versão. Um provaId ou subtopicoId que não existe não é erro: devolve a lista vazia. Ordem fixa por numero crescente. Página além do fim devolve 200 com a lista vazia.")
+	@Parameter(name = "sort", in = ParameterIn.QUERY, description = "Só numero ou numero,asc (o padrão). Qualquer outro valor, inclusive numero,desc, ou mais de um sort, dá 400.")
+	@ApiResponse(responseCode = "200", description = "Página de questões, com a mesma questão completa do GET por id.")
+	@ApiResponse(responseCode = "400", description = "Parâmetro inválido: page, size, sort, provaId, subtopicoId ou status (ARQUIVADA inclusive).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<PaginaResponse<QuestaoResponse>> listar(
+			@Parameter(description = "Filtro pelo id público da prova (UUID).") UUID provaId,
+			@Parameter(description = "Filtro pelo id público do subtópico da versão exibida (UUID).") UUID subtopicoId,
+			@Parameter(description = "Filtro pelo status da versão exibida: RASCUNHO ou PUBLICADA. A ARQUIVADA se lê por ?versao=n no GET por id.") String status,
+			@Parameter(description = "Número da página, a partir de 0. Padrão 0. Negativo ou não numérico dá 400.") String page,
+			@Parameter(description = "Itens por página. Padrão 20, máximo 50 (valor maior é reduzido a 50). Zero, negativo ou não numérico dá 400.") String size,
+			@Parameter(hidden = true) HttpServletRequest requisicao);
 
 	@Operation(summary = "Busca uma questão pelo id (só ADMIN)",
 			description = "Sem versao, devolve o rascunho aberto, se houver, senão a última publicada. Com ?versao=n, devolve essa versão, inclusive uma ARQUIVADA.")

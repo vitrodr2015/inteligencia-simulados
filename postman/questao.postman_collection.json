@@ -1,0 +1,2769 @@
+{
+  "info": {
+    "name": "Questão — /api/v1/admin/questoes",
+    "description": "Questão (Sprint 2, fatias 2b-i e 2b-ii): POST /admin/provas/{id}/questoes, GET /admin/questoes/{id} e GET /admin/questoes, só ADMIN. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). O caso da imagem usa localhost, o padrão de IMAGENS_HOSTS_PERMITIDOS em desenvolvimento. PROVA_NAO_EDITAVEL não está aqui: ainda não há rota que publique uma prova. Os dados ficam no banco local (ainda não há DELETE de questão).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "materiaId",
+      "value": ""
+    },
+    {
+      "key": "subtopicoId",
+      "value": ""
+    },
+    {
+      "key": "subtopicoInativoId",
+      "value": ""
+    },
+    {
+      "key": "provaId",
+      "value": ""
+    },
+    {
+      "key": "questaoId",
+      "value": ""
+    },
+    {
+      "key": "questao2Id",
+      "value": ""
+    },
+    {
+      "key": "sufixo",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "adminSenha",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "adminTokenExpira",
+      "value": ""
+    },
+    {
+      "key": "studentToken",
+      "value": ""
+    },
+    {
+      "key": "studentTokenExpira",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Preparar (matéria, subtópicos e prova)",
+      "item": [
+        {
+          "name": "Criar a matéria",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"sufixo\", Date.now().toString(36));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"materiaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Matéria Postman questão {{sufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Criar o subtópico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"subtopicoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"{{materiaId}}\",\"nome\":\"Subtópico Postman {{sufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Criar um subtópico para ficar inativo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"subtopicoInativoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"{{materiaId}}\",\"nome\":\"Subtópico inativo {{sufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desativar esse subtópico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{subtopicoInativoId}}/disable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{subtopicoInativoId}}",
+                "disable"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar a prova (5 questões)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"provaId\", pm.response.json().id);",
+                  "pm.test(\"sem questões: 0\", function () { pm.expect(pm.response.json().questoesCadastradas).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova da coleção de questão {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":5}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST — cadastrar",
+      "item": [
+        {
+          "name": "201 — questão completa (numero 1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"questaoId\", pm.response.json().id);",
+                  "pm.test(\"RASCUNHO, versão 1, alternativas A a E, sem programa nem tipo\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"RASCUNHO\"); pm.expect(j.versao).to.eql(1); pm.expect(j.alternativas.map(a => a.letra)).to.eql([\"A\",\"B\",\"C\",\"D\",\"E\"]); pm.expect(j).to.not.have.property(\"programa\"); pm.expect(j).to.not.have.property(\"tipo\"); });",
+                  "pm.test(\"Location\", function () { pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/v1/admin/questoes/\" + pm.response.json().id); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"textoApoio\":\"Leia o <b>texto</b>.\",\"grupoApoio\":1,\"imagemUrl\":\"https://localhost/imagem.png\",\"gabarito\":\"C\",\"dificuldade\":\"MEDIA\",\"explicacao\":\"Porque <i>sim</i>.\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — repetir a mesma questão (idempotente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"a mesma questão\", function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"questaoId\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"textoApoio\":\"Leia o <b>texto</b>.\",\"grupoApoio\":1,\"imagemUrl\":\"https://localhost/imagem.png\",\"gabarito\":\"C\",\"dificuldade\":\"MEDIA\",\"explicacao\":\"Porque <i>sim</i>.\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — gabarito diferente (fora do hash): mostra o gravado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"gabarito gravado\", function () { pm.expect(pm.response.json().gabarito).to.eql(\"C\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"textoApoio\":\"Leia o <b>texto</b>.\",\"grupoApoio\":1,\"imagemUrl\":\"https://localhost/imagem.png\",\"gabarito\":\"E\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — mesmo numero com enunciado diferente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo QUESTAO_NUMERO_EM_CONFLITO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_NUMERO_EM_CONFLITO\"); });",
+                  "pm.test(\"numerosEmConflito\", function () { pm.expect(pm.response.json().detalhes.numerosEmConflito).to.eql([1]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Outro enunciado {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "201 — só o obrigatório, alternativas fora de ordem (numero 2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"questao2Id\", pm.response.json().id);",
+                  "pm.test(\"de A a E\", function () { pm.expect(pm.response.json().alternativas.map(a => a.letra)).to.eql([\"A\",\"B\",\"C\",\"D\",\"E\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":2,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"H<sub>2</sub>O &lt; 3 {{sufixo}}\",\"alternativas\":[{\"letra\":\"E\",\"texto\":\"cinco\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"A\",\"texto\":\"um\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST — 400, 404, 409 e 415",
+      "item": [
+        {
+          "name": "400 — numero acima da quantidade da prova",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo numero\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"numero\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":6,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — numero 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo numero\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"numero\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":0,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — subtópico que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo subtopicoId\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"subtopicoId\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"00000000-0000-4000-8000-000000000000\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — sem enunciado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo enunciado\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"enunciado\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — 4 alternativas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo alternativas\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"alternativas\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"a\"},{\"letra\":\"B\",\"texto\":\"b\"},{\"letra\":\"C\",\"texto\":\"c\"},{\"letra\":\"D\",\"texto\":\"d\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — letra repetida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo alternativas\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"alternativas\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"A\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — marcação <script>",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo enunciado\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"enunciado\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"<script>alert(1)</script>\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — <br/> (só <br>)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo enunciado\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"enunciado\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"a<br/>b\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — imagem de host não permitido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo imagemUrl\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"imagemUrl\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"imagemUrl\":\"https://atacante.invalid/a.png\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — imagem http",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo imagemUrl\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"imagemUrl\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"imagemUrl\":\"http://localhost/a.png\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — gabarito F",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo gabarito\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"gabarito\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"F\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — grupo de apoio 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo grupoApoio\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"grupoApoio\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"grupoApoio\":0}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — JSON quebrado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CORPO_ILEGIVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_ILEGIVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — numero como texto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CORPO_ILEGIVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_ILEGIVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":\"3\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — id de prova com grupo curto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/11111111-1111-1111-1111-11111111111/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "11111111-1111-1111-1111-11111111111",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "404 — prova que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo PROVA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/00000000-0000-4000-8000-000000000000/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "00000000-0000-4000-8000-000000000000",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — subtópico inativo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo SUBTOPICO_INATIVO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"SUBTOPICO_INATIVO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":3,\"subtopicoId\":\"{{subtopicoInativoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "415 — corpo que não é JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 415\", function () { pm.response.to.have.status(415); });",
+                  "pm.test(\"codigo TIPO_NAO_SUPORTADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"TIPO_NAO_SUPORTADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "texto solto",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET — por id",
+      "item": [
+        {
+          "name": "200 — a versão exibida",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"mesma questão\", function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"questaoId\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — ?versao=1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}?versao=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ],
+              "query": [
+                {
+                  "key": "versao",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 — ?versao=2 não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo QUESTAO_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}?versao=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ],
+              "query": [
+                {
+                  "key": "versao",
+                  "value": "2"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — ?versao=0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}?versao=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ],
+              "query": [
+                {
+                  "key": "versao",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 — id que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo QUESTAO_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — id com grupo curto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/11111111-1111-1111-1111-11111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "11111111-1111-1111-1111-11111111111"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET — listar",
+      "item": [
+        {
+          "name": "200 — sem filtro (envelope)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"envelope\", function () { pm.expect(pm.response.json()).to.have.keys([\"conteudo\",\"pagina\",\"tamanho\",\"totalElementos\",\"totalPaginas\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — por prova, em ordem de numero",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"total 2\", function () { pm.expect(pm.response.json().totalElementos).to.eql(2); });",
+                  "pm.test(\"numeros 1,2\", function () { pm.expect(pm.response.json().conteudo.map(q => q.numero)).to.eql([1,2]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?provaId={{provaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "provaId",
+                  "value": "{{provaId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — por subtópico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"total 2\", function () { pm.expect(pm.response.json().totalElementos).to.eql(2); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?subtopicoId={{subtopicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "subtopicoId",
+                  "value": "{{subtopicoId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — status RASCUNHO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"total 2\", function () { pm.expect(pm.response.json().totalElementos).to.eql(2); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?provaId={{provaId}}&status=RASCUNHO",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "provaId",
+                  "value": "{{provaId}}"
+                },
+                {
+                  "key": "status",
+                  "value": "RASCUNHO"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — status PUBLICADA (nenhuma ainda)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"total 0\", function () { pm.expect(pm.response.json().totalElementos).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?provaId={{provaId}}&status=PUBLICADA",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "provaId",
+                  "value": "{{provaId}}"
+                },
+                {
+                  "key": "status",
+                  "value": "PUBLICADA"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — filtros combinados",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"numeros 1,2\", function () { pm.expect(pm.response.json().conteudo.map(q => q.numero)).to.eql([1,2]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?provaId={{provaId}}&subtopicoId={{subtopicoId}}&status=RASCUNHO&sort=numero",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "provaId",
+                  "value": "{{provaId}}"
+                },
+                {
+                  "key": "subtopicoId",
+                  "value": "{{subtopicoId}}"
+                },
+                {
+                  "key": "status",
+                  "value": "RASCUNHO"
+                },
+                {
+                  "key": "sort",
+                  "value": "numero"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — paginação (size=1, page=1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"numeros 2\", function () { pm.expect(pm.response.json().conteudo.map(q => q.numero)).to.eql([2]); });",
+                  "pm.test(\"2 páginas\", function () { pm.expect(pm.response.json().totalPaginas).to.eql(2); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?provaId={{provaId}}&size=1&page=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "provaId",
+                  "value": "{{provaId}}"
+                },
+                {
+                  "key": "size",
+                  "value": "1"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — prova que não existe: lista vazia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"total 0\", function () { pm.expect(pm.response.json().totalElementos).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?provaId=00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "provaId",
+                  "value": "00000000-0000-4000-8000-000000000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — subtópico que não existe: lista vazia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"total 0\", function () { pm.expect(pm.response.json().totalElementos).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?subtopicoId=00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "subtopicoId",
+                  "value": "00000000-0000-4000-8000-000000000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — status=ARQUIVADA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?status=ARQUIVADA",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ARQUIVADA"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — status=rascunho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?status=rascunho",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "rascunho"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — provaId=11111111-1111-1111-1111-11111111111",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?provaId=11111111-1111-1111-1111-11111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "provaId",
+                  "value": "11111111-1111-1111-1111-11111111111"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — subtopicoId=abc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?subtopicoId=abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "subtopicoId",
+                  "value": "abc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — page=-1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?page=-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "-1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — size=0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?size=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — sort=numero,desc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo ORDENACAO_INVALIDA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ORDENACAO_INVALIDA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?sort=numero,desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "numero,desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — sort=enunciado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo ORDENACAO_INVALIDA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ORDENACAO_INVALIDA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?sort=enunciado",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "enunciado"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — sort=numero&sort=numero",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo ORDENACAO_INVALIDA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ORDENACAO_INVALIDA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes?sort=numero&sort=numero",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "numero"
+                },
+                {
+                  "key": "sort",
+                  "value": "numero"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Depois do cadastro: contador e DELETE de subtópico",
+      "item": [
+        {
+          "name": "A prova conta 2 questões",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"questoesCadastradas 2\", function () { pm.expect(pm.response.json().questoesCadastradas).to.eql(2); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "409 — apagar o subtópico com questões",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo SUBTOPICO_COM_QUESTOES\", function () { pm.expect(pm.response.json().codigo).to.eql(\"SUBTOPICO_COM_QUESTOES\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{subtopicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{subtopicoId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Autorização",
+      "item": [
+        {
+          "name": "401 — cadastrar sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "401 — ler sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "401 — listar sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT não cadastra",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT não lê",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT não lista",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "403 — PUT de questão ainda não existe (negado até ao ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Quanto é 1+1? {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "403 — DELETE de questão ainda não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Duas identidades: ADMIN (cria e lê provas) e STUDENT (só prova o 403). O ADMIN NÃO se cadastra pela API (ele nasce na subida,",
+          "// pelo bootstrap do Módulo 12): informe adminEmail e adminSenha, os mesmos de ADMIN_EMAIL e ADMIN_SENHA (postman/README.md).",
+          "const base = pm.collectionVariables.get(\"baseUrl\");",
+          "const cab = { \"Content-Type\": \"application/json\" };",
+          "const corpo = (c) => ({ mode: \"raw\", raw: JSON.stringify(c) });",
+          "const precisa = (nome) => !pm.collectionVariables.get(nome) || Date.now() > Number(pm.collectionVariables.get(nome + \"Expira\") || 0) - 60000;",
+          "const guardar = (nome, j) => { pm.collectionVariables.set(nome, j.accessToken); pm.collectionVariables.set(nome + \"Expira\", String(Date.now() + j.expiresIn * 1000)); };",
+          "if (precisa(\"adminToken\")) {",
+          "  const email = pm.collectionVariables.get(\"adminEmail\");",
+          "  const senha = pm.collectionVariables.get(\"adminSenha\");",
+          "  if (!email || !senha) {",
+          "    throw new Error(\"Defina as variáveis adminEmail e adminSenha desta coleção (os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida; passo a passo no postman/README.md).\");",
+          "  }",
+          "  pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e, r) {",
+          "    guardar(\"adminToken\", r.json());",
+          "  });",
+          "}",
+          "if (precisa(\"studentToken\")) {",
+          "  const s = Date.now().toString(36);",
+          "  const email = \"postman.\" + s + \"@exemplo.invalid\";",
+          "  const senha = \"Pm-\" + s + \"-Aa1!x\";",
+          "  pm.sendRequest({ url: base + \"/api/v1/termos/vigente\", method: \"GET\" }, function (e1, r1) {",
+          "    pm.sendRequest({ url: base + \"/api/v1/auth/register\", method: \"POST\", header: cab,",
+          "      body: corpo({ nome: \"Postman\", email: email, senha: senha, dataNascimento: \"2000-01-01\", aceiteTermosVersao: r1.json().versao }) }, function (e2) {",
+          "      pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e3, r3) {",
+          "        guardar(\"studentToken\", r3.json());",
+          "      });",
+          "    });",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

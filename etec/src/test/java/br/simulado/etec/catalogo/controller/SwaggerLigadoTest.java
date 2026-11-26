@@ -189,6 +189,27 @@ class SwaggerLigadoTest {
 	}
 
 	@Test
+	void deve_documentar_a_listagem_de_questoes_com_filtros_sort_e_sem_example() throws Exception {
+		String listagem = "$.paths['/api/v1/admin/questoes'].get";
+		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+				.andExpect(jsonPath(listagem + ".responses.200").exists())
+				.andExpect(jsonPath(listagem + ".responses.400").exists())
+				.andExpect(jsonPath(listagem + ".responses.404").doesNotExist())
+				.andExpect(jsonPath(listagem + ".responses.401").doesNotExist())
+				.andExpect(jsonPath(listagem + ".responses.403").doesNotExist())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='provaId')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='subtopicoId')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='status')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='page')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='size')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='sort')].description").isNotEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.name=='requisicao')]").isEmpty())
+				.andExpect(jsonPath(listagem + ".parameters[?(@.example)]").isEmpty())
+				.andExpect(jsonPath("$.components.schemas.PaginaResponseQuestaoResponse").exists())
+				.andExpect(jsonPath("$.components.schemas.ProvaResponse.properties.questoesCadastradas.description").isNotEmpty());
+	}
+
+	@Test
 	void deve_documentar_o_409_de_subtopico_com_questoes_no_delete_do_subtopico() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
 				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}'].delete.responses.409").exists());

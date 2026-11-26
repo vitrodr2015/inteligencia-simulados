@@ -132,7 +132,8 @@ class ProvaControllerTest {
 				.andExpect(jsonPath("$.fonteUrl").value("https://exemplo.invalid/prova"))
 				.andExpect(jsonPath("$.status").value("RASCUNHO"))
 				.andExpect(jsonPath("$.publicadaEm").value((Object) null))
-				.andExpect(jsonPath("$.criadoEm", matchesPattern(DATA_HORA)));
+				.andExpect(jsonPath("$.criadoEm", matchesPattern(DATA_HORA)))
+				.andExpect(jsonPath("$.questoesCadastradas").value(0));
 		assertThat(UUID.fromString(id)).isNotNull();
 	}
 
@@ -142,7 +143,8 @@ class ProvaControllerTest {
 
 		assertThat(json).doesNotContain("programa").doesNotContain("publicId").doesNotContain("atualizadoEm");
 		assertThat(JsonPath.<java.util.Map<String, Object>>read(json, "$").keySet()).containsExactly("id", "titulo", "banca",
-				"ano", "semestre", "duracaoMinutos", "quantidadeQuestoes", "fonteUrl", "status", "publicadaEm", "criadoEm");
+				"ano", "semestre", "duracaoMinutos", "quantidadeQuestoes", "fonteUrl", "status", "publicadaEm", "criadoEm",
+				"questoesCadastradas");
 	}
 
 	@Test

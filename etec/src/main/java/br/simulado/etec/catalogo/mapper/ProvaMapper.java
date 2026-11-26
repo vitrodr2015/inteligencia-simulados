@@ -9,7 +9,8 @@ public final class ProvaMapper {
 	private ProvaMapper() {
 	}
 
-	public static ProvaResponse paraResponse(Prova prova) {
+	/** @param questoesCadastradas quantas questões a prova tem (o service conta numa consulta só) */
+	public static ProvaResponse paraResponse(Prova prova, long questoesCadastradas) {
 		return new ProvaResponse(
 				prova.getPublicId(),
 				prova.getTitulo(),
@@ -21,7 +22,8 @@ public final class ProvaMapper {
 				prova.getFonteUrl(),
 				prova.getStatus(),
 				prova.getPublicadaEm(),
-				prova.getCriadoEm());
+				prova.getCriadoEm(),
+				questoesCadastradas);
 	}
 
 }
