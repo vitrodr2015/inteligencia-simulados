@@ -34,6 +34,14 @@ public enum CodigoErro {
 	// Prova (Sprint 2, fatia 2a; D149, D150)
 	PROVA_NAO_ENCONTRADA,
 	PROVA_DUPLICADA,
+	// Prova que não é rascunho não aceita questões novas (Sprint 2, fatia 2b-i)
+	PROVA_NAO_EDITAVEL,
+
+	// Questão (Sprint 2, fatia 2b-i; D153, D156, D146)
+	QUESTAO_NAO_ENCONTRADA,
+	QUESTAO_NUMERO_EM_CONFLITO,
+	SUBTOPICO_INATIVO,
+	SUBTOPICO_COM_QUESTOES,
 
 	// Autenticação (Módulo 10; D120 para o 401 e o 403 da cadeia de segurança)
 	NAO_AUTENTICADO,

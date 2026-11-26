@@ -27,7 +27,7 @@ public final class MatrizDeAutorizacao {
 	}
 
 	/** Recursos criados (por um ADMIN) para cada execução de uma linha. */
-	public record Ctx(String materiaId, String subtopicoId, String materiaVaziaId, String provaId, String idInexistente,
+	public record Ctx(String materiaId, String subtopicoId, String materiaVaziaId, String provaId, String questaoId, String idInexistente,
 			String sufixo) {
 	}
 
@@ -191,7 +191,50 @@ public final class MatrizDeAutorizacao {
 		linha("gabarito da prova (ainda não existe)", "PUT", null, c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito",
 				c -> "{\"itens\":[]}", 401, 403, 403, 403);
 		linha("importação (ainda não existe)", "POST", null, c -> "/api/v1/admin/importacoes", c -> "{}", 401, 403, 403, 403);
-		linha("questões do admin (ainda não existem)", "GET", null, c -> "/api/v1/admin/questoes", null, 401, 403, 403, 403);
+		linha("listagem de questões (fica para a 2b-ii, negada)", "GET", null, c -> "/api/v1/admin/questoes", null, 401, 403, 403, 403);
+
+		// ----- questões (Sprint 2, fatia 2b-i): as duas rotas novas são só do ADMIN; o resto segue negado (D121) -----
+		linha("cadastrar questão", "POST", "/api/v1/admin/provas/{id}/questoes", c -> "/api/v1/admin/provas/" + c.provaId() + "/questoes",
+				c -> "{\"numero\":2,\"subtopicoId\":\"" + c.subtopicoId() + "\",\"enunciado\":\"Enunciado da matriz " + c.sufixo()
+						+ "\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"a\"},{\"letra\":\"B\",\"texto\":\"b\"},"
+						+ "{\"letra\":\"C\",\"texto\":\"c\"},{\"letra\":\"D\",\"texto\":\"d\"},{\"letra\":\"E\",\"texto\":\"e\"}]}",
+				401, 403, 403, 201);
+		linha("cadastrar questão com corpo inválido", "POST", "/api/v1/admin/provas/{id}/questoes",
+				c -> "/api/v1/admin/provas/" + c.provaId() + "/questoes", c -> "{}", 401, 403, 403, 400);
+		linha("cadastrar questão em prova inexistente", "POST", "/api/v1/admin/provas/{id}/questoes",
+				c -> "/api/v1/admin/provas/" + c.idInexistente() + "/questoes",
+				c -> "{\"numero\":2,\"subtopicoId\":\"" + c.subtopicoId() + "\",\"enunciado\":\"E\",\"alternativas\":["
+						+ "{\"letra\":\"A\",\"texto\":\"a\"},{\"letra\":\"B\",\"texto\":\"b\"},{\"letra\":\"C\",\"texto\":\"c\"},"
+						+ "{\"letra\":\"D\",\"texto\":\"d\"},{\"letra\":\"E\",\"texto\":\"e\"}]}",
+				401, 403, 403, 404);
+		linha("cadastrar questão com id de prova malformado", "POST", "/api/v1/admin/provas/{id}/questoes",
+				c -> "/api/v1/admin/provas/abc/questoes", c -> "{}", 401, 403, 403, 400);
+		for (String metodo : new String[] { "GET", "HEAD" }) {
+			linha("questão por id", metodo, "/api/v1/admin/questoes/{id}", c -> "/api/v1/admin/questoes/" + c.questaoId(), null, 401,
+					403, 403, 200);
+			linha("questão inexistente", metodo, "/api/v1/admin/questoes/{id}", c -> "/api/v1/admin/questoes/" + c.idInexistente(),
+					null, 401, 403, 403, 404);
+			linha("questão com id malformado", metodo, "/api/v1/admin/questoes/{id}", c -> "/api/v1/admin/questoes/abc", null, 401,
+					403, 403, 400);
+		}
+		for (String metodo : new String[] { "PUT", "DELETE", "PATCH" }) {
+			linha(metodo + " em /admin/questoes/{id} (ainda não existe)", metodo, null,
+					c -> "/api/v1/admin/questoes/" + c.questaoId(), c -> "{}", 401, 403, 403, 403);
+			linha(metodo + " em /admin/provas/{id}/questoes (ainda não existe)", metodo, null,
+					c -> "/api/v1/admin/provas/" + c.provaId() + "/questoes", c -> "{}", 401, 403, 403, 403);
+			linha(metodo + " na coleção /admin/questoes (ainda não existe)", metodo, null, c -> "/api/v1/admin/questoes", c -> "{}",
+					401, 403, 403, 403);
+		}
+		linha("GET em /admin/provas/{id}/questoes (a listagem fica para a 2b-ii)", "GET", null,
+				c -> "/api/v1/admin/provas/" + c.provaId() + "/questoes", null, 401, 403, 403, 403);
+		linha("POST em /admin/questoes (o cadastro é em /admin/provas/{id}/questoes)", "POST", null, c -> "/api/v1/admin/questoes",
+				c -> "{}", 401, 403, 403, 403);
+		linha("POST /versoes da questão (ainda não existe)", "POST", null,
+				c -> "/api/v1/admin/questoes/" + c.questaoId() + "/versoes", c -> "{}", 401, 403, 403, 403);
+		linha("publicar questão (ainda não existe)", "PATCH", null, c -> "/api/v1/admin/questoes/" + c.questaoId() + "/publish", null,
+				401, 403, 403, 403);
+		linha("STUDENT não lê questão do admin (a leitura do aluno é outra rota)", "GET", null,
+				c -> "/api/v1/questoes/" + c.questaoId(), null, 401, 403, 403, 403);
 
 		// ----- sem regra = negado (D121): rota inexistente, método sem regra, actuator e /error -----
 		linha("GET em rota inexistente", "GET", null, c -> "/api/v1/nao-existe", null, 401, 403, 403, 403);

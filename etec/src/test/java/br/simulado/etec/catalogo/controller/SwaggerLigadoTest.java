@@ -165,4 +165,33 @@ class SwaggerLigadoTest {
 				.andExpect(jsonPath(listagem + ".parameters[?(@.example)]").isEmpty());
 	}
 
+	@Test
+	void deve_documentar_as_duas_rotas_da_questao_e_o_schema_de_saida_sem_programa_nem_tipo() throws Exception {
+		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/provas/{id}/questoes'].post.responses.201").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/provas/{id}/questoes'].post.responses.200").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/provas/{id}/questoes'].post.responses.400").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/provas/{id}/questoes'].post.responses.404").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/provas/{id}/questoes'].post.responses.409").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/questoes/{id}'].get.responses.200").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/questoes/{id}'].get.responses.400").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/questoes/{id}'].get.responses.404").exists())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/questoes/{id}'].get.parameters[?(@.name=='versao')].description").isNotEmpty())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/questoes/{id}'].get.responses.401").doesNotExist())
+				.andExpect(jsonPath("$.paths['/api/v1/admin/questoes/{id}'].get.responses.403").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.QuestaoResponse").exists())
+				.andExpect(jsonPath("$.components.schemas.QuestaoResponse.properties.programa").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.QuestaoResponse.properties.tipo").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.QuestaoResponse.properties.alternativas").exists())
+				.andExpect(jsonPath("$.components.schemas.QuestaoRequest.properties.programa").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.QuestaoRequest.properties.tipo").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.AlternativaRequest").exists());
+	}
+
+	@Test
+	void deve_documentar_o_409_de_subtopico_com_questoes_no_delete_do_subtopico() throws Exception {
+		mockMvc.perform(get("/v3/api-docs"))
+				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}'].delete.responses.409").exists());
+	}
+
 }

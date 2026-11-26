@@ -37,6 +37,8 @@ security:
     refresh-token-expiration: 24h
 
 app:
+  imagens:
+    hosts-permitidos: imagens.exemplo.invalid,localhost
   termos:
     versao: v1-teste
     url: https://exemplo.invalid/termos

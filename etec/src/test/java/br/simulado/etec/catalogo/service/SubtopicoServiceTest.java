@@ -330,6 +330,33 @@ class SubtopicoServiceTest {
 				erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.SUBTOPICO_NAO_ENCONTRADO));
 	}
 
+	@Test
+	void deve_dar_409_subtopico_com_questoes_quando_o_banco_recusa_o_delete_pela_fk_da_versao_de_questao() {
+		UUID id = UUID.randomUUID();
+		when(repositorio.apagarPorPublicId(id)).thenThrow(new DataIntegrityViolationException("fk",
+				new ConstraintViolationException("fk", new SQLException("x"), "delete", ConstraintKind.FOREIGN_KEY,
+						"questao_versao.fk_questao_versao_subtopico")));
+
+		assertThatThrownBy(() -> servico.apagar(id)).isInstanceOfSatisfying(ConflictException.class,
+				erro -> assertThat(erro.getCodigo()).isEqualTo(CodigoErro.SUBTOPICO_COM_QUESTOES));
+	}
+
+	@Test
+	void deve_deixar_subir_qualquer_outra_violacao_de_integridade_no_delete_do_subtopico() {
+		UUID id = UUID.randomUUID();
+		DataIntegrityViolationException outraFk = new DataIntegrityViolationException("fk",
+				new ConstraintViolationException("fk", new SQLException("x"), "delete", ConstraintKind.FOREIGN_KEY,
+						"alguma_tabela.fk_outra"));
+		DataIntegrityViolationException check = new DataIntegrityViolationException("ck",
+				new ConstraintViolationException("ck", new SQLException("x"), "delete", ConstraintKind.CHECK, "tabela.ck_qualquer"));
+
+		UUID idDoCheck = UUID.randomUUID();
+		when(repositorio.apagarPorPublicId(id)).thenThrow(outraFk);
+		assertThatThrownBy(() -> servico.apagar(id)).as("outra FK não vira 409 falso").isSameAs(outraFk);
+
+		when(repositorio.apagarPorPublicId(idDoCheck)).thenThrow(check);
+		assertThatThrownBy(() -> servico.apagar(idDoCheck)).as("um CHECK não vira 409 falso").isSameAs(check);
+	}
 
 	// ----- visibilidade por papel (D28, D103) -----
 
