@@ -14,7 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * A ordem dos campos é a do contrato (seção 4.3) e um campo nulo sai SEMPRE como {@code null} (D72, D73).
  */
 @JsonPropertyOrder({ "id", "titulo", "banca", "ano", "semestre", "duracaoMinutos", "quantidadeQuestoes", "fonteUrl", "status",
-		"publicadaEm", "criadoEm" })
+		"publicadaEm", "criadoEm", "questoesCadastradas" })
 @JsonInclude(JsonInclude.Include.ALWAYS)
 @Schema(description = "Prova.")
 public record ProvaResponse(
@@ -50,6 +50,9 @@ public record ProvaResponse(
 		Instant publicadaEm,
 
 		@Schema(description = "Criação, em UTC com três casas de milissegundos.")
-		Instant criadoEm) {
+		Instant criadoEm,
+
+		@Schema(description = "Quantas questões já foram cadastradas na prova, contando cada questão uma vez, em qualquer status (não as versões). É 0 na criação. Compare com quantidadeQuestoes, a quantidade declarada.")
+		long questoesCadastradas) {
 
 }

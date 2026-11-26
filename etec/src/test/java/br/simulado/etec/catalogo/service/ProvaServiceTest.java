@@ -41,6 +41,9 @@ class ProvaServiceTest {
 	@Mock
 	private ProgramaRepository programas;
 
+	@Mock
+	private br.simulado.etec.catalogo.repository.QuestaoRepository questoes;
+
 	@InjectMocks
 	private ProvaService servico;
 
@@ -173,6 +176,46 @@ class ProvaServiceTest {
 		assertThat(dados.banca()).as("banca em branco vira nula (D104)").isNull();
 		assertThat(dados.fonteUrl()).isNull();
 		assertThat(new ProvaRequest("T", "  Vunesp ", null, null, 60, 10, null).banca()).isEqualTo("Vunesp");
+	}
+
+	// ----- questoesCadastradas -----
+
+	private Prova provaComId(long id) {
+		Prova prova = new Prova(etec, "T", null, null, null, 60, 10, null);
+		org.springframework.test.util.ReflectionTestUtils.setField(prova, "id", id);
+		return prova;
+	}
+
+	private static br.simulado.etec.catalogo.repository.QuestaoRepository.ContagemPorProva contagem(long provaId, long total) {
+		return new br.simulado.etec.catalogo.repository.QuestaoRepository.ContagemPorProva() {
+			@Override
+			public Long getProvaId() {
+				return provaId;
+			}
+
+			@Override
+			public long getTotal() {
+				return total;
+			}
+		};
+	}
+
+	@Test
+	void deve_contar_as_questoes_de_todas_as_provas_numa_unica_consulta() {
+		when(questoes.contarPorProva(java.util.List.of(1L, 2L, 3L)))
+				.thenReturn(java.util.List.of(contagem(1L, 4), contagem(3L, 1)));
+
+		java.util.Map<Long, Long> mapa = servico.contarQuestoes(java.util.List.of(provaComId(1), provaComId(2), provaComId(3)));
+
+		assertThat(mapa).containsEntry(1L, 4L).containsEntry(3L, 1L).doesNotContainKey(2L);
+		verify(questoes, org.mockito.Mockito.times(1)).contarPorProva(any());
+	}
+
+	@Test
+	void deve_nao_consultar_o_banco_quando_nao_ha_prova_para_contar() {
+		assertThat(servico.contarQuestoes(java.util.List.of())).isEmpty();
+
+		verify(questoes, never()).contarPorProva(any());
 	}
 
 	@Test

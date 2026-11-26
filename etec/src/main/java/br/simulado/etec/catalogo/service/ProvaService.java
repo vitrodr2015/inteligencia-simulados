@@ -1,6 +1,9 @@
 package br.simulado.etec.catalogo.service;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -16,6 +19,8 @@ import br.simulado.etec.catalogo.model.Prova;
 import br.simulado.etec.catalogo.model.StatusProva;
 import br.simulado.etec.catalogo.repository.ProgramaRepository;
 import br.simulado.etec.catalogo.repository.ProvaRepository;
+import br.simulado.etec.catalogo.repository.QuestaoRepository;
+import br.simulado.etec.catalogo.repository.QuestaoRepository.ContagemPorProva;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
@@ -46,9 +51,24 @@ public class ProvaService {
 
 	private final ProgramaRepository programas;
 
-	public ProvaService(ProvaRepository repositorio, ProgramaRepository programas) {
+	private final QuestaoRepository questoes;
+
+	public ProvaService(ProvaRepository repositorio, ProgramaRepository programas, QuestaoRepository questoes) {
 		this.repositorio = repositorio;
 		this.programas = programas;
+		this.questoes = questoes;
+	}
+
+	/**
+	 * Quantas questões (identidades, em qualquer status, nunca versões) cada prova tem, pela chave interna: UMA consulta agrupada
+	 * para todas as provas pedidas. Prova sem questão não vem no mapa (vale 0).
+	 */
+	public Map<Long, Long> contarQuestoes(Collection<Prova> provas) {
+		if (provas.isEmpty()) {
+			return Map.of();
+		}
+		return questoes.contarPorProva(provas.stream().map(Prova::getId).toList()).stream()
+				.collect(Collectors.toMap(ContagemPorProva::getProvaId, ContagemPorProva::getTotal));
 	}
 
 	@Transactional

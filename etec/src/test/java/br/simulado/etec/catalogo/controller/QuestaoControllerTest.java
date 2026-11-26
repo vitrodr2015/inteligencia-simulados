@@ -538,6 +538,121 @@ class QuestaoControllerTest {
 		verificarErro(mockMvc.perform(get("/api/v1/admin/questoes/" + id)), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
 	}
 
+	// ----- GET /admin/questoes (listagem) -----
+
+	private static final String LISTA = "/api/v1/admin/questoes";
+
+	@Test
+	void deve_listar_com_o_envelope_padrao_a_mesma_questao_completa_do_get_por_id_sem_programa_nem_tipo() throws Exception {
+		String id = cadastrarEObterId(1);
+		String porId = mockMvc.perform(get(LISTA + "/" + id)).andReturn().getResponse().getContentAsString();
+
+		String lista = mockMvc.perform(get(LISTA).param("provaId", provaId)).andExpect(status().isOk())
+				.andExpect(jsonPath("$.conteudo.length()").value(1))
+				.andExpect(jsonPath("$.pagina").value(0))
+				.andExpect(jsonPath("$.tamanho").value(20))
+				.andExpect(jsonPath("$.totalElementos").value(1))
+				.andExpect(jsonPath("$.totalPaginas").value(1))
+				.andReturn().getResponse().getContentAsString();
+
+		assertThat(JsonPath.<Map<String, Object>>read(lista, "$.conteudo[0]")).isEqualTo(JsonPath.read(porId, "$"));
+		assertThat(lista).doesNotContain("programa").doesNotContain("\"tipo\"").doesNotContain("MULTIPLA_ESCOLHA")
+				.doesNotContain("hash");
+	}
+
+	@Test
+	void deve_listar_em_ordem_de_numero_crescente_com_ou_sem_o_sort() throws Exception {
+		for (int numero : new int[] { 7, 2, 30, 1 }) {
+			cadastrarEObterId(numero);
+		}
+
+		for (String sort : new String[] { null, "numero", "numero,asc", "numero,ASC" }) {
+			var requisicao = get(LISTA).param("provaId", provaId);
+			if (sort != null) {
+				requisicao.param("sort", sort);
+			}
+			mockMvc.perform(requisicao).andExpect(status().isOk())
+					.andExpect(jsonPath("$.conteudo[*].numero").value(contains(1, 2, 7, 30)));
+		}
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "sort=numero,desc", "sort=numero,DESC", "sort=enunciado", "sort=id", "sort=NUMERO", "sort=versao",
+			"sort=numero,cima", "sort=", "sort=numero&sort=numero", "sort=numero,asc&sort=desc" })
+	void deve_devolver_400_ordenacao_invalida_para_qualquer_sort_que_nao_seja_numero_crescente(String consulta) throws Exception {
+		verificarErro(mockMvc.perform(get(LISTA + "?" + consulta)), 400, "Bad Request", CodigoErro.ORDENACAO_INVALIDA);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "status=ARQUIVADA", "status=rascunho", "status=Publicada", "status=", "status=OUTRO",
+			"provaId=abc", "provaId=" + UUID_CURTO, "subtopicoId=abc", "subtopicoId=" + UUID_CURTO, "page=-1", "page=x", "size=0",
+			"size=-2", "size=abc" })
+	void deve_devolver_400_parametro_invalido_para_filtro_ou_pagina_invalidos(String consulta) throws Exception {
+		verificarErro(mockMvc.perform(get(LISTA + "?" + consulta)), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+	}
+
+	@Test
+	void deve_filtrar_por_prova_subtopico_e_status() throws Exception {
+		String outraProva = criarProva(10);
+		cadastrarEObterId(1);
+		cadastrarEObterId(2);
+		mockMvc.perform(post("/api/v1/admin/provas/" + outraProva + "/questoes").contentType(MediaType.APPLICATION_JSON)
+				.content(corpo(3))).andExpect(status().isCreated());
+
+		mockMvc.perform(get(LISTA).param("provaId", provaId)).andExpect(jsonPath("$.totalElementos").value(2))
+				.andExpect(jsonPath("$.conteudo[*].provaId").value(contains(provaId, provaId)));
+		mockMvc.perform(get(LISTA).param("provaId", outraProva)).andExpect(jsonPath("$.conteudo[*].numero").value(contains(3)));
+		mockMvc.perform(get(LISTA).param("subtopicoId", subtopicoId)).andExpect(jsonPath("$.totalElementos").value(3));
+		mockMvc.perform(get(LISTA).param("status", "RASCUNHO")).andExpect(jsonPath("$.totalElementos").value(3));
+		mockMvc.perform(get(LISTA).param("status", "PUBLICADA")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.totalElementos").value(0));
+		mockMvc.perform(get(LISTA).param("provaId", outraProva).param("subtopicoId", subtopicoId).param("status", "RASCUNHO"))
+				.andExpect(jsonPath("$.totalElementos").value(1));
+	}
+
+	@Test
+	void deve_devolver_lista_vazia_com_200_quando_a_prova_ou_o_subtopico_do_filtro_nao_existem() throws Exception {
+		cadastrarEObterId(1);
+
+		for (String filtro : new String[] { "provaId", "subtopicoId" }) {
+			mockMvc.perform(get(LISTA).param(filtro, UUID.randomUUID().toString())).andExpect(status().isOk())
+					.andExpect(jsonPath("$.conteudo.length()").value(0))
+					.andExpect(jsonPath("$.totalElementos").value(0));
+		}
+	}
+
+	@Test
+	void deve_paginar_reduzir_o_size_a_50_e_devolver_vazio_alem_do_fim() throws Exception {
+		for (int numero = 1; numero <= 5; numero++) {
+			cadastrarEObterId(numero);
+		}
+
+		mockMvc.perform(get(LISTA).param("provaId", provaId).param("size", "2").param("page", "1"))
+				.andExpect(jsonPath("$.conteudo[*].numero").value(contains(3, 4)))
+				.andExpect(jsonPath("$.totalElementos").value(5))
+				.andExpect(jsonPath("$.totalPaginas").value(3));
+		mockMvc.perform(get(LISTA).param("size", "500")).andExpect(jsonPath("$.tamanho").value(50));
+		mockMvc.perform(get(LISTA).param("page", "99")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.conteudo.length()").value(0));
+		mockMvc.perform(get(LISTA).param("page", "99999999999999")).andExpect(status().isOk());
+	}
+
+	// ----- questoesCadastradas na prova -----
+
+	@Test
+	void deve_contar_as_questoes_cadastradas_em_cada_prova_no_get_e_na_listagem() throws Exception {
+		String vazia = criarProva(10);
+		cadastrarEObterId(1);
+		cadastrarEObterId(2);
+		cadastrar(corpo(2)).andExpect(status().isOk()); // repetir não conta de novo
+
+		mockMvc.perform(get("/api/v1/provas/" + provaId)).andExpect(jsonPath("$.questoesCadastradas").value(2));
+		mockMvc.perform(get("/api/v1/provas/" + vazia)).andExpect(jsonPath("$.questoesCadastradas").value(0));
+		mockMvc.perform(get("/api/v1/provas"))
+				.andExpect(jsonPath("$.conteudo[?(@.id=='" + provaId + "')].questoesCadastradas").value(contains(2)))
+				.andExpect(jsonPath("$.conteudo[?(@.id=='" + vazia + "')].questoesCadastradas").value(contains(0)));
+	}
+
 	// ----- o parser de UUID estrito vale para TODAS as rotas com id (antes, o grupo curto virava 404) -----
 
 	@Test

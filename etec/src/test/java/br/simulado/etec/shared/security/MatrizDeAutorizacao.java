@@ -191,7 +191,10 @@ public final class MatrizDeAutorizacao {
 		linha("gabarito da prova (ainda não existe)", "PUT", null, c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito",
 				c -> "{\"itens\":[]}", 401, 403, 403, 403);
 		linha("importação (ainda não existe)", "POST", null, c -> "/api/v1/admin/importacoes", c -> "{}", 401, 403, 403, 403);
-		linha("listagem de questões (fica para a 2b-ii, negada)", "GET", null, c -> "/api/v1/admin/questoes", null, 401, 403, 403, 403);
+		// listagem de questões (Sprint 2, fatia 2b-ii): só ADMIN
+		for (String metodo : new String[] { "GET", "HEAD" }) {
+			fixa(metodo, "/api/v1/admin/questoes", 401, 403, 403, 200);
+		}
 
 		// ----- questões (Sprint 2, fatia 2b-i): as duas rotas novas são só do ADMIN; o resto segue negado (D121) -----
 		linha("cadastrar questão", "POST", "/api/v1/admin/provas/{id}/questoes", c -> "/api/v1/admin/provas/" + c.provaId() + "/questoes",
@@ -225,7 +228,7 @@ public final class MatrizDeAutorizacao {
 			linha(metodo + " na coleção /admin/questoes (ainda não existe)", metodo, null, c -> "/api/v1/admin/questoes", c -> "{}",
 					401, 403, 403, 403);
 		}
-		linha("GET em /admin/provas/{id}/questoes (a listagem fica para a 2b-ii)", "GET", null,
+		linha("GET em /admin/provas/{id}/questoes (a listagem é em /admin/questoes)", "GET", null,
 				c -> "/api/v1/admin/provas/" + c.provaId() + "/questoes", null, 401, 403, 403, 403);
 		linha("POST em /admin/questoes (o cadastro é em /admin/provas/{id}/questoes)", "POST", null, c -> "/api/v1/admin/questoes",
 				c -> "{}", 401, 403, 403, 403);

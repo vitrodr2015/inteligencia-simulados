@@ -21,6 +21,11 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import br.simulado.etec.catalogo.dto.AlternativaRequest;
@@ -361,6 +366,44 @@ class QuestaoServiceTest {
 		assertThat(resultado.criada()).isFalse();
 		assertThat(resultado.versao().getGabarito()).as("a resposta mostra o gabarito GRAVADO").isEqualTo("A");
 		assertThat(resultado.versao().getExplicacao()).isEqualTo("explicação antiga");
+	}
+
+	// ----- listar -----
+
+	private QuestaoVersao versaoComId(long id, int numero) {
+		QuestaoVersao versao = new QuestaoVersao(new Questao(prova, numero, "0".repeat(64)), subtopico, null, null, "E", null,
+				Map.of("A", "1", "B", "2", "C", "3", "D", "4", "E", "5"), null, null, null);
+		ReflectionTestUtils.setField(versao, "id", id);
+		return versao;
+	}
+
+	@Test
+	void deve_devolver_as_versoes_na_ordem_dos_ids_mesmo_que_a_carga_venha_em_outra_ordem() {
+		UUID provaId = UUID.randomUUID();
+		UUID subtopicoId = UUID.randomUUID();
+		Pageable pagina = PageRequest.of(1, 3, Sort.by("numero", "id"));
+		when(versoes.buscarIdsDasVersoesExibidas(provaId, subtopicoId, StatusQuestao.RASCUNHO, PageRequest.of(1, 3)))
+				.thenReturn(new PageImpl<>(List.of(10L, 11L, 12L), PageRequest.of(1, 3), 9));
+		when(versoes.carregarCompletas(List.of(10L, 11L, 12L)))
+				.thenReturn(List.of(versaoComId(12, 3), versaoComId(10, 1), versaoComId(11, 2)));
+
+		Page<QuestaoVersao> resultado = servico.listar(provaId, subtopicoId, StatusQuestao.RASCUNHO, pagina);
+
+		assertThat(resultado.getContent()).extracting(QuestaoVersao::getId).containsExactly(10L, 11L, 12L);
+		assertThat(resultado.getTotalElements()).isEqualTo(9);
+		assertThat(resultado.getNumber()).isEqualTo(1);
+	}
+
+	@Test
+	void deve_nao_carregar_nada_quando_a_pagina_de_ids_e_vazia() {
+		when(versoes.buscarIdsDasVersoesExibidas(null, null, null, PageRequest.of(5, 20)))
+				.thenReturn(new PageImpl<>(List.of(), PageRequest.of(5, 20), 3));
+
+		Page<QuestaoVersao> resultado = servico.listar(null, null, null, PageRequest.of(5, 20));
+
+		assertThat(resultado.getContent()).isEmpty();
+		assertThat(resultado.getTotalElements()).isEqualTo(3);
+		verify(versoes, never()).carregarCompletas(any());
 	}
 
 	// ----- buscar -----

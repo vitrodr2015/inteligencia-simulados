@@ -76,12 +76,12 @@ public class SecurityConfig {
 	static final String[] PROVA_LEITURA = { "/api/v1/provas", "/api/v1/provas/{id}" };
 
 	/**
-	 * Questões (Sprint 2, fatia 2b-i): só as DUAS rotas novas, só ADMIN. A listagem GET /admin/questoes, o PUT, o DELETE, o PATCH e o
-	 * resto de /admin/** continuam negados (D121).
+	 * Questões (Sprint 2, fatias 2b-i e 2b-ii): cadastro, leitura por id e listagem, só ADMIN. O PUT, o DELETE, o PATCH e o resto de
+	 * /admin/** continuam negados (D121).
 	 */
 	static final String[] QUESTAO_CRIACAO = { "/api/v1/admin/provas/{id}/questoes" };
 
-	static final String[] QUESTAO_LEITURA = { "/api/v1/admin/questoes/{id}" };
+	static final String[] QUESTAO_LEITURA = { "/api/v1/admin/questoes", "/api/v1/admin/questoes/{id}" };
 
 	/** Documentação OpenAPI: só entra como pública quando está ligada (desenvolvimento e homologação, D34). */
 	static final String[] DOCUMENTACAO = { "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui.html",

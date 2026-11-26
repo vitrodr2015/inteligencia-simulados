@@ -4,8 +4,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +32,7 @@ import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.InvalidRequestException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
+import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
 
 /**
  * Regras da questão (contrato, seção 5). O cadastro unitário é o caminho PRIMÁRIO (D152): a importação da fatia 3 chamará
@@ -40,6 +47,9 @@ import br.simulado.etec.shared.exception.ResourceNotFoundException;
 @Service
 @Transactional(readOnly = true)
 public class QuestaoService {
+
+	/** A listagem só ordena por numero (D77); padrão: numero crescente. */
+	public static final CamposOrdenaveis CAMPOS_ORDENAVEIS = CamposOrdenaveis.de(Sort.by(Sort.Order.asc("numero")), "numero");
 
 	/** O que o cadastro fez: criou a questão agora ({@code criada}) ou o numero já tinha a MESMA questão (idempotente, D153). */
 	public record ResultadoDoCadastro(QuestaoVersao versao, boolean criada) {
@@ -113,6 +123,23 @@ public class QuestaoService {
 			return versoes.findByQuestaoAndVersao(questao, versao).orElseThrow(QuestaoService::questaoNaoEncontrada);
 		}
 		return versaoExibida(questao);
+	}
+
+	/**
+	 * A listagem do ADMIN: de cada questão, só a versão EXIBIDA (rascunho aberto, senão a publicada; D19, D56), em ordem de numero
+	 * (desempate pelo id interno, D77). Filtros opcionais (nulo = todos), todos sobre a versão exibida; um provaId ou subtopicoId que
+	 * não existe não é erro: só não casa com nada (lista vazia). São duas consultas fixas, não importa o tamanho da página.
+	 */
+	public Page<QuestaoVersao> listar(UUID provaId, UUID subtopicoId, StatusQuestao status, Pageable paginacao) {
+		// a ordem é fixa na consulta: a paginação vai sem sort, senão o Spring Data acrescentaria outro order by
+		Pageable semOrdem = PageRequest.of(paginacao.getPageNumber(), paginacao.getPageSize());
+		Page<Long> ids = versoes.buscarIdsDasVersoesExibidas(provaId, subtopicoId, status, semOrdem);
+		if (ids.isEmpty()) {
+			return new PageImpl<>(List.of(), semOrdem, ids.getTotalElements());
+		}
+		Map<Long, QuestaoVersao> porId = versoes.carregarCompletas(ids.getContent()).stream()
+				.collect(Collectors.toMap(QuestaoVersao::getId, Function.identity(), (a, b) -> a));
+		return ids.map(porId::get);
 	}
 
 	private QuestaoVersao versaoExibida(Questao questao) {

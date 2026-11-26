@@ -73,7 +73,7 @@
                 "exec": [
                   "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
                   "pm.collectionVariables.set(\"provaId\", pm.response.json().id);",
-                  "pm.test(\"nasce em RASCUNHO, sem publicadaEm e sem programa\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"RASCUNHO\"); pm.expect(j.publicadaEm).to.eql(null); pm.expect(j).to.not.have.property(\"programa\"); });",
+                  "pm.test(\"nasce em RASCUNHO, sem publicadaEm e sem programa\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"RASCUNHO\"); pm.expect(j.publicadaEm).to.eql(null); pm.expect(j).to.not.have.property(\"programa\"); pm.expect(j.questoesCadastradas).to.eql(0); });",
                   "pm.test(\"Location aponta para o recurso\", function () { pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/v1/provas/\" + pm.response.json().id); });"
                 ]
               }
@@ -1804,7 +1804,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"envelope e sem programa\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys([\"conteudo\", \"pagina\", \"tamanho\", \"totalElementos\", \"totalPaginas\"]); j.conteudo.forEach(p => pm.expect(p).to.not.have.property(\"programa\")); });"
+                  "pm.test(\"envelope e sem programa\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys([\"conteudo\", \"pagina\", \"tamanho\", \"totalElementos\", \"totalPaginas\"]); j.conteudo.forEach(p => { pm.expect(p).to.not.have.property(\"programa\"); pm.expect(p.questoesCadastradas).to.be.a(\"number\"); }); });"
                 ]
               }
             }
@@ -2559,7 +2559,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"mesma prova\", function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"provaId\")); });"
+                  "pm.test(\"mesma prova\", function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"provaId\")); });",
+                  "pm.test(\"sem questões ainda: 0\", function () { pm.expect(pm.response.json().questoesCadastradas).to.eql(0); });"
                 ]
               }
             }
