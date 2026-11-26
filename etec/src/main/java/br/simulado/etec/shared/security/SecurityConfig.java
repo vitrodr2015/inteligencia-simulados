@@ -67,6 +67,14 @@ public class SecurityConfig {
 	static final String[] CATALOGO_ESTADO = { "/api/v1/materias/{id}/disable", "/api/v1/materias/{id}/enable",
 			"/api/v1/subtopicos/{id}/disable", "/api/v1/subtopicos/{id}/enable" };
 
+	/**
+	 * Provas (Sprint 2, fatia 2a): as três rotas são só do ADMIN. O STUDENT e o GUARDIAN levam 403 até a fatia da leitura do aluno
+	 * (D154, adiamento temporário da seção 2 do contrato). O resto de /admin/** continua negado (D121).
+	 */
+	static final String[] PROVA_CRIACAO = { "/api/v1/admin/provas" };
+
+	static final String[] PROVA_LEITURA = { "/api/v1/provas", "/api/v1/provas/{id}" };
+
 	/** Documentação OpenAPI: só entra como pública quando está ligada (desenvolvimento e homologação, D34). */
 	static final String[] DOCUMENTACAO = { "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui.html",
 			"/swagger-ui/**" };
@@ -117,6 +125,9 @@ public class SecurityConfig {
 					regras.requestMatchers(HttpMethod.PUT, CATALOGO_ITEM).hasAuthority(Authorities.ROLE_ADMIN);
 					regras.requestMatchers(HttpMethod.DELETE, CATALOGO_ITEM).hasAuthority(Authorities.ROLE_ADMIN);
 					regras.requestMatchers(HttpMethod.PATCH, CATALOGO_ESTADO).hasAuthority(Authorities.ROLE_ADMIN);
+					// ----- só ADMIN (provas, D154) -----
+					regras.requestMatchers(HttpMethod.POST, PROVA_CRIACAO).hasAuthority(Authorities.ROLE_ADMIN);
+					leitura(regras, PROVA_LEITURA, url -> url.hasAuthority(Authorities.ROLE_ADMIN));
 					// D113: o resto de /actuator e /error = 401 para anônimo e 403 para autenticado, nunca 404.
 					regras.requestMatchers("/actuator/**", "/actuator", "/error", "/error/**").denyAll();
 					// D121: o que não tem regra é NEGADO (401 anônimo, 403 autenticado), inclusive rota inexistente.

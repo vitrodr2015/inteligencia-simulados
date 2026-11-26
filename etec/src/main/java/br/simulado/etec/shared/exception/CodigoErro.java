@@ -30,6 +30,11 @@ public enum CodigoErro {
 	// Subtópico
 	SUBTOPICO_NOME_DUPLICADO,
 	SUBTOPICO_NAO_ENCONTRADO,
+
+	// Prova (Sprint 2, fatia 2a; D149, D150)
+	PROVA_NAO_ENCONTRADA,
+	PROVA_DUPLICADA,
+
 	// Autenticação (Módulo 10; D120 para o 401 e o 403 da cadeia de segurança)
 	NAO_AUTENTICADO,
 	CREDENCIAIS_INVALIDAS,

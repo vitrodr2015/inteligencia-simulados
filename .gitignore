@@ -45,3 +45,6 @@ secrets/
 
 ### VS Code ###
 .vscode/
+
+### Logs locais ###
+*.log

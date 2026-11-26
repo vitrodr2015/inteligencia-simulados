@@ -2,7 +2,7 @@ Contrato da API — Fase 1 (v1.0, aprovada)
 
 O contrato é revisado e aprovado antes de qualquer código. Ele é rascunho até a aprovação; a v1.0 é a versão aprovada (D83), e depois dela qualquer mudança é registrada na seção 10. Este é o documento completo da API da fase 1 e não depende de outros.
 
-Estado: versão aprovada (v1.0). Decisões D1 a D144 e D148 decididas (D145 a D147: aprovadas e ainda não implementadas, ver memoria.md), exceto D22 e D24 (pendências externas).
+Estado: versão aprovada (v1.0). Decisões D1 a D144, D148 a D151 e D154 decididas (D145 a D147: aprovadas e ainda não implementadas, ver memoria.md; D152, D153, D155 e D156: reservadas para a fatia 2b, ainda não implementadas), exceto D22 e D24 (pendências externas).
 
 1. Convenções gerais (valem para todas as rotas)
 Tema	Decisão
@@ -47,7 +47,7 @@ Operação	Anônimo	STUDENT	ADMIN
 POST /auth/register, /auth/signin, /auth/refresh, /auth/logout; GET /termos/vigente	✅	✅	✅
 GET/PATCH/DELETE /me	❌	✅	✅
 POST /me/senha	❌	✅	✅
-GET de matérias, subtópicos e provas	❌	✅ (só ativos; provas só PUBLICADAS)	✅ (todos)
+GET de matérias, subtópicos e provas	❌	✅ (só ativos; provas só PUBLICADAS, a partir da fatia 5: até lá, provas só para o ADMIN, D154)	✅ (todos)
 Escrever matérias e subtópicos; publicar prova	❌	❌	✅
 /admin/** (provas, questões, importação, gabarito)	❌	❌	✅
 /tentativas/**	❌	✅ (só as próprias)	❌
@@ -61,6 +61,7 @@ Anotação da tabela quem pode o quê:
 - O HEAD segue a regra do GET da mesma rota.
 - O OPTIONS de preflight de CORS (com Origin e Access-Control-Request-Method) é público (D100); um OPTIONS comum é negado.
 - A autorização vem antes da existência, do formato e do conflito: STUDENT recebe 403 numa escrita mesmo com id inexistente, id malformado ou corpo inválido.
+- Adiamento temporário da tabela acima (D154): até a fatia 5 (leitura da prova pelo aluno), STUDENT e GUARDIAN recebem 403 em GET /provas e GET /provas/{id}, e só o ADMIN lê provas. POST /admin/provas é só do ADMIN. O resto de /admin/** continua negado (D121).
 
 Tentativa de outro aluno responde 404 (não revela que existe).
 
@@ -131,24 +132,27 @@ DELETE	/subtopicos/{id}	204	400, 401, 403, 404, 409 (tem questões, de qualquer 
 4.3 Prova
 Campo	Tipo	Regra	Quem preenche
 id	UUID	gerado	saída
-titulo	texto	obrigatório, até 150	vem da importação; saída
-banca	texto	obrigatório, até 80	importação; saída
-ano	inteiro	2000 a 2100	importação; saída
-semestre	inteiro	1 ou 2	importação; saída
-duracaoMinutos	inteiro	1 a 600 (a prova da ETEC tem 180)	importação; saída
-quantidadeQuestoes	inteiro	calculado: o número de questões da prova, uma por numero, em qualquer status (D108)	saída
-fonteUrl	texto	opcional, https, até 500	importação; saída
+titulo	texto	obrigatório; o servidor remove os espaços das pontas antes de validar; depois disso, 1 a 150 (D104)	criação (POST /admin/provas, D149); saída
+banca	texto	opcional (D150), até 80; os espaços das pontas são removidos e, em branco, vira nula (D104)	criação; saída
+ano	inteiro	opcional (D150), 2000 a 2100	criação; saída
+semestre	inteiro	opcional (D150), 1 ou 2	criação; saída
+duracaoMinutos	inteiro	obrigatório, 1 a 600 (a prova da ETEC tem 180)	criação; saída
+quantidadeQuestoes	inteiro	obrigatório, DECLARADO na criação, de 1 a 300 (teto fixo no código e no CHECK do banco; mudar exige migration, D151). Substitui o cálculo da D108 até a regra abaixo existir	criação; saída
+fonteUrl	texto	opcional, https, até 500; em branco vira nulo	criação; saída
 status	enum	RASCUNHO ou PUBLICADA	saída
 publicadaEm, criadoEm	data/hora	UTC	saída
 
-Uma prova é única por banca + ano + semestre (D20).
+Uma prova é única por banca + ano + semestre (D20), mas SÓ quando os três estão preenchidos (D150): banca, ano e semestre são opcionais, uma prova sem algum deles nunca conflita, e as combinações parciais são aceitas (no MySQL, NULL não conflita num índice único).
+
+Texto de entrada e campos inteiros (D86): o corpo só aceita número num campo inteiro; texto ("2024"), texto vazio, decimal (2024.5), booleano, lista ou objeto num campo inteiro dão 400 CORPO_ILEGIVEL, e nada é corrigido em silêncio. O programa da prova é interno (D143): o servidor o atribui (ETEC) e ele não aparece na entrada nem na saída. A saída traz id, titulo, banca, ano, semestre, duracaoMinutos, quantidadeQuestoes, fonteUrl, status, publicadaEm e criadoEm, nessa ordem.
 
 Verbo	Rota	Sucesso	Erros
-GET	/provas (filtros ano, semestre; ADMIN também status; sort: ano, semestre; padrão ano decrescente; sort=ano sem direção vale asc, e isso é intencional, D102). STUDENT que envia status (qualquer valor) = 400 (D28, D47)	200 lista paginada	400, 401, 403
-GET	/provas/{id} (STUDENT só vê PUBLICADA; senão 404)	200	400, 401, 403, 404
+POST	/admin/provas (só ADMIN; titulo, banca, ano, semestre, duracaoMinutos, quantidadeQuestoes e fonteUrl; a prova nasce em RASCUNHO, com publicadaEm nulo, D149)	201 + Location (/api/v1/provas/{id}, D78) e a prova completa (D96)	400, 401, 403, 409 (PROVA_DUPLICADA: já existe prova com a mesma banca + ano + semestre, só com os três preenchidos, D150)
+GET	/provas (filtros ano, semestre; ADMIN também status; sort: ano, semestre; padrão ano decrescente; sort=ano sem direção vale asc, e isso é intencional, D102; as provas sem ano ficam no FIM no padrão decrescente e no INÍCIO no crescente, comportamento do MySQL; desempate pelo id interno). STUDENT que envia status (qualquer valor) = 400 (D28, D47). Até a fatia 5 a rota é só do ADMIN: STUDENT e GUARDIAN levam 403 (D154)	200 lista paginada	400, 401, 403
+GET	/provas/{id} (STUDENT só vê PUBLICADA; senão 404; até a fatia 5 a rota é só do ADMIN, D154)	200	400, 401, 403, 404 (PROVA_NAO_ENCONTRADA)
 PATCH	/provas/{id}/publish (ADMIN)	200 com a prova completa (D96), idempotente	400, 401, 403, 404, 409 (sem questões, ou com questão ainda não publicada, o que inclui questão sem gabarito; detalhes.questoesPendentes lista os números das questões pendentes, D44)
 
-Não existe POST de prova (ela nasce pela importação). PUT e DELETE existem só sob /admin/provas e só em RASCUNHO (seção 5, D21). Prova publicada é imutável: o que muda depois de publicada é a questão, por nova versão (D18). Uma prova só é publicada com o gabarito completo (D13).
+A prova nasce ANTES das questões, pelo POST /admin/provas, em RASCUNHO (D149; revisa a D21 e o texto anterior "não existe POST de prova"). A importação (fatia 3) continuará podendo criar a prova, mas a IDENTIDADE da reimportação (a D20 identificava por banca + ano + semestre, agora opcionais, D150) será decidida antes da fatia 3. Regras registradas e AINDA NÃO implementadas (fatias 2b e 4, D151): o numero das questões da prova vai de 1 a quantidadeQuestoes, e a prova só publica com todas as questões cadastradas. PUT e DELETE existem só sob /admin/provas e só em RASCUNHO (seção 5, D21). Prova publicada é imutável: o que muda depois de publicada é a questão, por nova versão (D18). Uma prova só é publicada com o gabarito completo (D13).
 
 5. Questões, importação e gabarito (somente ADMIN)
 
@@ -187,7 +191,7 @@ Importação: entrada { prova: {titulo, banca, ano, semestre, duracaoMinutos, fo
 
 Fluxo esperado: importar a prova (sem gabarito) → aplicar o gabarito oficial de uma vez (PUT .../gabarito) → revisar → publicar as questões → publicar a prova. Para corrigir uma questão ou gabarito depois de publicado: POST /versoes, editar o rascunho e publicar; tentativas novas usam a última versão publicada e as antigas mantêm o snapshot (D18).
 
-Não existem: POST de questão avulsa (as questões entram pela importação).
+Nota (D149, D152): o cadastro unitário de questão é uma rota nova, prevista para a fatia 2b; ela ainda NÃO existe e esta seção não muda até lá. Hoje não existe POST de questão avulsa (as questões entram pela importação).
 
 6. Tentativas (aluno)
 
@@ -371,6 +375,14 @@ D142	Escolha da política: a propriedade app.entitlements.politica (hoje só stu
 D143	Programa de prova, INTERNO: a tabela programa (migration V7) tem uma linha, ETEC, e o código dela casa com Programa.ETEC (shared.programa; o CHECK da coluna tem o mesmo formato e um teste de integração prova a igualdade). Só as RAÍZES carregam programa_id: matéria agora, prova depois; o subtópico deriva o programa pela matéria e a questão pela prova (nenhuma coluna redundante). Nada de programa em rota, corpo ou resposta da API v1, e nenhum caminho de código para outro programa: o serviço de matéria atribui o ETEC lendo a tabela	✅ Confirmada
 D144	O nome da matéria é único POR PROGRAMA (índice uk_materia_programa_nome em programa_id + nome, sem distinguir maiúsculas e acentos), e não mais globalmente (refina a seção 4.1 e a D104). Como só existe o ETEC, nada muda para a API v1: a mesma matéria continua dando 409 MATERIA_NOME_DUPLICADO. A tradução do 409 reconhece SÓ a restrição desse índice; qualquer outra violação sobe como erro	✅ Confirmada (refina D104)
 D148	Numeração das migrations: a Sprint 2 usa a V7 e as seguintes; a migration do D92 (data_nascimento anulável) passa para a próxima numeração livre, na ordem da fila, e continua sendo pré-requisito da tarefa do DELETE /me. Nenhuma numeração é reservada com antecedência	✅ Confirmada (refina D92)
+D149	A prova nasce ANTES das questões, pelo POST /admin/provas (só ADMIN), sempre em RASCUNHO, com publicadaEm nulo e o programa atribuído pelo servidor (D143). Revisa a seção 4.3 (que dizia "não existe POST de prova") e a D21 (que só acrescentou PUT e DELETE de prova)	✅ Confirmada (revisa D21)
+D150	banca, ano e semestre da prova são OPCIONAIS. A unicidade por programa + banca + ano + semestre (índice uk_prova_programa_banca_ano_semestre) só vale com os TRÊS preenchidos: no MySQL, NULL não conflita num índice único, e as combinações parciais são aceitas. A tradução do 409 PROVA_DUPLICADA reconhece SÓ a violação desse índice; qualquer outra sobe como erro. Revisa a D20 e deixa explícito que a identidade da reimportação (a D20 identificava a prova por banca + ano + semestre) será decidida antes da fatia 3 (importação)	✅ Confirmada (revisa D20)
+D151	quantidadeQuestoes é dado DECLARADO na criação da prova, de 1 a 300 (teto fixo no código, em Prova.QUANTIDADE_MAXIMA_DE_QUESTOES, e no CHECK da migration V8; mudar o teto exige migration). Revisa a D108 (que a tratava como calculada). Regras registradas e a implementar: o numero das questões vai de 1 a N (fatia 2b) e a prova só publica com todas as questões cadastradas (fatia 4)	✅ Confirmada (revisa D108)
+D152	Cadastro unitário de questão é o caminho PRIMÁRIO, e a importação é um invólucro sobre o mesmo serviço	⏳ Reservada para a fatia 2b (aprovada, não implementada)
+D153	numero de questão repetido na prova: mesmo hash = 200 idempotente; hash diferente = 409 QUESTAO_NUMERO_EM_CONFLITO	⏳ Reservada para a fatia 2b (aprovada, não implementada)
+D154	STUDENT e GUARDIAN recebem 403 em GET /provas e GET /provas/{id} até a fatia 5 (leitura da prova pelo aluno): adiamento TEMPORÁRIO da tabela da seção 2. Só o ADMIN lê provas nesta fase	✅ Confirmada (adiamento temporário)
+D155	Limite do texto de cada alternativa da questão: 2000 caracteres	⏳ Reservada para a fatia 2b (aprovada, não implementada)
+D156	Questão com subtópico inativo: 409 SUBTOPICO_INATIVO	⏳ Reservada para a fatia 2b (aprovada, não implementada)
 9. Fora da fase 1 (de propósito)
 
 Pagamento e planos, entitlements como API (não existe GET /entitlements na fase 1; é um serviço interno com política stub explícita, D140), simulado curto, relatórios por subtópico, notas de corte, responsável e relatório semanal, plano de estudo, caderno de erros, IA, recuperação de senha, login com Google, envio de e-mail, questão anulada (D22), comportamento diferente para menores de idade (D24), outros exames (ENEM, OAB).
@@ -395,6 +407,8 @@ A v1.0 é a versão aprovada (D83). Toda mudança a partir dela entra aqui, com 
 
 2026-11-24 — Sprint 2, fatia 1 (programa). D143 (programa interno, só em matéria e prova, derivado nos demais), D144 (nome da matéria único POR PROGRAMA: mudança posterior à v1.0, refina a seção 4.1 e a D104) e D148 (numeração das migrations; o D92 passa à próxima livre). Migration V7; seção 4.1 atualizada. Nenhum endpoint novo e nenhuma mudança visível na API. Motivo: preparar o catálogo para outros programas sem custo agora.
 
+2026-11-24 — Sprint 2, fatia 2a (prova). D149 (a prova nasce antes das questões, pelo POST /admin/provas, em RASCUNHO; revisa a seção 4.3 e a D21), D150 (banca, ano e semestre opcionais; unicidade só com os três; revisa a D20), D151 (quantidadeQuestoes declarada, de 1 a 300; revisa a D108) e D154 (STUDENT e GUARDIAN com 403 em /provas até a fatia 5; adiamento temporário da seção 2). Reservadas, sem implementação: D152, D153, D155 e D156 (fatia 2b). Rotas novas: POST /admin/provas, GET /provas e GET /provas/{id}, as três só do ADMIN. Migration V8 (prova). Seção 1 (campo inteiro não aceita texto, decimal nem vazio, D86), seção 2 (nota do adiamento), seção 4.3, seção 5 (só a nota da rota nova de questão, fatia 2b), seção 11 e apêndice A (PROVA_NAO_ENCONTRADA e PROVA_DUPLICADA) atualizados. Motivo: começar o catálogo de provas pela prova, antes da questão.
+
 11. Pendências abertas e limitações conhecidas
 
 Menores de idade e LGPD (externa, D24): na fase 1, menor é só uma marca calculada, sem mudar comportamento. Antes do beta, é preciso definir a idade mínima e o consentimento do responsável, com apoio jurídico.
@@ -408,7 +422,9 @@ Ciclo de vida do token (D133 a D139), riscos conhecidos: (a) PWA em rede ruim: s
 
 Entitlements (D140 a D142), limitações conhecidas: (a) o stub libera tudo o que conhece (INICIAR_TENTATIVA no ETEC) para STUDENT e ADMIN e PRECISA ser trocado por regras reais antes de cobrar; (b) só existe o recurso INICIAR_TENTATIVA e o programa ETEC: explicação da questão, cota de simulados curtos e histórico entram com o primeiro endpoint que os usa (cota e histórico pedem estado, e a Decisao deixa a porta aberta); (c) o programa é só um código até existir exam_program, na Sprint 2.
 
-Programa (D143, D144), limitações conhecidas: (a) só existe o programa ETEC, e a listagem de matérias não filtra por programa (não há o que filtrar); (b) a prova ganha programa_id quando a tabela dela nascer, e o subtópico e a questão derivam o programa pela matéria e pela prova; (c) a origem das questões e os direitos autorais precisam estar decididos antes do primeiro conteúdo real no banco (um campo de origem entra depois, por migration aditiva).
+Programa (D143, D144), limitações conhecidas: (a) só existe o programa ETEC, e a listagem de matérias não filtra por programa (não há o que filtrar); (b) a prova tem programa_id (migration V8), e o subtópico e a questão derivam o programa pela matéria e pela prova; (c) a origem das questões e os direitos autorais precisam estar decididos antes do primeiro conteúdo real no banco (um campo de origem entra depois, por migration aditiva).
+
+Prova (D149 a D151, D154), limitações conhecidas e regras a decidir: (a) a regra de que o numero das questões vai de 1 a quantidadeQuestoes e a publicação com todas as questões cadastradas estão REGISTRADAS (D151), mas só serão implementadas nas fatias 2b e 4; até lá, quantidadeQuestoes é só um dado declarado e nada o confere; (b) regra a decidir na fatia 4: o PUT da prova NÃO pode reduzir quantidadeQuestoes abaixo do maior numero de questão já cadastrado; (c) a identidade da reimportação (D20 com banca, ano e semestre opcionais, D150) será decidida antes da fatia 3; (d) STUDENT e GUARDIAN recebem 403 em /provas até a fatia 5 (D154), e a tabela da seção 2 volta a valer então; (e) na listagem, as provas sem ano ficam no fim com sort decrescente (o padrão) e no início com sort crescente, comportamento do MySQL; (f) a banca compara pela collation da coluna (ignora caixa e acento) e a unicidade só vale com banca, ano e semestre preenchidos: "Vunesp" e "VUNESP" são a mesma banca, e duas provas sem banca podem ter o mesmo ano e semestre.
 
 Apêndice A. Catálogo de códigos de erro (D84)
 
@@ -416,7 +432,7 @@ Cada recurso novo acrescenta os seus códigos a este catálogo ao ser implementa
 
 Código	Status	Quando	Situação
 VALIDACAO_FALHOU	400	campos inválidos no corpo (traz campos); também é o código do 400 de materiaId inexistente no corpo do POST de subtópico, com campos[materiaId] (D14), do 400 de data fora do formato ou inexistente (D60, com a mensagem "Data inválida. Use o formato aaaa-mm-dd."), de e-mail fora do ASCII (D119), de senha fora de 8 a 72 bytes e de termos diferentes dos vigentes, sem código novo	Implementado
-CORPO_ILEGIVEL	400	JSON ilegível ou de tipo errado	Implementado
+CORPO_ILEGIVEL	400	JSON ilegível ou de tipo errado (inclui texto, texto vazio, decimal ou booleano num campo inteiro, e número ou booleano num campo de texto, D86)	Implementado
 PARAMETRO_AUSENTE	400	parâmetro obrigatório ausente	Implementado
 PARAMETRO_INVALIDO	400	parâmetro com valor inválido (page, size, ativo, id malformado...)	Implementado
 ORDENACAO_INVALIDA	400	sort com formato ou campo inválido	Implementado
@@ -428,6 +444,7 @@ ACESSO_NEGADO	403	autenticado sem permissão: papel que não pode a rota (STUDEN
 RECURSO_NAO_ENCONTRADO	404	rota liberada pela segurança mas sem recurso mapeado (hoje, só os três caminhos de saúde do actuator, que ainda não existe); a rota sem regra NÃO chega aqui: é negada com 401 ou 403 (D121)	Implementado
 MATERIA_NAO_ENCONTRADA	404	matéria inexistente (ou inativa para o STUDENT)	Implementado
 SUBTOPICO_NAO_ENCONTRADO	404	subtópico inexistente (para o STUDENT, também o inativo ou de matéria inativa, quando os papéis existirem)	Implementado
+PROVA_NAO_ENCONTRADA	404	prova inexistente (GET /provas/{id}); quando o aluno puder ler provas, a não PUBLICADA terá o mesmo 404 (D154, seção 4.3)	Implementado
 METODO_NAO_PERMITIDO	405	método HTTP que a segurança libera para a rota mas que o controller não atende (o método sem regra é negado com 401 ou 403, D121, então hoje não ocorre)	Implementado
 FORMATO_NAO_ACEITO	406	Accept que não seja JSON	Implementado
 CONFLITO	409	conflito sem código próprio	Implementado
@@ -435,6 +452,7 @@ MATERIA_NOME_DUPLICADO	409	já existe matéria com o nome	Implementado
 MATERIA_COM_SUBTOPICOS	409	matéria com subtópicos, ativos ou não, não pode ser apagada	Implementado
 SUBTOPICO_NOME_DUPLICADO	409	já existe subtópico com o nome nessa matéria	Implementado
 MATERIA_INATIVA	409	subtópico criado, ou inativo que seria reativado, em matéria desativada	Implementado
+PROVA_DUPLICADA	409	já existe prova com a mesma banca + ano + semestre no programa; só quando os três estão preenchidos (D150); a violação do índice uk_prova_programa_banca_ano_semestre também vira este 409 (corrida)	Implementado
 EMAIL_DUPLICADO	409	já existe usuário com o e-mail (normalizado, D105; D37)	Implementado
 TENTATIVA_EM_ANDAMENTO	409	já há tentativa em andamento nessa prova (traz detalhes.tentativaId)	Nomeado no contrato; a implementar
 REQUISICAO_INVALIDA	400	URL recusada pelo firewall de segurança (barra dupla, ;jsessionid, %2e e semelhantes), mensagem fixa (D124)	Implementado

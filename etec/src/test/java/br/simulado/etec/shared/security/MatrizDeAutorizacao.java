@@ -27,7 +27,8 @@ public final class MatrizDeAutorizacao {
 	}
 
 	/** Recursos criados (por um ADMIN) para cada execução de uma linha. */
-	public record Ctx(String materiaId, String subtopicoId, String materiaVaziaId, String idInexistente, String sufixo) {
+	public record Ctx(String materiaId, String subtopicoId, String materiaVaziaId, String provaId, String idInexistente,
+			String sufixo) {
 	}
 
 	/**
@@ -154,6 +155,43 @@ public final class MatrizDeAutorizacao {
 				401, 403, 403, 204);
 		linha("apagar subtópico inexistente", "DELETE", "/api/v1/subtopicos/{id}",
 				c -> "/api/v1/subtopicos/" + c.idInexistente(), null, 401, 403, 403, 404);
+
+		// ----- provas (Sprint 2, fatia 2a): as três rotas são só do ADMIN; STUDENT e GUARDIAN levam 403 (D154) -----
+		linha("criar prova", "POST", "/api/v1/admin/provas", c -> "/api/v1/admin/provas",
+				c -> "{\"titulo\":\"Prova da matriz " + c.sufixo() + "\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}", 401,
+				403, 403, 201);
+		linha("criar prova com corpo inválido", "POST", "/api/v1/admin/provas", c -> "/api/v1/admin/provas", c -> "{}", 401,
+				403, 403, 400);
+		for (String metodo : new String[] { "GET", "HEAD" }) {
+			fixa(metodo, "/api/v1/provas", 401, 403, 403, 200);
+			linha("prova por id", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/" + c.provaId(), null, 401, 403, 403, 200);
+			linha("prova inexistente", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/" + c.idInexistente(), null, 401, 403,
+					403, 404);
+			linha("prova com id malformado", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/abc", null, 401, 403, 403, 400);
+		}
+		// o que ainda NÃO existe em provas é negado, inclusive para o ADMIN (D121): PUT, DELETE, PATCH e o resto de /admin/**
+		for (String metodo : new String[] { "PUT", "DELETE", "PATCH" }) {
+			linha(metodo + " em /admin/provas/{id} (ainda não existe)", metodo, null, c -> "/api/v1/admin/provas/" + c.provaId(),
+					c -> "{}", 401, 403, 403, 403);
+			linha(metodo + " em /provas/{id} (ainda não existe)", metodo, null, c -> "/api/v1/provas/" + c.provaId(), c -> "{}",
+					401, 403, 403, 403);
+			linha(metodo + " na coleção /admin/provas (ainda não existe)", metodo, null, c -> "/api/v1/admin/provas", c -> "{}",
+					401, 403, 403, 403);
+			linha(metodo + " na coleção /provas (ainda não existe)", metodo, null, c -> "/api/v1/provas", c -> "{}", 401, 403,
+					403, 403);
+		}
+		linha("POST em /provas (a criação é só em /admin/provas)", "POST", null, c -> "/api/v1/provas", c -> "{}", 401, 403, 403,
+				403);
+		linha("POST em /provas/{id}", "POST", null, c -> "/api/v1/provas/" + c.provaId(), c -> "{}", 401, 403, 403, 403);
+		linha("GET em /admin/provas (a listagem é em /provas)", "GET", null, c -> "/api/v1/admin/provas", null, 401, 403, 403, 403);
+		linha("GET em /admin/provas/{id} (a leitura é em /provas/{id})", "GET", null, c -> "/api/v1/admin/provas/" + c.provaId(),
+				null, 401, 403, 403, 403);
+		linha("publicar prova (ainda não existe)", "PATCH", null, c -> "/api/v1/provas/" + c.provaId() + "/publish", null, 401,
+				403, 403, 403);
+		linha("gabarito da prova (ainda não existe)", "PUT", null, c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito",
+				c -> "{\"itens\":[]}", 401, 403, 403, 403);
+		linha("importação (ainda não existe)", "POST", null, c -> "/api/v1/admin/importacoes", c -> "{}", 401, 403, 403, 403);
+		linha("questões do admin (ainda não existem)", "GET", null, c -> "/api/v1/admin/questoes", null, 401, 403, 403, 403);
 
 		// ----- sem regra = negado (D121): rota inexistente, método sem regra, actuator e /error -----
 		linha("GET em rota inexistente", "GET", null, c -> "/api/v1/nao-existe", null, 401, 403, 403, 403);

@@ -48,7 +48,10 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 				.post("/api/v1/subtopicos").then().statusCode(201).extract().path("id");
 		String materiaVazia = requisicaoComo(Papel.ADMIN).body("{\"nome\":\"Matéria vazia " + sufixo + "\"}").post(MATERIAS)
 				.then().statusCode(201).extract().path("id");
-		return new Ctx(materia, subtopico, materiaVazia, MatrizDeAutorizacao.uuidInexistente(), sufixo);
+		String prova = requisicaoComo(Papel.ADMIN)
+				.body("{\"titulo\":\"Prova base " + sufixo + "\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}")
+				.post("/api/v1/admin/provas").then().statusCode(201).extract().path("id");
+		return new Ctx(materia, subtopico, materiaVazia, prova, MatrizDeAutorizacao.uuidInexistente(), sufixo);
 	}
 
 	private RequestSpecification comoPerfil(Perfil perfil) {

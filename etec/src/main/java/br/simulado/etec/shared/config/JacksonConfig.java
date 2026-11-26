@@ -60,6 +60,12 @@ public class JacksonConfig {
 				.withCoercionConfig(LogicalType.Textual, configuracao -> configuracao
 						.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)
 						.setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
+						.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))
+				// Mesmo princípio para campo inteiro (prova, D151): "2024" e 2024.5 não viram 2024 em silêncio.
+				.withCoercionConfig(LogicalType.Integer, configuracao -> configuracao
+						.setCoercion(CoercionInputShape.String, CoercionAction.Fail)
+						.setCoercion(CoercionInputShape.EmptyString, CoercionAction.Fail)
+						.setCoercion(CoercionInputShape.Float, CoercionAction.Fail)
 						.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail));
 	}
 
