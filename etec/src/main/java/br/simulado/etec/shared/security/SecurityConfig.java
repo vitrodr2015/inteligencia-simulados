@@ -83,6 +83,9 @@ public class SecurityConfig {
 
 	static final String[] QUESTAO_LEITURA = { "/api/v1/admin/questoes", "/api/v1/admin/questoes/{id}" };
 
+	/** Importação em lote (fatia 3): uma rota, só POST, só ADMIN. */
+	static final String[] IMPORTACAO = { "/api/v1/admin/importacoes" };
+
 	/** Documentação OpenAPI: só entra como pública quando está ligada (desenvolvimento e homologação, D34). */
 	static final String[] DOCUMENTACAO = { "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui.html",
 			"/swagger-ui/**" };
@@ -139,6 +142,8 @@ public class SecurityConfig {
 					// ----- só ADMIN (questões, fatia 2b-i) -----
 					regras.requestMatchers(HttpMethod.POST, QUESTAO_CRIACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					leitura(regras, QUESTAO_LEITURA, url -> url.hasAuthority(Authorities.ROLE_ADMIN));
+					// ----- só ADMIN (importação em lote, fatia 3) -----
+					regras.requestMatchers(HttpMethod.POST, IMPORTACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					// D113: o resto de /actuator e /error = 401 para anônimo e 403 para autenticado, nunca 404.
 					regras.requestMatchers("/actuator/**", "/actuator", "/error", "/error/**").denyAll();
 					// D121: o que não tem regra é NEGADO (401 anônimo, 403 autenticado), inclusive rota inexistente.

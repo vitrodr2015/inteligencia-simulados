@@ -78,6 +78,12 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:false}
 
 server:
+  tomcat:
+    # Quanto do corpo AINDA NÃO LIDO o Tomcat descarta depois de responder sem derrubar a conexão (maxSwallowSize). O padrão
+    # (2 MB) fazia o cliente perder o 413 da importação já com 3 MB: a conexão caía antes de ele ler a resposta. Com 20 MB o
+    # 413 chega para corpos de até 20 MB (o maior lote que passa em todas as regras por item fica abaixo disso); acima, o Tomcat
+    # ainda fecha a conexão, de propósito. Vale para todas as rotas.
+    max-swallow-size: 20MB
   error:
     # Nenhum detalhe de erro no corpo (D127): sem mensagem, exceção nem pilha, inclusive nas respostas que o container
     # (Tomcat) dá antes da cadeia de segurança. (No Boot 4.2 o campo path é SEMPRE incluído, não há propriedade que o tire.)

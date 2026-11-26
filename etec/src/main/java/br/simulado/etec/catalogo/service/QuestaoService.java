@@ -3,6 +3,7 @@ package br.simulado.etec.catalogo.service;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -13,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.simulado.etec.catalogo.dto.AlternativaRequest;
@@ -35,14 +37,16 @@ import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
 
 /**
- * Regras da questão (contrato, seção 5). O cadastro unitário é o caminho PRIMÁRIO (D152): a importação da fatia 3 chamará
- * {@link #cadastrar} em laço, dentro de uma transação sua, sem duplicar nenhuma regra. Por isso este service não conhece HTTP.
+ * Regras da questão (contrato, seção 5). O cadastro unitário é o caminho PRIMÁRIO (D152). O cadastro tem duas partes,
+ * {@link #travarProvaEditavel} e {@link #cadastrarNaProva}, que o unitário ({@link #cadastrar}) e a importação em lote usam,
+ * sem duplicar nenhuma regra. Este service não conhece HTTP.
  *
- * <p>Ordem do cadastro (D79, D153, D156, D157, D158): prova inexistente (404) → prova que não é RASCUNHO (409 PROVA_NAO_EDITAVEL) → numero
- * acima da quantidade da prova (400) → subtópico inexistente ou de outro programa (400) → subtópico inativo ou de matéria inativa
- * (409 SUBTOPICO_INATIVO) → numero já cadastrado: mesmo hash = devolve a questão gravada (idempotente), hash diferente = 409
- * QUESTAO_NUMERO_EM_CONFLITO → grava. A linha da prova fica TRAVADA (SELECT ... FOR UPDATE) do começo ao fim: os cadastros da mesma
- * prova se serializam, e a decisão "já existe?" nunca corre com outra transação.
+ * <p>Ordem do cadastro (D79, D153, D156 a D158 e a D169): prova inexistente (404) → prova que não é RASCUNHO (409
+ * PROVA_NAO_EDITAVEL) → numero acima da quantidade da prova (400) → subtópico inexistente ou de outro programa (400) → numero já
+ * cadastrado: mesmo hash = a questão gravada (idempotente), hash diferente = conflito (409 QUESTAO_NUMERO_EM_CONFLITO) → só
+ * quando vai gravar: subtópico inativo ou de matéria inativa (409 SUBTOPICO_INATIVO) → grava. A linha da prova fica TRAVADA
+ * (SELECT ... FOR UPDATE) até o fim da transação: os cadastros da mesma prova se serializam, e a decisão "já existe?" nunca
+ * corre com outra transação.
  */
 @Service
 @Transactional(readOnly = true)
@@ -51,8 +55,23 @@ public class QuestaoService {
 	/** A listagem só ordena por numero (D77); padrão: numero crescente. */
 	public static final CamposOrdenaveis CAMPOS_ORDENAVEIS = CamposOrdenaveis.de(Sort.by(Sort.Order.asc("numero")), "numero");
 
-	/** O que o cadastro fez: criou a questão agora ({@code criada}) ou o numero já tinha a MESMA questão (idempotente, D153). */
-	public record ResultadoDoCadastro(QuestaoVersao versao, boolean criada) {
+	/** O que aconteceu com uma questão enviada ao cadastro. */
+	public enum Situacao {
+		/** Gravada agora. */
+		CRIADA,
+		/** O numero já tinha a MESMA questão (mesmo hash): nada foi gravado (D153). */
+		JA_EXISTIA,
+		/** O numero já tem questão de conteúdo diferente: nada foi gravado. */
+		CONFLITO
+	}
+
+	/** O resultado do cadastro; {@code versao} é a gravada (ou a que já estava lá) e é {@code null} no CONFLITO. */
+	public record ResultadoDoCadastro(Situacao situacao, QuestaoVersao versao) {
+
+		public boolean criada() {
+			return situacao == Situacao.CRIADA;
+		}
+
 	}
 
 	private final ProvaRepository provas;
@@ -71,46 +90,90 @@ public class QuestaoService {
 		this.subtopicos = subtopicos;
 	}
 
+	/** O cadastro unitário: trava a prova, cadastra nela e traduz o conflito de conteúdo no 409. */
 	@Transactional
 	public ResultadoDoCadastro cadastrar(UUID provaPublicId, QuestaoRequest dados) {
-		// As 5 alternativas A a E: o HTTP já validou, mas o service não depende dele (a importação o chama direto).
-		if (!AlternativasValidasValidator.valida(dados.alternativas())) {
-			throw InvalidRequestException.campoInvalido("alternativas",
-					"A questão precisa de exatamente 5 alternativas, com as letras A, B, C, D e E, cada uma uma vez.");
+		exigirAlternativas(dados);
+		ResultadoDoCadastro resultado = gravarNaProva(travarProvaEditavel(provaPublicId), dados);
+		if (resultado.situacao() == Situacao.CONFLITO) {
+			throw new ConflictException(CodigoErro.QUESTAO_NUMERO_EM_CONFLITO,
+					"Já existe uma questão com esse número e conteúdo diferente.",
+					Map.of("numerosEmConflito", List.of(dados.numero())));
 		}
+		return resultado;
+	}
+
+	/**
+	 * Primeira parte do cadastro: TRAVA a linha da prova (SELECT ... FOR UPDATE) até o fim da transação e exige que ela esteja em
+	 * RASCUNHO (404 se não existe; 409 PROVA_NAO_EDITAVEL se não é rascunho).
+	 *
+	 * <p>Precisa ser a PRIMEIRA leitura da transação de quem chama. No REPEATABLE READ do MySQL, uma leitura comum antes da trava
+	 * fixa o snapshot: quem esperou a trava não enxergaria o que a transação anterior gravou, decidiria que o numero está livre e
+	 * terminaria em erro no índice único.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public Prova travarProvaEditavel(UUID provaPublicId) {
 		Prova prova = provas.buscarComTrava(provaPublicId).orElseThrow(QuestaoService::provaNaoEncontrada);
 		if (prova.getStatus() != StatusProva.RASCUNHO) {
 			throw new ConflictException(CodigoErro.PROVA_NAO_EDITAVEL, "A prova não está em rascunho e não aceita novas questões.");
 		}
+		return prova;
+	}
+
+	/**
+	 * Segunda parte: cadastra UMA questão na prova que {@link #travarProvaEditavel} devolveu, na mesma transação. Usada pelo
+	 * cadastro unitário e pelo lote.
+	 *
+	 * <p>O conflito de conteúdo no numero é DEVOLVIDO ({@link Situacao#CONFLITO}, sem nada gravado), e não lançado: uma exceção que
+	 * cruza o proxy transacional marca a transação para rollback, e o lote precisa continuar para juntar todos os conflitos. As
+	 * demais recusas são exceções.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public ResultadoDoCadastro cadastrarNaProva(Prova provaTravada, QuestaoRequest dados) {
+		exigirAlternativas(dados);
+		return gravarNaProva(provaTravada, dados);
+	}
+
+	/** As 5 alternativas A a E: o HTTP já validou, mas o service não depende dele. */
+	private static void exigirAlternativas(QuestaoRequest dados) {
+		if (!AlternativasValidasValidator.valida(dados.alternativas())) {
+			throw InvalidRequestException.campoInvalido("alternativas",
+					"A questão precisa de exatamente 5 alternativas, com as letras A, B, C, D e E, cada uma uma vez.");
+		}
+	}
+
+	/**
+	 * Ordem: numero acima da prova (400) → subtópico inexistente ou de outro programa (400) → hash: o numero já tem questão? igual =
+	 * JA_EXISTIA, diferente = CONFLITO → só então o estado do subtópico (409 SUBTOPICO_INATIVO) → grava. Quando nada será gravado,
+	 * o subtópico estar desativado não importa.
+	 */
+	private ResultadoDoCadastro gravarNaProva(Prova prova, QuestaoRequest dados) {
 		if (dados.numero() > prova.getQuantidadeQuestoes()) {
 			throw InvalidRequestException.campoInvalido("numero",
 					"O número deve ser de 1 até a quantidade de questões da prova (" + prova.getQuantidadeQuestoes() + ").");
 		}
 		Subtopico subtopico = subtopicos.findByPublicId(dados.subtopicoId()).filter(s -> mesmoPrograma(s, prova))
 				.orElseThrow(() -> InvalidRequestException.campoInvalido("subtopicoId", "O subtópico informado não existe."));
-		if (!subtopico.visivelParaAluno()) {
-			throw new ConflictException(CodigoErro.SUBTOPICO_INATIVO, "O subtópico está desativado, ou é de uma matéria desativada.");
-		}
 
 		Map<String, String> textoPorLetra = dados.alternativas().stream()
 				.collect(Collectors.toMap(AlternativaRequest::letra, AlternativaRequest::texto));
 		String hash = HashDaQuestao.calcular(prova.getPublicId(), dados.numero(), dados.textoApoio(), dados.grupoApoio(),
 				dados.enunciado(), dados.imagemUrl(), textoPorLetra);
 
-		return questoes.findByProvaAndNumero(prova, dados.numero()).map(existente -> {
-			if (!existente.getHashConteudo().equals(hash)) {
-				throw new ConflictException(CodigoErro.QUESTAO_NUMERO_EM_CONFLITO,
-						"Já existe uma questão com esse número e conteúdo diferente.",
-						Map.of("numerosEmConflito", List.of(dados.numero())));
-			}
-			return new ResultadoDoCadastro(versaoExibida(existente), false);
-		}).orElseGet(() -> {
-			Questao questao = questoes.save(new Questao(prova, dados.numero(), hash));
-			QuestaoVersao primeira = versoes.saveAndFlush(new QuestaoVersao(questao, subtopico, dados.textoApoio(),
-					dados.grupoApoio(), dados.enunciado(), dados.imagemUrl(), textoPorLetra, dados.gabarito(),
-					dados.dificuldade(), dados.explicacao()));
-			return new ResultadoDoCadastro(primeira, true);
-		});
+		Optional<Questao> existente = questoes.findByProvaAndNumero(prova, dados.numero());
+		if (existente.isPresent()) {
+			return existente.get().getHashConteudo().equals(hash)
+					? new ResultadoDoCadastro(Situacao.JA_EXISTIA, versaoExibida(existente.get()))
+					: new ResultadoDoCadastro(Situacao.CONFLITO, null);
+		}
+		if (!subtopico.visivelParaAluno()) {
+			throw new ConflictException(CodigoErro.SUBTOPICO_INATIVO, "O subtópico está desativado, ou é de uma matéria desativada.");
+		}
+		Questao questao = questoes.save(new Questao(prova, dados.numero(), hash));
+		QuestaoVersao primeira = versoes.saveAndFlush(new QuestaoVersao(questao, subtopico, dados.textoApoio(),
+				dados.grupoApoio(), dados.enunciado(), dados.imagemUrl(), textoPorLetra, dados.gabarito(),
+				dados.dificuldade(), dados.explicacao()));
+		return new ResultadoDoCadastro(Situacao.CRIADA, primeira);
 	}
 
 	/**

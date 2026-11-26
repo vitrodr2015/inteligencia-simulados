@@ -68,6 +68,9 @@ app:
 
 # Swagger desligado por padrão, como em produção; os testes do Swagger ligam por propriedade.
 server:
+  tomcat:
+    # O mesmo do application.yml principal (o 413 da importação precisa chegar ao cliente); GuardasDeArquivosReaisTest confere.
+    max-swallow-size: 20MB
   error:
     # Nenhum detalhe de erro no corpo (D127): sem mensagem, exceção nem pilha, inclusive nas respostas que o container
     # (Tomcat) dá antes da cadeia de segurança. (No Boot 4.2 o campo path é SEMPRE incluído, não há propriedade que o tire.)

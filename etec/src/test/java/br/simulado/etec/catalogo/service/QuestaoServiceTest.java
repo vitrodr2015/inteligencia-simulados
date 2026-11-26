@@ -44,6 +44,7 @@ import br.simulado.etec.catalogo.repository.QuestaoRepository;
 import br.simulado.etec.catalogo.repository.QuestaoVersaoRepository;
 import br.simulado.etec.catalogo.repository.SubtopicoRepository;
 import br.simulado.etec.catalogo.service.QuestaoService.ResultadoDoCadastro;
+import br.simulado.etec.catalogo.service.QuestaoService.Situacao;
 import br.simulado.etec.shared.exception.ApiException;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
@@ -366,6 +367,83 @@ class QuestaoServiceTest {
 		assertThat(resultado.criada()).isFalse();
 		assertThat(resultado.versao().getGabarito()).as("a resposta mostra o gabarito GRAVADO").isEqualTo("A");
 		assertThat(resultado.versao().getExplicacao()).isEqualTo("explicação antiga");
+	}
+
+	// ----- idempotência ANTES do estado do subtópico (D169) -----
+
+	private Questao jaGravada(int numero) {
+		String hash = HashDaQuestao.calcular(prova.getPublicId(), numero, null, null, "Quanto é 1+1?", null,
+				Map.of("A", "um", "B", "dois", "C", "três", "D", "quatro", "E", "cinco"));
+		return new Questao(prova, numero, hash);
+	}
+
+	@Test
+	void deve_devolver_ja_existia_sem_olhar_o_estado_do_subtopico_quando_a_mesma_questao_ja_esta_gravada() {
+		subtopico.desativar();
+		prepararCaminhoFeliz();
+		Questao existente = jaGravada(4);
+		QuestaoVersao gravada = new QuestaoVersao(existente, subtopico, null, null, "Quanto é 1+1?", null,
+				Map.of("A", "um", "B", "dois", "C", "três", "D", "quatro", "E", "cinco"), null, null, null);
+		when(questoes.findByProvaAndNumero(prova, 4)).thenReturn(Optional.of(existente));
+		when(versoes.findByQuestaoAndStatus(existente, StatusQuestao.RASCUNHO)).thenReturn(Optional.of(gravada));
+
+		ResultadoDoCadastro resultado = servico.cadastrar(prova.getPublicId(), dados(4));
+
+		assertThat(resultado.situacao()).isEqualTo(Situacao.JA_EXISTIA);
+		assertThat(resultado.versao()).isSameAs(gravada);
+		verify(questoes, never()).save(any());
+	}
+
+	@Test
+	void deve_dar_o_conflito_de_conteudo_antes_do_subtopico_inativo_quando_o_numero_tem_outra_questao() {
+		materia.desativar();
+		prepararCaminhoFeliz();
+		when(questoes.findByProvaAndNumero(prova, 4)).thenReturn(Optional.of(new Questao(prova, 4, "0".repeat(64))));
+
+		assertThatThrownBy(() -> servico.cadastrar(prova.getPublicId(), dados(4))).isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_NUMERO_EM_CONFLITO"));
+	}
+
+	@Test
+	void deve_continuar_exigindo_o_subtopico_existente_e_do_programa_mesmo_quando_o_numero_ja_tem_questao() {
+		when(provas.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(subtopicos.findByPublicId(subtopico.getPublicId())).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.cadastrar(prova.getPublicId(), dados(4))).isInstanceOf(InvalidRequestException.class);
+		verify(questoes, never()).findByProvaAndNumero(any(), org.mockito.ArgumentMatchers.anyInt());
+	}
+
+	// ----- as duas partes usadas pelo lote -----
+
+	@Test
+	void deve_devolver_conflito_sem_lancar_nem_gravar_quando_cadastra_na_prova_travada_com_conteudo_diferente() {
+		when(subtopicos.findByPublicId(subtopico.getPublicId())).thenReturn(Optional.of(subtopico));
+		when(questoes.findByProvaAndNumero(prova, 4)).thenReturn(Optional.of(new Questao(prova, 4, "0".repeat(64))));
+
+		ResultadoDoCadastro resultado = servico.cadastrarNaProva(prova, dados(4));
+
+		assertThat(resultado.situacao()).isEqualTo(Situacao.CONFLITO);
+		assertThat(resultado.versao()).isNull();
+		verify(questoes, never()).save(any());
+		verify(provas, never()).buscarComTrava(any());
+	}
+
+	@Test
+	void deve_validar_as_alternativas_tambem_ao_cadastrar_na_prova_travada() {
+		assertThatThrownBy(() -> servico.cadastrarNaProva(prova, dados(1, "E", cinco().subList(0, 4))))
+				.isInstanceOf(InvalidRequestException.class);
+		verify(questoes, never()).save(any());
+	}
+
+	@Test
+	void deve_travar_a_prova_e_devolve_la_so_quando_esta_em_rascunho() {
+		when(provas.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+
+		assertThat(servico.travarProvaEditavel(prova.getPublicId())).isSameAs(prova);
+
+		ReflectionTestUtils.setField(prova, "status", StatusProva.PUBLICADA);
+		assertThatThrownBy(() -> servico.travarProvaEditavel(prova.getPublicId())).isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("PROVA_NAO_EDITAVEL"));
 	}
 
 	// ----- listar -----

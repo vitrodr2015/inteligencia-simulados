@@ -210,6 +210,22 @@ class SwaggerLigadoTest {
 	}
 
 	@Test
+	void deve_documentar_a_importacao_com_200_400_409_413_e_os_schemas() throws Exception {
+		String importacao = "$.paths['/api/v1/admin/importacoes'].post";
+		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+				.andExpect(jsonPath(importacao + ".responses.200").exists())
+				.andExpect(jsonPath(importacao + ".responses.400").exists())
+				.andExpect(jsonPath(importacao + ".responses.409").exists())
+				.andExpect(jsonPath(importacao + ".responses.413").exists())
+				.andExpect(jsonPath(importacao + ".responses.201").doesNotExist())
+				.andExpect(jsonPath(importacao + ".responses.401").doesNotExist())
+				.andExpect(jsonPath(importacao + ".responses.403").doesNotExist())
+				.andExpect(jsonPath("$.components.schemas.ImportacaoRequest.properties.provaId").exists())
+				.andExpect(jsonPath("$.components.schemas.ImportacaoRequest.properties.questoes.maxItems").value(100))
+				.andExpect(jsonPath("$.components.schemas.ImportacaoResponse.properties.questoesIgnoradas").exists());
+	}
+
+	@Test
 	void deve_documentar_o_409_de_subtopico_com_questoes_no_delete_do_subtopico() throws Exception {
 		mockMvc.perform(get("/v3/api-docs"))
 				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}'].delete.responses.409").exists());

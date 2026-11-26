@@ -39,6 +39,22 @@ public class InvalidRequestException extends ApiException {
 				List.of(new CampoInvalido(campo, mensagem)));
 	}
 
+	/** 400 de validação que aponta VÁRIOS campos do corpo (VALIDACAO_FALHOU, com {@code campos}). */
+	public static InvalidRequestException camposInvalidos(List<CampoInvalido> campos) {
+		return new InvalidRequestException(CodigoErro.VALIDACAO_FALHOU, "Há campos inválidos na requisição.", campos);
+	}
+
+	/**
+	 * O mesmo erro de validação, com o caminho de cada campo precedido por {@code prefixo} (por exemplo {@code questoes[3].}):
+	 * é assim que o erro de um item de um lote diz de qual item é. Sem {@code campos}, devolve o próprio erro.
+	 */
+	public InvalidRequestException comPrefixoNosCampos(String prefixo) {
+		if (campos == null) {
+			return this;
+		}
+		return camposInvalidos(campos.stream().map(c -> new CampoInvalido(prefixo + c.campo(), c.mensagem())).toList());
+	}
+
 	/** Campos inválidos a mostrar no ErrorResponse, ou {@code null} quando o erro não aponta campo. */
 	public List<CampoInvalido> getCampos() {
 		return campos;

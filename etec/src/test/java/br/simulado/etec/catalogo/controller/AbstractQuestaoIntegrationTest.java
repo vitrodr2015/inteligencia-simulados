@@ -10,7 +10,7 @@ import br.simulado.etec.integracao.AbstractIntegrationTest;
 import io.restassured.response.Response;
 
 /** Ajudantes HTTP e de banco da Questão para os testes de integração (mesma configuração do Spring da base). */
-abstract class AbstractQuestaoIntegrationTest extends AbstractIntegrationTest {
+public abstract class AbstractQuestaoIntegrationTest extends AbstractIntegrationTest {
 
 	protected static final String DATA_HORA = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z";
 
