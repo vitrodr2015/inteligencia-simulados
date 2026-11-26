@@ -156,6 +156,12 @@ Plano aprovado em 2026-11-24 (respostas às dúvidas H1 a H11). Marcação: ✅ 
 - **Para o Módulo 17:** `IMAGENS_HOSTS_PERMITIDOS` obrigatória em produção (hoje nada confere; sugestão: guarda na `ValidacaoDeAmbiente` no perfil prod) e o front precisa saber que `<br/>` é recusado.
 - **Suíte lenta (análise, nada implementado):** na `AutorizacaoIntegracaoTest`, cada uma das 592 execuções da matriz faz 6 POSTs de preparo, e só 41 das 148 linhas usam algum recurso criado; criar sob demanda (só o que a linha usa) cortaria cerca de 92% desses POSTs.
 
+### Chore de velocidade: matriz com recursos sob demanda, branch `chore/matriz-recursos-sob-demanda`
+
+- ✅ **Feito (só testes):** o `Ctx` da matriz devolve MARCADORES (`{provaId}` etc.) e o `MarcadoresDaMatriz` cria apenas os recursos que aparecem no caminho e no corpo que a linha montou (com dependências: subtópico → matéria; questão → prova e matéria), uma instância por execução (nada compartilhado). Sobrou marcador, ou a fábrica não devolveu id: o teste ERRA com mensagem clara. As linhas da matriz não mudaram. `MarcadoresDaMatrizTest` é unitário (sem Spring).
+- **Prova:** POSTs de preparo 3.576 → 296; a classe caiu de 171 s para 66 s na mesma máquina e hora; registro por execução (596: perfil, linha, esperado, obtido) e os 603 nomes/resultados do XML idênticos antes e depois. A matriz tem 149 linhas (a 148 era o estado da 2b-i).
+- **Como acrescentar um recurso novo à matriz:** campo no `Ctx`, marcador e criação no `MarcadoresDaMatriz` e na `Fabrica` da `AutorizacaoIntegracaoTest`. Esquecer a criação faz as linhas que o usam falharem com "Marcador não resolvido".
+
 Reservada (aprovada, NÃO implementada): ⏳ D147 (`ScoringStrategy` com uma implementação, a da ETEC, e a configuração da prova em dados, ambas na fatia da Tentativa, para não nascer código sem chamador). D145 (tipo da questão interno, só `MULTIPLA_ESCOLHA`) e D146 (item 4) foram implementados na fatia 2b-i; D152, D153, D155 e D156 viraram decisões na 2b-i.
 
 Ordem das fatias: (1) programa e ganchos de dados ✅; (2) modelo de Prova e Questão + Importação + leitura do admin; (3) edição (PUT, versões, gabarito em lote, publicar, apagar); (4) leitura do aluno junto da Tentativa, com o DTO sem gabarito (D75) e a `ScoringStrategy`.
