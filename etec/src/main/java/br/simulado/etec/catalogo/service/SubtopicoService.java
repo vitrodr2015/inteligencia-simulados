@@ -44,6 +44,9 @@ public class SubtopicoService {
 	/** Nome da chave estrangeira do subtópico para a matéria (migration V3). */
 	static final String FK_MATERIA = "fk_subtopico_materia";
 
+	/** Nome da chave estrangeira da versão de questão para o subtópico (migration V10, D146). */
+	static final String FK_QUESTAO_VERSAO = "fk_questao_versao_subtopico";
+
 	private final SubtopicoRepository repositorio;
 
 	private final MateriaRepository materias;
@@ -156,12 +159,24 @@ public class SubtopicoService {
 	}
 
 	/**
-	 * Atômico: uma instrução só; 0 linhas = não existia. O 409 de "tem questões" (contrato 4.2) entra com a tabela
-	 * de questões e a chave estrangeira dela; hoje não há nada que dependa de um subtópico.
+	 * Atômico: uma instrução só; 0 linhas = não existia. Se o subtópico tem versão de questão, em QUALQUER status, a chave
+	 * estrangeira com ON DELETE RESTRICT do banco recusa o delete e isso vira 409 SUBTOPICO_COM_QUESTOES (D146). Só ESSA
+	 * restrição é traduzida: qualquer outra violação de integridade sobe como está, e não é escondida.
 	 */
 	@Transactional
 	public void apagar(UUID id) {
-		if (repositorio.apagarPorPublicId(id) == 0) {
+		int apagados;
+		try {
+			apagados = repositorio.apagarPorPublicId(id);
+		}
+		catch (DataIntegrityViolationException ex) {
+			if (Restricoes.ehChaveEstrangeira(ex, FK_QUESTAO_VERSAO)) {
+				throw new ConflictException(CodigoErro.SUBTOPICO_COM_QUESTOES,
+						"O subtópico tem questões, em qualquer estado, e não pode ser apagado.");
+			}
+			throw ex;
+		}
+		if (apagados == 0) {
 			throw naoEncontrado();
 		}
 	}

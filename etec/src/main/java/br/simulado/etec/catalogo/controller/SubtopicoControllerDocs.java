@@ -100,7 +100,9 @@ public interface SubtopicoControllerDocs {
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<SubtopicoResponse> ativar(@Parameter(description = "Id público do subtópico (UUID).") UUID id);
 
-	@Operation(summary = "Apaga o subtópico", description = "Atômico: uma instrução só.")
+	@Operation(summary = "Apaga o subtópico", description = "Atômico: uma instrução só. Um subtópico que tem questão, em qualquer estado, não pode ser apagado.")
+	@ApiResponse(responseCode = "409", description = "O subtópico tem questões, em qualquer estado (SUBTOPICO_COM_QUESTOES).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	@ApiResponse(responseCode = "204", description = "Subtópico apagado.")
 	@ApiResponse(responseCode = "400", description = "Id malformado.",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))

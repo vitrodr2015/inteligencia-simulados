@@ -51,7 +51,16 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 		String prova = requisicaoComo(Papel.ADMIN)
 				.body("{\"titulo\":\"Prova base " + sufixo + "\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}")
 				.post("/api/v1/admin/provas").then().statusCode(201).extract().path("id");
-		return new Ctx(materia, subtopico, materiaVazia, prova, MatrizDeAutorizacao.uuidInexistente(), sufixo);
+		// a questão fica num subtópico PRÓPRIO: um subtópico com questão não pode ser apagado (409), e a matriz apaga o subtopicoId
+		String subtopicoDaQuestao = requisicaoComo(Papel.ADMIN)
+				.body("{\"materiaId\":\"" + materia + "\",\"nome\":\"Subtópico da questão " + sufixo + "\"}")
+				.post("/api/v1/subtopicos").then().statusCode(201).extract().path("id");
+		String questao = requisicaoComo(Papel.ADMIN)
+				.body("{\"numero\":1,\"subtopicoId\":\"" + subtopicoDaQuestao + "\",\"enunciado\":\"Enunciado\",\"alternativas\":["
+						+ "{\"letra\":\"A\",\"texto\":\"a\"},{\"letra\":\"B\",\"texto\":\"b\"},{\"letra\":\"C\",\"texto\":\"c\"},"
+						+ "{\"letra\":\"D\",\"texto\":\"d\"},{\"letra\":\"E\",\"texto\":\"e\"}]}")
+				.post("/api/v1/admin/provas/" + prova + "/questoes").then().statusCode(201).extract().path("id");
+		return new Ctx(materia, subtopico, materiaVazia, prova, questao, MatrizDeAutorizacao.uuidInexistente(), sufixo);
 	}
 
 	private RequestSpecification comoPerfil(Perfil perfil) {
