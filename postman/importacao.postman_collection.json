@@ -1,0 +1,1418 @@
+{
+  "info": {
+    "name": "Importação — /api/v1/admin/importacoes",
+    "description": "Importação de questões em lote (fatia 3): POST /admin/importacoes, só ADMIN, tudo ou nada, de 1 a 100 questões e corpo de até 2 MiB. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). PROVA_NAO_EDITAVEL não está aqui: ainda não há rota que publique uma prova. Os dados ficam no banco local (ainda não há DELETE de questão).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "materiaId",
+      "value": ""
+    },
+    {
+      "key": "subtopicoId",
+      "value": ""
+    },
+    {
+      "key": "subtopicoInativoId",
+      "value": ""
+    },
+    {
+      "key": "provaId",
+      "value": ""
+    },
+    {
+      "key": "sufixo",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "adminSenha",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "adminTokenExpira",
+      "value": ""
+    },
+    {
+      "key": "studentToken",
+      "value": ""
+    },
+    {
+      "key": "studentTokenExpira",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Preparar (matéria, subtópicos e prova)",
+      "item": [
+        {
+          "name": "Criar a matéria",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"sufixo\", Date.now().toString(36));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"materiaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Matéria Postman importação {{sufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Criar o subtópico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"subtopicoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"{{materiaId}}\",\"nome\":\"Subtópico Postman {{sufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Criar um subtópico para ficar inativo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"subtopicoInativoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"{{materiaId}}\",\"nome\":\"Subtópico inativo {{sufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Desativar esse subtópico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos/{{subtopicoInativoId}}/disable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos",
+                "{{subtopicoInativoId}}",
+                "disable"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar a prova (10 questões)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"provaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova da coleção de importação {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":10}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Importar",
+      "item": [
+        {
+          "name": "200 — 3 questões novas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"criadas 3, ignoradas 0\", function () { const j = pm.response.json(); pm.expect(j.questoesCriadas).to.eql(3); pm.expect(j.questoesIgnoradas).to.eql(0); pm.expect(j.provaId).to.eql(pm.collectionVariables.get(\"provaId\")); });",
+                  "pm.test(\"sem Location\", function () { pm.expect(pm.response.headers.get(\"Location\")).to.be.undefined; });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 1 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"A\"},{\"numero\":2,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 2 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 3 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — o mesmo lote de novo: tudo ignorado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"criadas 0, ignoradas 3\", function () { const j = pm.response.json(); pm.expect(j.questoesCriadas).to.eql(0); pm.expect(j.questoesIgnoradas).to.eql(3); pm.expect(j.provaId).to.eql(pm.collectionVariables.get(\"provaId\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 1 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"A\"},{\"numero\":2,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 2 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 3 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — gabarito diferente é ignorado (não altera) e uma nova é criada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"criadas 1, ignoradas 1\", function () { const j = pm.response.json(); pm.expect(j.questoesCriadas).to.eql(1); pm.expect(j.questoesIgnoradas).to.eql(1); pm.expect(j.provaId).to.eql(pm.collectionVariables.get(\"provaId\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 1 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"E\"},{\"numero\":4,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 4 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — a já gravada com um subtópico que está inativo é ignorada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"criadas 0, ignoradas 1\", function () { const j = pm.response.json(); pm.expect(j.questoesCriadas).to.eql(0); pm.expect(j.questoesIgnoradas).to.eql(1); pm.expect(j.provaId).to.eql(pm.collectionVariables.get(\"provaId\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":2,\"subtopicoId\":\"{{subtopicoInativoId}}\",\"enunciado\":\"Questão importada 2 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — conflitos de conteúdo, todos juntos, nada gravado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo QUESTAO_NUMERO_EM_CONFLITO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_NUMERO_EM_CONFLITO\"); });",
+                  "pm.test(\"lista os dois e identifica o primeiro\", function () { const d = pm.response.json().detalhes; pm.expect(d.numerosEmConflito).to.eql([2, 3]); pm.expect(d.indice).to.eql(1); pm.expect(d.numero).to.eql(2); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":2,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Mudou 2\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Mudou 3\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — subtópico inativo num item que seria gravado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo SUBTOPICO_INATIVO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"SUBTOPICO_INATIVO\"); });",
+                  "pm.test(\"indice e numero\", function () { const d = pm.response.json().detalhes; pm.expect(d.indice).to.eql(1); pm.expect(d.numero).to.eql(6); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":6,\"subtopicoId\":\"{{subtopicoInativoId}}\",\"enunciado\":\"Questão importada 6 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A prova tem 4 questões (nada dos lotes recusados ficou)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"questoesCadastradas 4\", function () { pm.expect(pm.response.json().questoesCadastradas).to.eql(4); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "400, 413 e 415",
+      "item": [
+        {
+          "name": "400 — lote vazio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos questoes\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.eql([\"questoes\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — 101 itens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos questoes\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.eql([\"questoes\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 1 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":2,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 2 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":3,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 3 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":4,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 4 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":6,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 6 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":7,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 7 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":8,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 8 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":9,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 9 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":10,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 10 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":11,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 11 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":12,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 12 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":13,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 13 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":14,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 14 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":15,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 15 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":16,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 16 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":17,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 17 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":18,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 18 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":19,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 19 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":20,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 20 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":21,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 21 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":22,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 22 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":23,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 23 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":24,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 24 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":25,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 25 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":26,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 26 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":27,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 27 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":28,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 28 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":29,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 29 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":30,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 30 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":31,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 31 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":32,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 32 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":33,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 33 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":34,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 34 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":35,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 35 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":36,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 36 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":37,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 37 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":38,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 38 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":39,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 39 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":40,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 40 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":41,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 41 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":42,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 42 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":43,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 43 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":44,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 44 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":45,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 45 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":46,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 46 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":47,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 47 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":48,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 48 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":49,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 49 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":50,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 50 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":51,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 51 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":52,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 52 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":53,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 53 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":54,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 54 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":55,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 55 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":56,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 56 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":57,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 57 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":58,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 58 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":59,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 59 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":60,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 60 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":61,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 61 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":62,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 62 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":63,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 63 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":64,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 64 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":65,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 65 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":66,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 66 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":67,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 67 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":68,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 68 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":69,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 69 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":70,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 70 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":71,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 71 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":72,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 72 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":73,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 73 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":74,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 74 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":75,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 75 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":76,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 76 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":77,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 77 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":78,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 78 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":79,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 79 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":80,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 80 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":81,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 81 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":82,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 82 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":83,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 83 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":84,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 84 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":85,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 85 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":86,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 86 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":87,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 87 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":88,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 88 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":89,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 89 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":90,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 90 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":91,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 91 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":92,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 92 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":93,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 93 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":94,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 94 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":95,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 95 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":96,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 96 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":97,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 97 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":98,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 98 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":99,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 99 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":100,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 100 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":101,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 101 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — sem provaId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos provaId\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.eql([\"provaId\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — campos inválidos em dois itens (todos juntos, com índice)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos questoes[0].enunciado, questoes[1].gabarito\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.eql([\"questoes[0].enunciado\",\"questoes[1].gabarito\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":6,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 6 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"F\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — numero repetido no lote",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos questoes[2].numero\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.eql([\"questoes[2].numero\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":6,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 6 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — prova que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos provaId\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.eql([\"provaId\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"00000000-0000-4000-8000-000000000000\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — numero acima da prova",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos questoes[1].numero\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.eql([\"questoes[1].numero\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]},{\"numero\":11,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 11 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — subtópico que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campos questoes[0].subtopicoId\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.eql([\"questoes[0].subtopicoId\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"00000000-0000-4000-8000-000000000000\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — provaId com grupo curto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CORPO_ILEGIVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_ILEGIVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"11111111-1111-1111-1111-11111111111\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — enum inválido (sem índice)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CORPO_ILEGIVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_ILEGIVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":5,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 5 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"dificuldade\":\"IMPOSSIVEL\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — JSON quebrado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CORPO_ILEGIVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_ILEGIVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "413 — corpo acima de 2 MiB",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"corpoGrande\", \"{\" + \" \".repeat(2100000) + \"}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 413\", function () { pm.response.to.have.status(413); });",
+                  "pm.test(\"codigo CORPO_MUITO_GRANDE\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CORPO_MUITO_GRANDE\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{corpoGrande}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "415 — corpo que não é JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 415\", function () { pm.response.to.have.status(415); });",
+                  "pm.test(\"codigo TIPO_NAO_SUPORTADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"TIPO_NAO_SUPORTADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "texto solto",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Autorização",
+      "item": [
+        {
+          "name": "401 — sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"codigo NAO_AUTENTICADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"NAO_AUTENTICADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":7,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 7 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaId}}\",\"questoes\":[{\"numero\":7,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Questão importada 7 {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "403 — GET em /admin/importacoes não existe (negado até ao ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "403 — DELETE em /admin/importacoes/{id} não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Duas identidades: ADMIN (cria e lê provas) e STUDENT (só prova o 403). O ADMIN NÃO se cadastra pela API (ele nasce na subida,",
+          "// pelo bootstrap do Módulo 12): informe adminEmail e adminSenha, os mesmos de ADMIN_EMAIL e ADMIN_SENHA (postman/README.md).",
+          "const base = pm.collectionVariables.get(\"baseUrl\");",
+          "const cab = { \"Content-Type\": \"application/json\" };",
+          "const corpo = (c) => ({ mode: \"raw\", raw: JSON.stringify(c) });",
+          "const precisa = (nome) => !pm.collectionVariables.get(nome) || Date.now() > Number(pm.collectionVariables.get(nome + \"Expira\") || 0) - 60000;",
+          "const guardar = (nome, j) => { pm.collectionVariables.set(nome, j.accessToken); pm.collectionVariables.set(nome + \"Expira\", String(Date.now() + j.expiresIn * 1000)); };",
+          "if (precisa(\"adminToken\")) {",
+          "  const email = pm.collectionVariables.get(\"adminEmail\");",
+          "  const senha = pm.collectionVariables.get(\"adminSenha\");",
+          "  if (!email || !senha) {",
+          "    throw new Error(\"Defina as variáveis adminEmail e adminSenha desta coleção (os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida; passo a passo no postman/README.md).\");",
+          "  }",
+          "  pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e, r) {",
+          "    guardar(\"adminToken\", r.json());",
+          "  });",
+          "}",
+          "if (precisa(\"studentToken\")) {",
+          "  const s = Date.now().toString(36);",
+          "  const email = \"postman.\" + s + \"@exemplo.invalid\";",
+          "  const senha = \"Pm-\" + s + \"-Aa1!x\";",
+          "  pm.sendRequest({ url: base + \"/api/v1/termos/vigente\", method: \"GET\" }, function (e1, r1) {",
+          "    pm.sendRequest({ url: base + \"/api/v1/auth/register\", method: \"POST\", header: cab,",
+          "      body: corpo({ nome: \"Postman\", email: email, senha: senha, dataNascimento: \"2000-01-01\", aceiteTermosVersao: r1.json().versao }) }, function (e2) {",
+          "      pm.sendRequest({ url: base + \"/api/v1/auth/signin\", method: \"POST\", header: cab, body: corpo({ email: email, senha: senha }) }, function (e3, r3) {",
+          "        guardar(\"studentToken\", r3.json());",
+          "      });",
+          "    });",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

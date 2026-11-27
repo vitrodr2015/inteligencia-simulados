@@ -83,6 +83,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return resposta(HttpStatus.CONFLICT, ex.getCodigo(), ex.getMessage(), null, ex.getDetalhes(), null);
 	}
 
+	/** Corpo acima do limite de bytes da rota (413). */
+	@ExceptionHandler(CorpoMuitoGrandeException.class)
+	ResponseEntity<Object> aoReceberCorpoGrandeDemais(CorpoMuitoGrandeException ex) {
+		return resposta(HttpStatus.CONTENT_TOO_LARGE, ex.getCodigo(), ex.getMessage(), null, null, null);
+	}
+
 	/** Signin com credenciais erradas ou refresh inválido (401). A mensagem é genérica e fixa. */
 	@ExceptionHandler(AutenticacaoException.class)
 	ResponseEntity<Object> aoFalharAutenticacao(AutenticacaoException ex) {

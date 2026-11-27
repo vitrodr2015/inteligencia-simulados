@@ -65,6 +65,14 @@ public final class MatrizDeAutorizacao {
 		linha(caminho, metodo, caminho, c -> caminho, null, anonimo, guardian, student, admin);
 	}
 
+	/** Um lote válido com uma questão no subtópico da execução. */
+	private static String loteDeUmaQuestao(String provaId, Ctx c) {
+		return "{\"provaId\":\"" + provaId + "\",\"questoes\":[{\"numero\":2,\"subtopicoId\":\"" + c.subtopicoId()
+				+ "\",\"enunciado\":\"Enunciado do lote " + c.sufixo() + "\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"a\"},"
+				+ "{\"letra\":\"B\",\"texto\":\"b\"},{\"letra\":\"C\",\"texto\":\"c\"},{\"letra\":\"D\",\"texto\":\"d\"},"
+				+ "{\"letra\":\"E\",\"texto\":\"e\"}]}]}";
+	}
+
 	private static String json(String chave, String valor) {
 		return "{\"" + chave + "\":\"" + valor + "\"}";
 	}
@@ -190,7 +198,21 @@ public final class MatrizDeAutorizacao {
 				403, 403, 403);
 		linha("gabarito da prova (ainda não existe)", "PUT", null, c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito",
 				c -> "{\"itens\":[]}", 401, 403, 403, 403);
-		linha("importação (ainda não existe)", "POST", null, c -> "/api/v1/admin/importacoes", c -> "{}", 401, 403, 403, 403);
+		// importação em lote (fatia 3): uma rota, só POST, só ADMIN
+		linha("importar um lote", "POST", "/api/v1/admin/importacoes", c -> "/api/v1/admin/importacoes",
+				c -> loteDeUmaQuestao(c.provaId(), c), 401, 403, 403, 200);
+		linha("importar com corpo inválido", "POST", "/api/v1/admin/importacoes", c -> "/api/v1/admin/importacoes", c -> "{}", 401,
+				403, 403, 400);
+		linha("importar em prova inexistente (referência no corpo)", "POST", "/api/v1/admin/importacoes",
+				c -> "/api/v1/admin/importacoes", c -> loteDeUmaQuestao(c.idInexistente(), c), 401, 403, 403, 400);
+		for (String metodo : new String[] { "GET", "HEAD", "PUT", "PATCH", "DELETE" }) {
+			Function<Ctx, String> semCorpoOuVazio = metodo.equals("GET") || metodo.equals("HEAD") || metodo.equals("DELETE") ? null
+					: c -> "{}";
+			linha(metodo + " em /admin/importacoes (não existe)", metodo, null, c -> "/api/v1/admin/importacoes", semCorpoOuVazio,
+					401, 403, 403, 403);
+			linha(metodo + " em /admin/importacoes/{id} (não existe)", metodo, null,
+					c -> "/api/v1/admin/importacoes/" + c.idInexistente(), semCorpoOuVazio, 401, 403, 403, 403);
+		}
 		// listagem de questões (Sprint 2, fatia 2b-ii): só ADMIN
 		for (String metodo : new String[] { "GET", "HEAD" }) {
 			fixa(metodo, "/api/v1/admin/questoes", 401, 403, 403, 200);

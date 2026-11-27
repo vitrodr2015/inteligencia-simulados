@@ -156,6 +156,20 @@ class GuardasDeArquivosReaisTest {
 		}
 	}
 
+	// ----- 413 da importação -----
+
+	/**
+	 * O padrão do Tomcat (2 MB) fazia o cliente PERDER o 413 da importação (a conexão caía): o principal e o de teste precisam do
+	 * mesmo valor, porque o yml de teste substitui o principal e o teste por HTTP real só prova o que ele define.
+	 */
+	@Test
+	void deve_manter_o_max_swallow_size_do_tomcat_igual_no_yml_real_e_no_de_teste() {
+		assertThat(yml().getProperty("server.tomcat.max-swallow-size")).isEqualTo("20MB");
+		YamlPropertiesFactoryBean deTeste = new YamlPropertiesFactoryBean();
+		deTeste.setResources(new FileSystemResource(RaizDoProjeto.resolver("src/test/resources/application.yml")));
+		assertThat(deTeste.getObject().getProperty("server.tomcat.max-swallow-size")).isEqualTo("20MB");
+	}
+
 	// ----- Swagger e actuator -----
 
 	@Test

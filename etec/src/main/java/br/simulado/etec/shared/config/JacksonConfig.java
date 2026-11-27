@@ -6,6 +6,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
@@ -52,6 +53,8 @@ public class JacksonConfig {
 		SimpleModule moduloDeInstant = new SimpleModule("InstantUtcComMilissegundos");
 		moduloDeInstant.addSerializer(Instant.class, new InstantSerializador());
 		moduloDeInstant.addDeserializer(LocalDate.class, new LocalDateEstrito());
+		// D159: UUID em corpo só no formato canônico (o mesmo parser das rotas e parâmetros).
+		moduloDeInstant.addDeserializer(UUID.class, new UuidDoCorpoEstrito());
 		return construtor -> construtor
 				.addModule(moduloDeInstant)
 				.withConfigOverride(LocalDate.class, configuracao -> configuracao
@@ -96,6 +99,29 @@ public class JacksonConfig {
 			}
 			catch (DateTimeParseException e) {
 				throw contexto.weirdStringException(texto, LocalDate.class, "Data inexistente.");
+			}
+		}
+
+	}
+
+	/**
+	 * UUID de corpo, estrito (D159): só texto no formato canônico 8-4-4-4-12. O padrão do Jackson também aceita Base64 de 24
+	 * caracteres, texto vazio ou em branco (vira nulo) e espaço antes do valor. Valor que não é texto, ou texto fora do formato,
+	 * é 400 CORPO_ILEGIVEL. O {@code null} do JSON continua nulo (quem exige o campo é o Bean Validation).
+	 */
+	static final class UuidDoCorpoEstrito extends ValueDeserializer<UUID> {
+
+		@Override
+		public UUID deserialize(JsonParser parser, DeserializationContext contexto) {
+			if (!parser.hasToken(JsonToken.VALUE_STRING)) {
+				return (UUID) contexto.handleUnexpectedToken(UUID.class, parser);
+			}
+			String texto = parser.getString();
+			try {
+				return UuidEstritoConfig.paraUuid(texto);
+			}
+			catch (IllegalArgumentException e) {
+				throw contexto.weirdStringException(texto, UUID.class, "UUID fora do formato canônico.");
 			}
 		}
 

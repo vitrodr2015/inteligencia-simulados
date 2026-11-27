@@ -42,6 +42,8 @@ public enum CodigoErro {
 	QUESTAO_NUMERO_EM_CONFLITO,
 	SUBTOPICO_INATIVO,
 	SUBTOPICO_COM_QUESTOES,
+	// Importação em lote: o corpo passa do limite de bytes (413)
+	CORPO_MUITO_GRANDE,
 
 	// Autenticação (Módulo 10; D120 para o 401 e o 403 da cadeia de segurança)
 	NAO_AUTENTICADO,
