@@ -63,6 +63,15 @@ public class Alternativa {
 		this.texto = texto;
 	}
 
+	/** Troca o texto NA MESMA linha (a letra não muda). Devolve se o texto mudou. */
+	boolean mudarTexto(String novo) {
+		if (this.texto.equals(novo)) {
+			return false;
+		}
+		this.texto = novo;
+		return true;
+	}
+
 	public String getLetra() {
 		return letra;
 	}

@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.core.MethodParameter;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -57,6 +58,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 	public static final String MENSAGEM_ERRO_INTERNO = "Ocorreu um erro interno. Tente novamente mais tarde.";
 
+	static final String MENSAGEM_RECURSO_OCUPADO = "O recurso está em uso por outra operação. Tente novamente em alguns segundos.";
+
+	/** Segundos sugeridos no Retry-After do 503 (D176). */
+	static final int RETRY_AFTER_DE_RECURSO_OCUPADO = 5;
+
 	/** Texto exato da D60. */
 	static final String MENSAGEM_DATA_INVALIDA = "Data inválida. Use o formato aaaa-mm-dd.";
 
@@ -81,6 +87,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(ConflictException.class)
 	ResponseEntity<Object> aoConflitar(ConflictException ex) {
 		return resposta(HttpStatus.CONFLICT, ex.getCodigo(), ex.getMessage(), null, ex.getDetalhes(), null);
+	}
+
+	/**
+	 * Trava de banco não obtida a tempo (innodb_lock_wait_timeout) ou transação escolhida como vítima de deadlock (503
+	 * RECURSO_OCUPADO com Retry-After, D176). A transação foi desfeita: quem chama pode repetir. Não há nova tentativa
+	 * automática. Só as falhas de TRAVA: a de versão otimista continua 500, porque seria defeito nosso. O limite de tentativas
+	 * trata as próprias falhas antes de chegarem aqui (429, D132).
+	 */
+	@ExceptionHandler(PessimisticLockingFailureException.class)
+	ResponseEntity<Object> aoNaoObterATrava(PessimisticLockingFailureException ex) {
+		LOG.warn("Recurso ocupado no banco (trava não obtida ou deadlock): {}", ex.getClass().getSimpleName());
+		HttpHeaders cabecalhos = new HttpHeaders();
+		cabecalhos.set(HttpHeaders.RETRY_AFTER, String.valueOf(RETRY_AFTER_DE_RECURSO_OCUPADO));
+		return resposta(HttpStatus.SERVICE_UNAVAILABLE, CodigoErro.RECURSO_OCUPADO, MENSAGEM_RECURSO_OCUPADO, null, null,
+				cabecalhos);
 	}
 
 	/** Corpo acima do limite de bytes da rota (413). */

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Prova — /api/v1/admin/provas e /api/v1/provas",
-    "description": "Rotas da Prova (Sprint 2, fatia 2a): POST /admin/provas, GET /provas e GET /provas/{id}, as três só do ADMIN (STUDENT e GUARDIAN levam 403 até a leitura do aluno, D154). Rode na ordem. Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). As provas criadas ficam no banco local (ainda não há DELETE de prova); o sufixo muda a cada rodada, então a coleção pode ser rodada de novo.",
+    "description": "Rotas da Prova (Sprint 2, fatia 2a): POST /admin/provas, GET /provas e GET /provas/{id}, as três só do ADMIN (STUDENT e GUARDIAN levam 403 até a leitura do aluno, D154). Rode na ordem. Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). As provas criadas ficam no banco local (ainda não há DELETE de prova); o sufixo muda a cada rodada, então a coleção pode ser rodada de novo. Os PUT de prova (D170) entraram na fatia 4, passada 1.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -47,6 +47,14 @@
     },
     {
       "key": "studentTokenExpira",
+      "value": ""
+    },
+    {
+      "key": "provaEdicaoId",
+      "value": ""
+    },
+    {
+      "key": "provaOutraId",
       "value": ""
     }
   ],
@@ -2640,6 +2648,526 @@
                 "v1",
                 "provas",
                 "abc"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT — editar prova em rascunho",
+      "item": [
+        {
+          "name": "Criar a prova que será editada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"provaEdicaoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Para editar {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Criar outra prova com identidade completa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"provaOutraId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Outra {{sufixo}}\",\"banca\":\"Banca ocupada {{sufixo}}\",\"ano\":2031,\"semestre\":2,\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — troca a prova inteira, inclusive a quantidade",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"quantidade nova\", function () { pm.expect(pm.response.json().quantidadeQuestoes).to.eql(40); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaEdicaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaEdicaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova editada {{sufixo}}\",\"banca\":\"Banca edição {{sufixo}}\",\"ano\":2030,\"semestre\":1,\"duracaoMinutos\":200,\"quantidadeQuestoes\":40}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — opcionais omitidos viram nulos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"banca nula\", function () { pm.expect(pm.response.json().banca).to.eql(null); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaEdicaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaEdicaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Só o essencial {{sufixo}}\",\"duracaoMinutos\":90,\"quantidadeQuestoes\":30}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — sem quantidadeQuestoes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo VALIDACAO_FALHOU\", function () { pm.expect(pm.response.json().codigo).to.eql(\"VALIDACAO_FALHOU\"); });",
+                  "pm.test(\"campo quantidadeQuestoes\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"quantidadeQuestoes\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaEdicaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaEdicaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"T\",\"duracaoMinutos\":90}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — quantidade 301",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"campo quantidadeQuestoes\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"quantidadeQuestoes\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaEdicaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaEdicaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova editada {{sufixo}}\",\"banca\":\"Banca edição {{sufixo}}\",\"ano\":2030,\"semestre\":1,\"duracaoMinutos\":200,\"quantidadeQuestoes\":301}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "404 — prova que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo PROVA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova editada {{sufixo}}\",\"banca\":\"Banca edição {{sufixo}}\",\"ano\":2030,\"semestre\":1,\"duracaoMinutos\":200,\"quantidadeQuestoes\":40}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — banca, ano e semestre de outra prova",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo PROVA_DUPLICADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_DUPLICADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaEdicaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaEdicaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova editada {{sufixo}}\",\"banca\":\"Banca ocupada {{sufixo}}\",\"ano\":2031,\"semestre\":2,\"duracaoMinutos\":200,\"quantidadeQuestoes\":40}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "415 — corpo que não é JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 415\", function () { pm.response.to.have.status(415); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaEdicaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaEdicaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "texto solto",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "401 — sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaEdicaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaEdicaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova editada {{sufixo}}\",\"banca\":\"Banca edição {{sufixo}}\",\"ano\":2030,\"semestre\":1,\"duracaoMinutos\":200,\"quantidadeQuestoes\":40}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaEdicaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaEdicaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova editada {{sufixo}}\",\"banca\":\"Banca edição {{sufixo}}\",\"ano\":2030,\"semestre\":1,\"duracaoMinutos\":200,\"quantidadeQuestoes\":40}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
               ]
             }
           }

@@ -31,6 +31,8 @@ import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.programa.Programa;
+import org.mockito.InOrder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ProvaServiceTest {
@@ -221,6 +223,132 @@ class ProvaServiceTest {
 	@Test
 	void deve_ter_o_teto_de_300_questoes_como_constante_unica() {
 		assertThat(Prova.QUANTIDADE_MAXIMA_DE_QUESTOES).isEqualTo(300);
+	}
+
+	// ----- atualizar (PUT, D170) -----
+
+	private Prova provaGravada() {
+		return new Prova(etec, "Antiga", "Vunesp", 2025, 2, 120, 50, "https://exemplo.invalid/antiga");
+	}
+
+	@Test
+	void deve_travar_a_prova_antes_de_qualquer_outra_leitura_no_put() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.buscarMaiorNumero(prova)).thenReturn(Optional.empty());
+		when(repositorio.saveAndFlush(prova)).thenReturn(prova);
+
+		servico.atualizar(prova.getPublicId(), completa());
+
+		InOrder ordem = org.mockito.Mockito.inOrder(repositorio, questoes);
+		ordem.verify(repositorio).buscarComTrava(prova.getPublicId());
+		ordem.verify(repositorio).existsByProgramaAndBancaAndAnoAndSemestreAndPublicIdNot(etec, "Vunesp", 2026, 1,
+				prova.getPublicId());
+		ordem.verify(questoes).buscarMaiorNumero(prova);
+		ordem.verify(repositorio).saveAndFlush(prova);
+		verify(repositorio, never()).findByPublicId(any());
+	}
+
+	@Test
+	void deve_substituir_todos_os_dados_editaveis_e_apagar_o_que_foi_omitido() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.buscarMaiorNumero(prova)).thenReturn(Optional.empty());
+		when(repositorio.saveAndFlush(prova)).thenReturn(prova);
+
+		Prova salva = servico.atualizar(prova.getPublicId(), semIdentidade());
+
+		assertThat(salva.getTitulo()).isEqualTo("Simulado solto");
+		assertThat(salva.getBanca()).isNull();
+		assertThat(salva.getAno()).isNull();
+		assertThat(salva.getSemestre()).isNull();
+		assertThat(salva.getFonteUrl()).isNull();
+		assertThat(salva.getDuracaoMinutos()).isEqualTo(120);
+		assertThat(salva.getQuantidadeQuestoes()).isEqualTo(40);
+		assertThat(salva.getStatus()).isEqualTo(StatusProva.RASCUNHO);
+		verify(repositorio, never()).existsByProgramaAndBancaAndAnoAndSemestreAndPublicIdNot(any(), any(), any(), any(), any());
+	}
+
+	@Test
+	void deve_lancar_404_no_put_quando_a_prova_nao_existe() {
+		UUID id = UUID.randomUUID();
+		when(repositorio.buscarComTrava(id)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.atualizar(id, completa())).isInstanceOf(ResourceNotFoundException.class)
+				.satisfies(e -> assertThat(((ResourceNotFoundException) e).getCodigo()).isEqualTo(CodigoErro.PROVA_NAO_ENCONTRADA));
+	}
+
+	@Test
+	void deve_recusar_com_409_prova_nao_editavel_antes_de_qualquer_outra_regra_no_put() {
+		Prova publicada = provaGravada();
+		ReflectionTestUtils.setField(publicada, "status", StatusProva.PUBLICADA);
+		when(repositorio.buscarComTrava(publicada.getPublicId())).thenReturn(Optional.of(publicada));
+
+		assertThatThrownBy(() -> servico.atualizar(publicada.getPublicId(), completa())).isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(((ConflictException) e).getCodigo()).isEqualTo(CodigoErro.PROVA_NAO_EDITAVEL));
+		assertThat(publicada.getTitulo()).isEqualTo("Antiga");
+		verify(questoes, never()).buscarMaiorNumero(any());
+		verify(repositorio, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void deve_recusar_com_409_prova_duplicada_antes_da_regra_da_quantidade() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(repositorio.existsByProgramaAndBancaAndAnoAndSemestreAndPublicIdNot(etec, "Vunesp", 2026, 1, prova.getPublicId()))
+				.thenReturn(true);
+
+		assertThatThrownBy(() -> servico.atualizar(prova.getPublicId(), completa()))
+				.satisfies(e -> assertThat(((ConflictException) e).getCodigo()).isEqualTo(CodigoErro.PROVA_DUPLICADA));
+		assertThat(prova.getTitulo()).isEqualTo("Antiga");
+		verify(repositorio, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void deve_recusar_a_quantidade_abaixo_do_maior_numero_cadastrado_informando_qual_e() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.buscarMaiorNumero(prova)).thenReturn(Optional.of(41));
+
+		assertThatThrownBy(() -> servico.atualizar(prova.getPublicId(), semIdentidade()))
+				.isInstanceOfSatisfying(ConflictException.class, e -> {
+					assertThat(e.getCodigo()).isEqualTo(CodigoErro.PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE);
+					assertThat(e.getDetalhes()).containsEntry("maiorNumero", 41).hasSize(1);
+				});
+		assertThat(prova.getQuantidadeQuestoes()).isEqualTo(50);
+		verify(repositorio, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void deve_aceitar_a_quantidade_igual_ao_maior_numero_cadastrado() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.buscarMaiorNumero(prova)).thenReturn(Optional.of(40));
+		when(repositorio.saveAndFlush(prova)).thenReturn(prova);
+
+		assertThat(servico.atualizar(prova.getPublicId(), semIdentidade()).getQuantidadeQuestoes()).isEqualTo(40);
+	}
+
+	@Test
+	void deve_traduzir_para_409_so_a_violacao_do_indice_da_prova_na_corrida_do_put() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.buscarMaiorNumero(prova)).thenReturn(Optional.empty());
+		when(repositorio.saveAndFlush(prova)).thenThrow(violacao(ConstraintKind.UNIQUE, ProvaService.UK_PROVA));
+
+		assertThatThrownBy(() -> servico.atualizar(prova.getPublicId(), completa()))
+				.satisfies(e -> assertThat(((ConflictException) e).getCodigo()).isEqualTo(CodigoErro.PROVA_DUPLICADA));
+	}
+
+	@Test
+	void deve_deixar_subir_outra_violacao_na_gravacao_do_put() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.buscarMaiorNumero(prova)).thenReturn(Optional.empty());
+		DataIntegrityViolationException outra = violacao(ConstraintKind.UNIQUE, "uk_outra");
+		when(repositorio.saveAndFlush(prova)).thenThrow(outra);
+
+		assertThatThrownBy(() -> servico.atualizar(prova.getPublicId(), completa())).isSameAs(outra);
 	}
 
 }

@@ -76,12 +76,16 @@ public class SecurityConfig {
 	static final String[] PROVA_LEITURA = { "/api/v1/provas", "/api/v1/provas/{id}" };
 
 	/**
-	 * Questões (Sprint 2, fatias 2b-i e 2b-ii): cadastro, leitura por id e listagem, só ADMIN. O PUT, o DELETE, o PATCH e o resto de
-	 * /admin/** continuam negados (D121).
+	 * Questões (Sprint 2, fatias 2b-i e 2b-ii): cadastro, leitura por id e listagem, só ADMIN. O DELETE, o PATCH, o POST de
+	 * versões, o publicar e o resto de /admin/** continuam negados (D121).
 	 */
 	static final String[] QUESTAO_CRIACAO = { "/api/v1/admin/provas/{id}/questoes" };
 
 	static final String[] QUESTAO_LEITURA = { "/api/v1/admin/questoes", "/api/v1/admin/questoes/{id}" };
+
+	/** Edição do rascunho (fatia 4, passada 1): prova, questão e gabarito em lote. Só PUT, só ADMIN. */
+	static final String[] EDICAO = { "/api/v1/admin/provas/{id}", "/api/v1/admin/questoes/{id}",
+			"/api/v1/admin/provas/{id}/gabarito" };
 
 	/** Importação em lote (fatia 3): uma rota, só POST, só ADMIN. */
 	static final String[] IMPORTACAO = { "/api/v1/admin/importacoes" };
@@ -142,6 +146,8 @@ public class SecurityConfig {
 					// ----- só ADMIN (questões, fatia 2b-i) -----
 					regras.requestMatchers(HttpMethod.POST, QUESTAO_CRIACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					leitura(regras, QUESTAO_LEITURA, url -> url.hasAuthority(Authorities.ROLE_ADMIN));
+					// ----- só ADMIN (edição do rascunho, fatia 4) -----
+					regras.requestMatchers(HttpMethod.PUT, EDICAO).hasAuthority(Authorities.ROLE_ADMIN);
 					// ----- só ADMIN (importação em lote, fatia 3) -----
 					regras.requestMatchers(HttpMethod.POST, IMPORTACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					// D113: o resto de /actuator e /error = 401 para anônimo e 403 para autenticado, nunca 404.

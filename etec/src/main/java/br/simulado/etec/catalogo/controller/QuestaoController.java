@@ -11,11 +11,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.simulado.etec.catalogo.dto.QuestaoAtualizacaoRequest;
 import br.simulado.etec.catalogo.dto.QuestaoRequest;
 import br.simulado.etec.catalogo.dto.QuestaoResponse;
 import br.simulado.etec.catalogo.mapper.QuestaoMapper;
@@ -52,6 +54,13 @@ public class QuestaoController implements QuestaoControllerDocs {
 		}
 		// D153: o numero já tem a mesma questão; 200 com o que está gravado (sem Location: nada foi criado)
 		return ResponseEntity.ok(corpo);
+	}
+
+	@Override
+	@PutMapping(path = "/questoes/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<QuestaoResponse> atualizar(@PathVariable UUID id,
+			@Valid @RequestBody QuestaoAtualizacaoRequest dados) {
+		return ResponseEntity.ok(QuestaoMapper.paraResponse(servico.atualizar(id, dados)));
 	}
 
 	@Override

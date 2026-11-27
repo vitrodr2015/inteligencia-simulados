@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -124,6 +125,51 @@ public class QuestaoVersao {
 		this.dificuldade = dificuldade;
 		this.explicacao = explicacao;
 		new TreeMap<>(textoPorLetra).forEach((letra, texto) -> this.alternativas.add(new Alternativa(this, letra, texto)));
+	}
+
+	/**
+	 * Substituição total do conteúdo do RASCUNHO (PUT, D111 e D171): o opcional omitido vira nulo, inclusive o gabarito. As
+	 * alternativas mudam o texto das MESMAS 5 linhas: trocar a coleção faria o JPA inserir antes de apagar e bater no índice
+	 * único (versão, letra). Sem mudança de valor, o JPA não grava nada. Mudar só o texto de uma alternativa não suja esta
+	 * linha, por isso o {@code momento} da alteração é anotado aqui nesse caso. A identidade da questão, e com ela o hash,
+	 * não é tocada (D51).
+	 */
+	public void editarRascunho(Subtopico subtopico, String textoApoio, Integer grupoApoio, String enunciado, String imagemUrl,
+			Map<String, String> textoPorLetra, String gabarito, Dificuldade dificuldade, String explicacao, Instant momento) {
+		exigirRascunho();
+		this.subtopico = subtopico;
+		this.textoApoio = textoApoio;
+		this.grupoApoio = grupoApoio;
+		this.enunciado = enunciado;
+		this.imagemUrl = imagemUrl;
+		this.gabarito = gabarito;
+		this.dificuldade = dificuldade;
+		this.explicacao = explicacao;
+		boolean mudouAlternativa = false;
+		for (Alternativa alternativa : this.alternativas) {
+			mudouAlternativa |= alternativa.mudarTexto(textoPorLetra.get(alternativa.getLetra()));
+		}
+		if (mudouAlternativa) {
+			this.atualizadoEm = momento;
+		}
+	}
+
+	/** Define o gabarito do rascunho (lote, D174). Não existe apagar por aqui. Devolve se o valor mudou. */
+	public boolean definirGabarito(String letra) {
+		exigirRascunho();
+		Objects.requireNonNull(letra, "gabarito");
+		if (letra.equals(this.gabarito)) {
+			return false;
+		}
+		this.gabarito = letra;
+		return true;
+	}
+
+	/** Versão publicada ou arquivada nunca muda: é o que a tentativa referencia. O service barra antes, com o 409. */
+	private void exigirRascunho() {
+		if (this.status != StatusQuestao.RASCUNHO) {
+			throw new IllegalStateException("Só a versão em RASCUNHO pode ser alterada.");
+		}
 	}
 
 	public Long getId() {

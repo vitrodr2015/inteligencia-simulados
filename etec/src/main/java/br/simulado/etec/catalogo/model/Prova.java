@@ -108,6 +108,22 @@ public class Prova {
 		this.status = StatusProva.RASCUNHO;
 	}
 
+	/**
+	 * Substituição total dos dados editáveis (PUT, D61 e D170): o opcional omitido vira nulo. Status, publicação e programa não
+	 * mudam por aqui. Quem chama já conferiu que a prova está em rascunho e que a quantidade cobre as questões cadastradas.
+	 * Sem mudança de valor, o JPA não grava nada e o atualizadoEm fica como estava.
+	 */
+	public void editar(String titulo, String banca, Integer ano, Integer semestre, int duracaoMinutos, int quantidadeQuestoes,
+			String fonteUrl) {
+		this.titulo = titulo;
+		this.banca = banca;
+		this.ano = ano;
+		this.semestre = semestre;
+		this.duracaoMinutos = duracaoMinutos;
+		this.quantidadeQuestoes = quantidadeQuestoes;
+		this.fonteUrl = fonteUrl;
+	}
+
 	public Long getId() {
 		return id;
 	}

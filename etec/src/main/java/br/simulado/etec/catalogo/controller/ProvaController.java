@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,7 +32,7 @@ import jakarta.validation.Valid;
 
 /**
  * Só HTTP: valida a entrada, chama o service e monta a resposta. A documentação fica em {@link ProvaControllerDocs}. A criação
- * mora em {@code /admin/provas} (D149) e a leitura em {@code /provas}; as três rotas são só do ADMIN nesta fatia (D154).
+ * e a edição moram em {@code /admin/provas} (D149, D170) e a leitura em {@code /provas}; tudo é só do ADMIN por enquanto (D154).
  */
 @RestController
 @RequestMapping(path = "/api/v1", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -50,6 +51,12 @@ public class ProvaController implements ProvaControllerDocs {
 		URI local = URI.create("/api/v1/provas/" + criada.getPublicId());
 		// uma prova que acabou de nascer não tem questão: 0, sem consultar
 		return ResponseEntity.created(local).body(ProvaMapper.paraResponse(criada, 0));
+	}
+
+	@Override
+	@PutMapping(path = "/admin/provas/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<ProvaResponse> atualizar(@PathVariable UUID id, @Valid @RequestBody ProvaRequest dados) {
+		return ResponseEntity.ok(comContagem(servico.atualizar(id, dados)));
 	}
 
 	@Override
@@ -73,9 +80,11 @@ public class ProvaController implements ProvaControllerDocs {
 	@Override
 	@GetMapping("/provas/{id}")
 	public ResponseEntity<ProvaResponse> buscar(@PathVariable UUID id) {
-		Prova prova = servico.buscar(id);
-		return ResponseEntity.ok(ProvaMapper.paraResponse(prova,
-				servico.contarQuestoes(List.of(prova)).getOrDefault(prova.getId(), 0L)));
+		return ResponseEntity.ok(comContagem(servico.buscar(id)));
+	}
+
+	private ProvaResponse comContagem(Prova prova) {
+		return ProvaMapper.paraResponse(prova, servico.contarQuestoes(List.of(prova)).getOrDefault(prova.getId(), 0L));
 	}
 
 }

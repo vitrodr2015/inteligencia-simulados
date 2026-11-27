@@ -18,8 +18,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * Documentação OpenAPI da prova. Só o que o código devolve hoje: 200, 201, 400, 404 e 409. As três rotas são só do ADMIN
- * nesta fatia (D154). O controller implementa esta interface e fica só com a lógica.
+ * Documentação OpenAPI da prova. Só o que o código devolve hoje: 200, 201, 400, 404 e 409 (o 401, o 403, o 500 e o 503 não são
+ * repetidos por rota). As rotas são só do ADMIN (D154). O controller implementa esta interface e fica só com a lógica.
  */
 @Tag(name = "Provas", description = "Cadastro e consulta de provas do catálogo (só ADMIN nesta fase).")
 public interface ProvaControllerDocs {
@@ -33,6 +33,18 @@ public interface ProvaControllerDocs {
 	@ApiResponse(responseCode = "409", description = "Já existe uma prova com essa banca, ano e semestre (PROVA_DUPLICADA).",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<ProvaResponse> criar(ProvaRequest dados);
+
+	@Operation(summary = "Altera uma prova em rascunho (só ADMIN)",
+			description = "Substituição total: o campo opcional omitido (banca, ano, semestre, fonteUrl) vira nulo. Só em RASCUNHO. A quantidadeQuestoes pode mudar, mas não pode ficar abaixo do maior número de questão já cadastrado. Status e datas enviados no corpo são ignorados. Sem mudança de valor, nada é gravado.")
+	@ApiResponse(responseCode = "200", description = "Prova alterada.",
+			content = @Content(schema = @Schema(implementation = ProvaResponse.class)))
+	@ApiResponse(responseCode = "400", description = "Corpo inválido ou ilegível, ou id malformado.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "404", description = "Prova não encontrada (PROVA_NAO_ENCONTRADA).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "PROVA_NAO_EDITAVEL (prova que não é rascunho), PROVA_DUPLICADA ou PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE (detalhes.maiorNumero).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<ProvaResponse> atualizar(@Parameter(description = "Id público da prova (UUID).") UUID id, ProvaRequest dados);
 
 	@Operation(summary = "Lista as provas (só ADMIN)",
 			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia. Com sort por ano, as provas sem ano ficam no fim na ordem decrescente (o padrão) e no início na crescente.")
