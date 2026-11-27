@@ -160,6 +160,18 @@ class CorsTest {
 	}
 
 	@Test
+	void deve_expor_exatamente_location_e_retry_after_e_nunca_o_curinga() throws Exception {
+		for (HttpResponse<String> resposta : java.util.List.of(enviar("GET", "/api/v1/termos/vigente", PERMITIDA, null),
+				enviar("GET", "/api/v1/materias", OUTRA_PERMITIDA, null))) {
+			assertThat(cabecalho(resposta, "Access-Control-Expose-Headers")).isEqualTo("Location, Retry-After");
+			assertThat(resposta.headers().map().entrySet().stream()
+					.filter(cabecalho -> cabecalho.getKey().toLowerCase().startsWith("access-control-"))
+					.flatMap(cabecalho -> cabecalho.getValue().stream()))
+					.as("nenhum cabeçalho de CORS com curinga").noneMatch(valor -> valor.contains("*"));
+		}
+	}
+
+	@Test
 	void deve_levar_os_cabecalhos_de_cors_no_401_de_quem_chama_de_uma_origem_permitida() throws Exception {
 		HttpResponse<String> resposta = enviar("GET", "/api/v1/materias", PERMITIDA, null);
 

@@ -34,7 +34,7 @@ import jakarta.persistence.UniqueConstraint;
 /**
  * Uma versão do conteúdo de uma questão (contrato, seção 5). O subtópico é DA VERSÃO (D146). As colunas geradas
  * {@code rascunho_aberto} e {@code publicada_vigente} (índices únicos de "um rascunho e uma publicada por questão") existem só no
- * banco e não são mapeadas aqui. Nesta fatia só nasce a versão 1, em RASCUNHO.
+ * banco e não são mapeadas aqui. A API ainda só cria a versão 1, em RASCUNHO; a publicação da prova a publica (D178).
  */
 @Entity
 @EntityListeners(AuditingEntityListener.class)
@@ -163,6 +163,21 @@ public class QuestaoVersao {
 		}
 		this.gabarito = letra;
 		return true;
+	}
+
+	/** Publica o rascunho (D178): status e data juntos, como o CHECK da V11 exige. Daqui em diante o conteúdo não muda mais. */
+	public void publicar(Instant momento) {
+		exigirRascunho();
+		this.status = StatusQuestao.PUBLICADA;
+		this.publicadaEm = Objects.requireNonNull(momento, "momento");
+	}
+
+	/** A publicada que dá lugar a outra vira ARQUIVADA e guarda a data em que foi publicada. */
+	public void arquivar() {
+		if (this.status != StatusQuestao.PUBLICADA) {
+			throw new IllegalStateException("Só a versão PUBLICADA pode ser arquivada.");
+		}
+		this.status = StatusQuestao.ARQUIVADA;
 	}
 
 	/** Versão publicada ou arquivada nunca muda: é o que a tentativa referencia. O service barra antes, com o 409. */

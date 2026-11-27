@@ -33,6 +33,9 @@ import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.programa.Programa;
 import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
+import java.time.Instant;
+import br.simulado.etec.catalogo.service.QuestaoService.MotivoDePendencia;
+import br.simulado.etec.catalogo.service.QuestaoService.Pendencia;
 
 @ExtendWith(MockitoExtension.class)
 class ProvaServiceTest {
@@ -45,6 +48,12 @@ class ProvaServiceTest {
 
 	@Mock
 	private br.simulado.etec.catalogo.repository.QuestaoRepository questoes;
+
+	@Mock
+	private QuestaoService servicoDeQuestoes;
+
+	@Mock
+	private java.time.Clock relogio;
 
 	@InjectMocks
 	private ProvaService servico;
@@ -349,6 +358,67 @@ class ProvaServiceTest {
 		when(repositorio.saveAndFlush(prova)).thenThrow(outra);
 
 		assertThatThrownBy(() -> servico.atualizar(prova.getPublicId(), completa())).isSameAs(outra);
+	}
+
+	// ----- publicar (D178) -----
+
+	@Test
+	void deve_travar_a_prova_antes_da_cascata_e_publicar_tudo_com_o_mesmo_momento_em_milissegundos() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(relogio.instant()).thenReturn(Instant.parse("2026-11-28T10:00:00.123456789Z"));
+		Instant momento = Instant.parse("2026-11-28T10:00:00.123Z");
+		when(servicoDeQuestoes.publicarQuestoesDaProva(prova, momento)).thenReturn(java.util.List.of());
+		when(repositorio.saveAndFlush(prova)).thenReturn(prova);
+
+		Prova publicada = servico.publicar(prova.getPublicId());
+
+		assertThat(publicada.getStatus()).isEqualTo(StatusProva.PUBLICADA);
+		assertThat(publicada.getPublicadaEm()).isEqualTo(momento);
+		InOrder ordem = org.mockito.Mockito.inOrder(repositorio, servicoDeQuestoes);
+		ordem.verify(repositorio).buscarComTrava(prova.getPublicId());
+		ordem.verify(servicoDeQuestoes).publicarQuestoesDaProva(prova, momento);
+		ordem.verify(repositorio).saveAndFlush(prova);
+		verify(repositorio, never()).findByPublicId(any());
+	}
+
+	@Test
+	void deve_dar_409_com_todas_as_pendencias_e_nao_publicar_a_prova() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(relogio.instant()).thenReturn(Instant.parse("2026-11-28T10:00:00Z"));
+		java.util.List<Pendencia> pendencias = java.util.List.of(new Pendencia(2, MotivoDePendencia.QUESTAO_AUSENTE),
+				new Pendencia(3, MotivoDePendencia.SEM_GABARITO));
+		when(servicoDeQuestoes.publicarQuestoesDaProva(any(), any())).thenReturn(pendencias);
+
+		assertThatThrownBy(() -> servico.publicar(prova.getPublicId())).isInstanceOfSatisfying(ConflictException.class, e -> {
+			assertThat(e.getCodigo()).isEqualTo(CodigoErro.PROVA_COM_QUESTOES_PENDENTES);
+			assertThat(e.getDetalhes()).containsEntry("questoesPendentes", pendencias).hasSize(1);
+		});
+		assertThat(prova.getStatus()).isEqualTo(StatusProva.RASCUNHO);
+		assertThat(prova.getPublicadaEm()).isNull();
+		verify(repositorio, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void deve_recusar_publicar_a_prova_ja_publicada_sem_tocar_nas_questoes() {
+		Prova prova = provaGravada();
+		prova.publicar(Instant.parse("2026-11-01T10:00:00Z"));
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+
+		assertThatThrownBy(() -> servico.publicar(prova.getPublicId()))
+				.satisfies(e -> assertThat(((ConflictException) e).getCodigo()).isEqualTo(CodigoErro.PROVA_NAO_EDITAVEL));
+		assertThat(prova.getPublicadaEm()).isEqualTo(Instant.parse("2026-11-01T10:00:00Z"));
+		org.mockito.Mockito.verifyNoInteractions(servicoDeQuestoes);
+	}
+
+	@Test
+	void deve_lancar_404_ao_publicar_prova_que_nao_existe() {
+		UUID id = UUID.randomUUID();
+		when(repositorio.buscarComTrava(id)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.publicar(id)).isInstanceOf(ResourceNotFoundException.class);
+		org.mockito.Mockito.verifyNoInteractions(servicoDeQuestoes);
 	}
 
 }

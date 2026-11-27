@@ -84,10 +84,13 @@ public abstract class AbstractQuestaoIntegrationTest extends AbstractIntegration
 
 	protected long inserirVersaoCompleta(long questaoId, int versao, String status, long subtopicoId, String textoApoio,
 			Object grupoApoio, String enunciado, String gabarito, String dificuldade, String explicacao) {
+		// a data de publicação acompanha o status (CHECK da V11). A comparação é binária, como a do banco: um status inválido
+		// ganha data, para a linha ser recusada só pelo CHECK do status, que é o que o teste dele confere
 		jdbc.update("INSERT INTO questao_versao (questao_id, versao, status, subtopico_id, texto_apoio, grupo_apoio, enunciado, "
-				+ "gabarito, dificuldade, explicacao, criado_em, atualizado_em) "
-				+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))", questaoId, versao, status, subtopicoId,
-				textoApoio, grupoApoio, enunciado, gabarito, dificuldade, explicacao);
+				+ "gabarito, dificuldade, explicacao, publicada_em, criado_em, atualizado_em) "
+				+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, IF(BINARY ? = 'RASCUNHO', NULL, UTC_TIMESTAMP(3)), UTC_TIMESTAMP(3), "
+				+ "UTC_TIMESTAMP(3))", questaoId, versao, status, subtopicoId, textoApoio, grupoApoio, enunciado, gabarito,
+				dificuldade, explicacao, status);
 		return jdbc.queryForObject("SELECT id FROM questao_versao WHERE questao_id = ? AND versao = ?", Long.class, questaoId, versao);
 	}
 

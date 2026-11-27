@@ -151,20 +151,69 @@ public abstract class AbstractEdicaoIntegrationTest extends AbstractQuestaoInteg
 
 	/** Espera o MySQL mostrar uma transação esperando por trava (consultado como root, que enxerga o innodb_trx). */
 	protected static void esperarAlguemNaFilaDaTrava() throws SQLException, InterruptedException {
+		esperarNaFilaDaTrava(1);
+	}
+
+	/** O mesmo, até haver pelo menos {@code quantas} transações esperando por trava. */
+	protected static void esperarNaFilaDaTrava(int quantas) throws SQLException, InterruptedException {
 		long limite = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
 		try (Connection root = DriverManager.getConnection(MYSQL.getJdbcUrl(), "root", MYSQL.getPassword());
 				Statement s = root.createStatement()) {
 			while (System.nanoTime() < limite) {
 				try (ResultSet r = s.executeQuery("SELECT COUNT(*) FROM information_schema.innodb_trx WHERE trx_state = 'LOCK WAIT'")) {
 					r.next();
-					if (r.getInt(1) > 0) {
+					if (r.getInt(1) >= quantas) {
 						return;
 					}
 				}
 				Thread.sleep(100);
 			}
 		}
-		throw new AssertionError("a requisição não chegou a esperar por uma trava");
+		throw new AssertionError("não chegou a haver " + quantas + " requisição(ões) esperando por uma trava");
+	}
+
+	/** O que a outra transação faz enquanto a requisição espera a trava. */
+	protected interface AcaoNaOutraTransacao {
+		void executarEm(Connection outra) throws SQLException;
+	}
+
+	/**
+	 * Segura a trava da prova, dispara a requisição, espera ela entrar na fila, confere que ela ainda não travou NENHUMA linha
+	 * das questões da prova (a da prova é a primeira), aplica a mudança, confirma e devolve a resposta. A requisição precisa
+	 * ENXERGAR a mudança ao acordar: se tivesse lido qualquer coisa antes da trava, o snapshot do REPEATABLE READ a esconderia.
+	 */
+	protected Response comAProvaTravada(String prova, Callable<Response> requisicao, AcaoNaOutraTransacao mudanca)
+			throws Exception {
+		ExecutorService pool = Executors.newSingleThreadExecutor();
+		try (Connection outra = outraTransacao()) {
+			travarProva(outra, prova);
+			Future<Response> resposta = pool.submit(requisicao);
+			esperarAlguemNaFilaDaTrava();
+			exigirQuestoesSemTrava(prova);
+			mudanca.executarEm(outra);
+			outra.commit();
+			return resposta.get(60, TimeUnit.SECONDS);
+		}
+		finally {
+			pool.shutdownNow();
+		}
+	}
+
+	/** Uma terceira conexão trava, SEM esperar (NOWAIT), as linhas das três tabelas de questão da prova, e solta em seguida. */
+	private void exigirQuestoesSemTrava(String prova) throws SQLException {
+		long id = idInternoDaProva(prova);
+		List<Long> questoes = jdbc.queryForList("SELECT id FROM questao WHERE prova_id = ?", Long.class, id);
+		if (questoes.isEmpty()) {
+			return;
+		}
+		String ids = questoes.stream().map(String::valueOf).collect(Collectors.joining(","));
+		try (Connection terceira = outraTransacao(); Statement comando = terceira.createStatement()) {
+			comando.executeQuery("SELECT id FROM questao WHERE id IN (" + ids + ") FOR UPDATE NOWAIT").close();
+			comando.executeQuery("SELECT id FROM questao_versao WHERE questao_id IN (" + ids + ") FOR UPDATE NOWAIT").close();
+			comando.executeQuery("SELECT a.id FROM alternativa a JOIN questao_versao v ON v.id = a.questao_versao_id "
+					+ "WHERE v.questao_id IN (" + ids + ") FOR UPDATE NOWAIT").close();
+			terceira.rollback();
+		}
 	}
 
 	/** Dispara as tarefas ao mesmo tempo (todas esperam a largada) e devolve os resultados na ordem das tarefas. */

@@ -59,6 +59,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import br.simulado.etec.catalogo.dto.QuestaoAtualizacaoRequest;
 import br.simulado.etec.catalogo.model.Alternativa;
 import br.simulado.etec.catalogo.service.QuestaoService.SituacaoDoGabarito;
+import java.util.HashMap;
+import br.simulado.etec.catalogo.service.QuestaoService.MotivoDePendencia;
+import br.simulado.etec.catalogo.service.QuestaoService.Pendencia;
 
 @ExtendWith(MockitoExtension.class)
 class QuestaoServiceTest {
@@ -80,6 +83,9 @@ class QuestaoServiceTest {
 
 	@Mock
 	private java.time.Clock relogio;
+
+	@Mock
+	private br.simulado.etec.shared.config.ImagensProperties imagens;
 
 	@InjectMocks
 	private QuestaoService servico;
@@ -868,6 +874,118 @@ class QuestaoServiceTest {
 
 		assertThat(servico.aplicarGabarito(prova, 4, "A")).isEqualTo(SituacaoDoGabarito.SEM_RASCUNHO);
 		assertThat(servico.aplicarGabarito(prova, 5, "A")).isEqualTo(SituacaoDoGabarito.QUESTAO_INEXISTENTE);
+	}
+
+	// ----- publicar as questões da prova, em cascata (D178) -----
+
+	private Prova provaCom(int quantidade) {
+		return new Prova(etec, "Para publicar", null, null, null, 180, quantidade, null);
+	}
+
+	/** Um rascunho pronto para publicar (com gabarito, no subtópico ativo), a ser estragado pelo teste. */
+	private QuestaoVersao pronta(Prova daProva, int numero, Subtopico emQue, String gabarito, String imagemUrl) {
+		Questao questao = new Questao(daProva, numero, "a".repeat(64));
+		return new QuestaoVersao(questao, emQue, null, null, "E", imagemUrl,
+				Map.of("A", "1", "B", "2", "C", "3", "D", "4", "E", "5"), gabarito, null, null);
+	}
+
+	private QuestaoVersao pronta(Prova daProva, int numero) {
+		return pronta(daProva, numero, subtopico, "A", null);
+	}
+
+	private void aProvaTem(Prova daProva, QuestaoVersao... versoesDela) {
+		when(questoes.findByProva(daProva))
+				.thenReturn(java.util.Arrays.stream(versoesDela).map(QuestaoVersao::getQuestao).distinct().toList());
+		when(versoes.buscarVivasDaProva(daProva)).thenReturn(List.of(versoesDela));
+	}
+
+	@Test
+	void deve_publicar_todos_os_rascunhos_com_o_mesmo_momento_quando_nao_ha_pendencia() {
+		Prova duas = provaCom(2);
+		QuestaoVersao um = pronta(duas, 1);
+		QuestaoVersao dois = pronta(duas, 2, subtopico, "E", "https://localhost/a.png");
+		aProvaTem(duas, dois, um);
+		when(imagens.permite("localhost")).thenReturn(true);
+
+		assertThat(servico.publicarQuestoesDaProva(duas, MOMENTO)).isEmpty();
+
+		for (QuestaoVersao versao : List.of(um, dois)) {
+			assertThat(versao.getStatus()).isEqualTo(StatusQuestao.PUBLICADA);
+			assertThat(versao.getPublicadaEm()).isEqualTo(MOMENTO);
+		}
+	}
+
+	@Test
+	void deve_juntar_todas_as_pendencias_em_ordem_de_numero_sem_publicar_nada() {
+		Prova seis = provaCom(6);
+		Subtopico desativado = new Subtopico(materia, "Desativado");
+		desativado.desativar();
+		ProgramaDeProva outroPrograma = new ProgramaDeProva(Programa.ETEC, "outro");
+		ReflectionTestUtils.setField(outroPrograma, "id", 2L);
+		Subtopico deOutroPrograma = new Subtopico(new Materia(outroPrograma, "De fora", null), "De fora");
+		QuestaoVersao boa = pronta(seis, 1);
+		QuestaoVersao semGabarito = pronta(seis, 3, subtopico, null, null);
+		QuestaoVersao comTres = pronta(seis, 4, desativado, null, "https://fora.exemplo.invalid/a.png");
+		QuestaoVersao deFora = pronta(seis, 5, deOutroPrograma, "A", null);
+		QuestaoVersao soPublicada = pronta(seis, 6);
+		ReflectionTestUtils.setField(soPublicada, "status", StatusQuestao.PUBLICADA);
+		aProvaTem(seis, soPublicada, deFora, comTres, semGabarito, boa);
+
+		List<Pendencia> pendencias = servico.publicarQuestoesDaProva(seis, MOMENTO);
+
+		assertThat(pendencias).containsExactly(new Pendencia(2, MotivoDePendencia.QUESTAO_AUSENTE),
+				new Pendencia(3, MotivoDePendencia.SEM_GABARITO), new Pendencia(4, MotivoDePendencia.SEM_GABARITO),
+				new Pendencia(4, MotivoDePendencia.SUBTOPICO_INATIVO), new Pendencia(4, MotivoDePendencia.IMAGEM_NAO_PERMITIDA),
+				new Pendencia(5, MotivoDePendencia.SUBTOPICO_DE_OUTRO_PROGRAMA),
+				new Pendencia(6, MotivoDePendencia.QUESTAO_SEM_RASCUNHO));
+		assertThat(boa.getStatus()).as("nem a que estava pronta").isEqualTo(StatusQuestao.RASCUNHO);
+		assertThat(boa.getPublicadaEm()).isNull();
+		verify(versoes, never()).flush();
+	}
+
+	@Test
+	void deve_apontar_o_subtopico_de_materia_desativada_como_inativo() {
+		Prova uma = provaCom(1);
+		QuestaoVersao versao = pronta(uma, 1);
+		materia.desativar();
+		aProvaTem(uma, versao);
+
+		assertThat(servico.publicarQuestoesDaProva(uma, MOMENTO))
+				.containsExactly(new Pendencia(1, MotivoDePendencia.SUBTOPICO_INATIVO));
+	}
+
+	@Test
+	void deve_arquivar_a_publicada_anterior_e_mandar_ao_banco_antes_de_publicar_o_rascunho() {
+		Prova uma = provaCom(1);
+		QuestaoVersao anterior = pronta(uma, 1);
+		anterior.publicar(MOMENTO.minusSeconds(60));
+		QuestaoVersao nova = new QuestaoVersao(anterior.getQuestao(), subtopico, null, null, "E2", null,
+				Map.of("A", "1", "B", "2", "C", "3", "D", "4", "E", "5"), "B", null, null);
+		aProvaTem(uma, anterior, nova);
+		Map<String, StatusQuestao> noFlush = new HashMap<>();
+		org.mockito.Mockito.doAnswer(chamada -> {
+			noFlush.put("anterior", anterior.getStatus());
+			noFlush.put("nova", nova.getStatus());
+			return null;
+		}).when(versoes).flush();
+
+		assertThat(servico.publicarQuestoesDaProva(uma, MOMENTO)).isEmpty();
+
+		assertThat(noFlush).as("quando o flush acontece, só a antiga mudou").containsEntry("anterior", StatusQuestao.ARQUIVADA)
+				.containsEntry("nova", StatusQuestao.RASCUNHO);
+		assertThat(nova.getStatus()).isEqualTo(StatusQuestao.PUBLICADA);
+		assertThat(anterior.getPublicadaEm()).as("a arquivada guarda a data dela").isEqualTo(MOMENTO.minusSeconds(60));
+	}
+
+	@Test
+	void deve_recusar_na_entidade_publicar_o_que_nao_e_rascunho_e_arquivar_o_que_nao_e_publicada() {
+		QuestaoVersao versao = pronta(prova, 1);
+
+		assertThatThrownBy(versao::arquivar).isInstanceOf(IllegalStateException.class);
+		versao.publicar(MOMENTO);
+		assertThatThrownBy(() -> versao.publicar(MOMENTO)).isInstanceOf(IllegalStateException.class);
+		prova.publicar(MOMENTO);
+		assertThatThrownBy(() -> prova.publicar(MOMENTO)).isInstanceOf(IllegalStateException.class);
 	}
 
 }

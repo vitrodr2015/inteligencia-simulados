@@ -27,8 +27,8 @@ public final class MatrizDeAutorizacao {
 	}
 
 	/** Recursos criados (por um ADMIN) para cada execução de uma linha. */
-	public record Ctx(String materiaId, String subtopicoId, String materiaVaziaId, String provaId, String questaoId, String idInexistente,
-			String sufixo) {
+	public record Ctx(String materiaId, String subtopicoId, String materiaVaziaId, String provaId, String questaoId,
+			String provaCompletaId, String idInexistente, String sufixo) {
 	}
 
 	/**
@@ -207,8 +207,20 @@ public final class MatrizDeAutorizacao {
 		linha("GET em /admin/provas (a listagem é em /provas)", "GET", null, c -> "/api/v1/admin/provas", null, 401, 403, 403, 403);
 		linha("GET em /admin/provas/{id} (a leitura é em /provas/{id})", "GET", null, c -> "/api/v1/admin/provas/" + c.provaId(),
 				null, 401, 403, 403, 403);
-		linha("publicar prova (ainda não existe)", "PATCH", null, c -> "/api/v1/provas/" + c.provaId() + "/publish", null, 401,
-				403, 403, 403);
+		// ----- publicar a prova (fatia 4, passada 2a; D178): só PATCH, só ADMIN -----
+		linha("publicar prova completa", "PATCH", "/api/v1/provas/{id}/publish",
+				c -> "/api/v1/provas/" + c.provaCompletaId() + "/publish", null, 401, 403, 403, 200);
+		linha("publicar prova incompleta", "PATCH", "/api/v1/provas/{id}/publish",
+				c -> "/api/v1/provas/" + c.provaId() + "/publish", null, 401, 403, 403, 409);
+		linha("publicar prova inexistente", "PATCH", "/api/v1/provas/{id}/publish",
+				c -> "/api/v1/provas/" + c.idInexistente() + "/publish", null, 401, 403, 403, 404);
+		linha("publicar prova com id malformado", "PATCH", "/api/v1/provas/{id}/publish",
+				c -> "/api/v1/provas/abc/publish", null, 401, 403, 403, 400);
+		for (String metodo : new String[] { "GET", "HEAD", "POST", "PUT", "DELETE" }) {
+			linha(metodo + " em /provas/{id}/publish (não existe)", metodo, null,
+					c -> "/api/v1/provas/" + c.provaId() + "/publish",
+					metodo.equals("POST") || metodo.equals("PUT") ? c -> "{}" : null, 401, 403, 403, 403);
+		}
 		linha("publicar prova por /admin (não existe)", "PATCH", null,
 				c -> "/api/v1/admin/provas/" + c.provaId() + "/publish", null, 401, 403, 403, 403);
 
@@ -313,6 +325,16 @@ public final class MatrizDeAutorizacao {
 				c -> "/api/v1/admin/questoes/" + c.questaoId() + "/versoes", c -> "{}", 401, 403, 403, 403);
 		linha("publicar questão (ainda não existe)", "PATCH", null, c -> "/api/v1/admin/questoes/" + c.questaoId() + "/publish", null,
 				401, 403, 403, 403);
+		for (String metodo : new String[] { "GET", "POST", "PUT", "DELETE" }) {
+			linha(metodo + " em /admin/questoes/{id}/publish (ainda não existe)", metodo, null,
+					c -> "/api/v1/admin/questoes/" + c.questaoId() + "/publish",
+					metodo.equals("POST") || metodo.equals("PUT") ? c -> "{}" : null, 401, 403, 403, 403);
+		}
+		for (String metodo : new String[] { "PUT", "PATCH", "DELETE" }) {
+			linha(metodo + " em /admin/questoes/{id}/versoes (ainda não existe)", metodo, null,
+					c -> "/api/v1/admin/questoes/" + c.questaoId() + "/versoes",
+					metodo.equals("DELETE") ? null : c -> "{}", 401, 403, 403, 403);
+		}
 		linha("STUDENT não lê questão do admin (a leitura do aluno é outra rota)", "GET", null,
 				c -> "/api/v1/questoes/" + c.questaoId(), null, 401, 403, 403, 403);
 

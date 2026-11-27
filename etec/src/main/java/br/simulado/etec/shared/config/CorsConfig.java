@@ -20,7 +20,7 @@ import br.simulado.etec.shared.security.SecurityErrorWriter;
 /**
  * CORS (contrato, D100 e D123). As origens vêm só de {@code app.cors.allowed-origins}; vazia = sem CORS (nenhuma
  * configuração registrada). Métodos GET, POST, PUT, PATCH, DELETE e OPTIONS; cabeçalhos Authorization e Content-Type;
- * SEM credenciais; Max-Age de 3600 s; {@code Location} exposto. Em produção (perfil {@link Perfis#PRODUCAO}) só origens https: a
+ * SEM credenciais; Max-Age de 3600 s; {@code Location} e {@code Retry-After} expostos (D180). Em produção (perfil {@link Perfis#PRODUCAO}) só origens https: a
  * aplicação não sobe com http.
  *
  * <p>O {@link CorsFilter} é um bean chamado {@code corsFilter} e fica DESLIGADO como filtro do servlet: quem o aplica é o
@@ -38,7 +38,8 @@ public class CorsConfig {
 
 	static final List<String> CABECALHOS_PERMITIDOS = List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE);
 
-	static final List<String> CABECALHOS_EXPOSTOS = List.of(HttpHeaders.LOCATION);
+	/** O que o front em outra origem consegue LER: o endereço do recurso criado e a espera do 429 e do 503 (D180). */
+	static final List<String> CABECALHOS_EXPOSTOS = List.of(HttpHeaders.LOCATION, HttpHeaders.RETRY_AFTER);
 
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource(CorsProperties propriedades, Environment ambiente) {

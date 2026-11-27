@@ -904,4 +904,64 @@ class QuestaoControllerTest {
 		verificarErro(gabarito(provaId, "[" + item(40, "\"A\"") + "]"), 409, "Conflict", CodigoErro.PROVA_NAO_EDITAVEL);
 	}
 
+	// ----- publicar a prova (D178). A cascata no banco, a atomicidade e a concorrência estão no MySQL real -----
+
+	private ResultActions publicar(String prova) throws Exception {
+		return mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+				.patch("/api/v1/provas/" + prova + "/publish"));
+	}
+
+	private String cadastrarNaProva(String prova, int numero, String extra) throws Exception {
+		return JsonPath.read(mockMvc
+				.perform(post("/api/v1/admin/provas/" + prova + "/questoes").contentType(MediaType.APPLICATION_JSON)
+						.content(corpo(numero, "Enunciado " + numero, extra)))
+				.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
+	}
+
+	@Test
+	void deve_devolver_200_com_a_prova_publicada_e_publicar_as_questoes_quando_esta_completa() throws Exception {
+		String duas = criarProva(2);
+		String um = cadastrarNaProva(duas, 1, "\"gabarito\":\"A\"");
+		cadastrarNaProva(duas, 2, "\"gabarito\":\"B\"");
+
+		publicar(duas).andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(duas))
+				.andExpect(jsonPath("$.status").value("PUBLICADA"))
+				.andExpect(jsonPath("$.publicadaEm", matchesPattern(DATA_HORA)))
+				.andExpect(jsonPath("$.quantidadeQuestoes").value(2))
+				.andExpect(jsonPath("$.questoesCadastradas").value(2));
+
+		mockMvc.perform(get("/api/v1/admin/questoes/" + um)).andExpect(jsonPath("$.status").value("PUBLICADA"));
+		mockMvc.perform(get(LISTA + "?provaId=" + duas + "&status=PUBLICADA")).andExpect(jsonPath("$.totalElementos").value(2));
+		verificarErro(publicar(duas), 409, "Conflict", CodigoErro.PROVA_NAO_EDITAVEL);
+		verificarErro(editarQuestao(um, corpoDoPut("Depois de publicada", "")), 409, "Conflict", CodigoErro.QUESTAO_SEM_RASCUNHO);
+		verificarErro(gabarito(duas, "[" + item(1, "\"E\"") + "]"), 409, "Conflict", CodigoErro.PROVA_NAO_EDITAVEL);
+		verificarErro(editarProva(duas, 2), 409, "Conflict", CodigoErro.PROVA_NAO_EDITAVEL);
+	}
+
+	@Test
+	void deve_devolver_409_com_cada_pendencia_como_numero_e_motivo_e_nao_publicar_nada() throws Exception {
+		String tres = criarProva(3);
+		String um = cadastrarNaProva(tres, 1, "\"gabarito\":\"A\"");
+		cadastrarNaProva(tres, 3, "");
+
+		verificarErro(publicar(tres), 409, "Conflict", CodigoErro.PROVA_COM_QUESTOES_PENDENTES)
+				.andExpect(jsonPath("$.detalhes.questoesPendentes.length()").value(2))
+				.andExpect(jsonPath("$.detalhes.questoesPendentes[0].numero").value(2))
+				.andExpect(jsonPath("$.detalhes.questoesPendentes[0].motivo").value("QUESTAO_AUSENTE"))
+				.andExpect(jsonPath("$.detalhes.questoesPendentes[1].numero").value(3))
+				.andExpect(jsonPath("$.detalhes.questoesPendentes[1].motivo").value("SEM_GABARITO"));
+
+		mockMvc.perform(get("/api/v1/provas/" + tres)).andExpect(jsonPath("$.status").value("RASCUNHO"))
+				.andExpect(jsonPath("$.publicadaEm").value((Object) null));
+		mockMvc.perform(get("/api/v1/admin/questoes/" + um)).andExpect(jsonPath("$.status").value("RASCUNHO"));
+	}
+
+	@Test
+	void deve_devolver_404_e_400_ao_publicar_com_id_inexistente_ou_malformado() throws Exception {
+		verificarErro(publicar(java.util.UUID.randomUUID().toString()), 404, "Not Found", CodigoErro.PROVA_NAO_ENCONTRADA);
+		verificarErro(publicar("abc"), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+		verificarErro(publicar(UUID_CURTO), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+	}
+
 }

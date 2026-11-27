@@ -68,6 +68,19 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 			}
 
 			@Override
+			public String provaCompleta(String materiaId) {
+				String prova = criar("/api/v1/admin/provas",
+						"{\"titulo\":\"Prova completa " + sufixo + "\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":1}");
+				String subtopico = criar("/api/v1/subtopicos",
+						"{\"materiaId\":\"" + materiaId + "\",\"nome\":\"Subtópico da prova completa " + sufixo + "\"}");
+				criar("/api/v1/admin/provas/" + prova + "/questoes",
+						"{\"numero\":1,\"subtopicoId\":\"" + subtopico + "\",\"enunciado\":\"Enunciado\",\"gabarito\":\"A\","
+								+ "\"alternativas\":[{\"letra\":\"A\",\"texto\":\"a\"},{\"letra\":\"B\",\"texto\":\"b\"},"
+								+ "{\"letra\":\"C\",\"texto\":\"c\"},{\"letra\":\"D\",\"texto\":\"d\"},{\"letra\":\"E\",\"texto\":\"e\"}]}");
+				return prova;
+			}
+
+			@Override
 			public String questao(String provaId, String materiaId) {
 				// a questão fica num subtópico PRÓPRIO: um subtópico com questão não pode ser apagado (409), e a matriz apaga o
 				// subtopicoId

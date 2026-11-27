@@ -28,6 +28,9 @@ public interface QuestaoRepository extends JpaRepository<Questao, Long> {
 	@Query("select q.prova.publicId from Questao q where q.publicId = :publicId")
 	Optional<UUID> buscarProvaDaQuestao(@Param("publicId") UUID publicId);
 
+	/** Todas as questões (identidades) da prova. */
+	List<Questao> findByProva(Prova prova);
+
 	/** O maior numero de questão cadastrado na prova (vazio se não há questão). */
 	@Query("select max(q.numero) from Questao q where q.prova = :prova")
 	Optional<Integer> buscarMaiorNumero(@Param("prova") Prova prova);

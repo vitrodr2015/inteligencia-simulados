@@ -128,7 +128,9 @@ class QuestaoIntegracaoTest extends AbstractQuestaoIntegrationTest {
 
 		assertThat(checks).containsOnlyKeys("ck_questao_versao_versao", "ck_questao_versao_status", "ck_questao_versao_texto_apoio",
 				"ck_questao_versao_enunciado", "ck_questao_versao_explicacao", "ck_questao_versao_grupo_apoio",
-				"ck_questao_versao_gabarito", "ck_questao_versao_dificuldade");
+				"ck_questao_versao_gabarito", "ck_questao_versao_dificuldade", "ck_questao_versao_publicada_em");
+		assertThat(checks.get("ck_questao_versao_publicada_em")).contains("utf8mb4_bin").contains("publicada_em")
+				.contains("RASCUNHO");
 		assertThat(checks.get("ck_questao_versao_enunciado")).contains("10000");
 		assertThat(checks.get("ck_questao_versao_status")).contains("RASCUNHO").contains("PUBLICADA").contains("ARQUIVADA");
 		assertThat(checks.get("ck_questao_versao_gabarito")).contains("utf8mb4_bin").containsPattern("A.*B.*C.*D.*E");

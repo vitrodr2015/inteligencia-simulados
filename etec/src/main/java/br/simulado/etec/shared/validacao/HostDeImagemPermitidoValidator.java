@@ -18,6 +18,14 @@ public class HostDeImagemPermitidoValidator implements ConstraintValidator<HostD
 
 	@Override
 	public boolean isValid(CharSequence texto, ConstraintValidatorContext contexto) {
+		return hostPermitido(texto, propriedades);
+	}
+
+	/**
+	 * A regra do host, também usada fora da validação de entrada: a publicação da prova a aplica de novo (D178), porque a lista
+	 * é configuração e pode ter mudado depois de a questão ser gravada. Sem URL, ou sem host que se possa ler, passa.
+	 */
+	public static boolean hostPermitido(CharSequence texto, ImagensProperties propriedades) {
 		if (texto == null) {
 			return true;
 		}

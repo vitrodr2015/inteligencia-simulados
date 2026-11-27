@@ -2,16 +2,9 @@ package br.simulado.etec.catalogo.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -26,48 +19,6 @@ import io.restassured.response.Response;
  * acordar (se tivesse lido qualquer coisa antes da trava, o snapshot do REPEATABLE READ a esconderia).
  */
 class EdicaoConcorrenciaIntegracaoTest extends AbstractEdicaoIntegrationTest {
-
-	private interface AcaoNaOutraTransacao {
-		void executarEm(Connection outra) throws SQLException;
-	}
-
-	/**
-	 * Segura a trava da prova, dispara a requisição, espera ela entrar na fila, confere que ela ainda não travou NENHUMA linha
-	 * das questões da prova (a da prova é a primeira), aplica a mudança, confirma e devolve a resposta.
-	 */
-	private Response comAProvaTravada(String prova, Callable<Response> requisicao, AcaoNaOutraTransacao mudanca)
-			throws Exception {
-		ExecutorService pool = Executors.newSingleThreadExecutor();
-		try (Connection outra = outraTransacao()) {
-			travarProva(outra, prova);
-			Future<Response> resposta = pool.submit(requisicao);
-			esperarAlguemNaFilaDaTrava();
-			exigirQuestoesSemTrava(prova);
-			mudanca.executarEm(outra);
-			outra.commit();
-			return resposta.get(60, TimeUnit.SECONDS);
-		}
-		finally {
-			pool.shutdownNow();
-		}
-	}
-
-	/** Uma terceira conexão trava, SEM esperar (NOWAIT), as linhas das três tabelas de questão da prova, e solta em seguida. */
-	private void exigirQuestoesSemTrava(String prova) throws SQLException {
-		long id = idInternoDaProva(prova);
-		List<Long> questoes = jdbc.queryForList("SELECT id FROM questao WHERE prova_id = ?", Long.class, id);
-		if (questoes.isEmpty()) {
-			return;
-		}
-		String ids = questoes.stream().map(String::valueOf).collect(Collectors.joining(","));
-		try (Connection terceira = outraTransacao(); Statement comando = terceira.createStatement()) {
-			comando.executeQuery("SELECT id FROM questao WHERE id IN (" + ids + ") FOR UPDATE NOWAIT").close();
-			comando.executeQuery("SELECT id FROM questao_versao WHERE questao_id IN (" + ids + ") FOR UPDATE NOWAIT").close();
-			comando.executeQuery("SELECT a.id FROM alternativa a JOIN questao_versao v ON v.id = a.questao_versao_id "
-					+ "WHERE v.questao_id IN (" + ids + ") FOR UPDATE NOWAIT").close();
-			terceira.rollback();
-		}
-	}
 
 	// ----- determinísticos: a trava da prova é a primeira coisa, inclusive nas rotas por id de questão -----
 
