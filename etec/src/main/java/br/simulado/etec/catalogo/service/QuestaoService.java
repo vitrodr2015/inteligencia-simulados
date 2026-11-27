@@ -1,5 +1,7 @@
 package br.simulado.etec.catalogo.service;
 
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -8,17 +10,21 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import br.simulado.etec.catalogo.dto.AlternativaRequest;
 import br.simulado.etec.catalogo.dto.AlternativasValidasValidator;
+import br.simulado.etec.catalogo.dto.QuestaoAtualizacaoRequest;
 import br.simulado.etec.catalogo.dto.QuestaoRequest;
 import br.simulado.etec.catalogo.model.Prova;
 import br.simulado.etec.catalogo.model.Questao;
@@ -35,6 +41,7 @@ import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.InvalidRequestException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
+import br.simulado.etec.shared.persistencia.Restricoes;
 
 /**
  * Regras da questão (contrato, seção 5). O cadastro unitário é o caminho PRIMÁRIO (D152). O cadastro tem duas partes,
@@ -74,6 +81,18 @@ public class QuestaoService {
 
 	}
 
+	/** O que aconteceu ao aplicar um item do gabarito em lote (D174). */
+	public enum SituacaoDoGabarito {
+		/** O gabarito do rascunho mudou. */
+		ALTERADO,
+		/** O rascunho já tinha esse gabarito: nada foi gravado. */
+		SEM_MUDANCA,
+		/** A questão existe, mas não tem rascunho aberto: nada foi gravado. */
+		SEM_RASCUNHO,
+		/** A prova não tem questão com esse numero. */
+		QUESTAO_INEXISTENTE
+	}
+
 	private final ProvaRepository provas;
 
 	private final QuestaoRepository questoes;
@@ -82,18 +101,24 @@ public class QuestaoService {
 
 	private final SubtopicoRepository subtopicos;
 
+	private final TransactionTemplate transacao;
+
+	private final Clock relogio;
+
 	public QuestaoService(ProvaRepository provas, QuestaoRepository questoes, QuestaoVersaoRepository versoes,
-			SubtopicoRepository subtopicos) {
+			SubtopicoRepository subtopicos, PlatformTransactionManager gerenteDeTransacao, Clock relogio) {
 		this.provas = provas;
 		this.questoes = questoes;
 		this.versoes = versoes;
 		this.subtopicos = subtopicos;
+		this.transacao = new TransactionTemplate(gerenteDeTransacao);
+		this.relogio = relogio;
 	}
 
 	/** O cadastro unitário: trava a prova, cadastra nela e traduz o conflito de conteúdo no 409. */
 	@Transactional
 	public ResultadoDoCadastro cadastrar(UUID provaPublicId, QuestaoRequest dados) {
-		exigirAlternativas(dados);
+		exigirAlternativas(dados.alternativas());
 		ResultadoDoCadastro resultado = gravarNaProva(travarProvaEditavel(provaPublicId), dados);
 		if (resultado.situacao() == Situacao.CONFLITO) {
 			throw new ConflictException(CodigoErro.QUESTAO_NUMERO_EM_CONFLITO,
@@ -114,10 +139,74 @@ public class QuestaoService {
 	@Transactional(propagation = Propagation.MANDATORY)
 	public Prova travarProvaEditavel(UUID provaPublicId) {
 		Prova prova = provas.buscarComTrava(provaPublicId).orElseThrow(QuestaoService::provaNaoEncontrada);
-		if (prova.getStatus() != StatusProva.RASCUNHO) {
-			throw new ConflictException(CodigoErro.PROVA_NAO_EDITAVEL, "A prova não está em rascunho e não aceita novas questões.");
-		}
+		ProvaService.exigirRascunho(prova);
 		return prova;
+	}
+
+	/**
+	 * PUT de uma questão (D171): substituição total do RASCUNHO ABERTO. Só o status da versão decide: sem rascunho aberto é 409
+	 * QUESTAO_SEM_RASCUNHO, e o status da prova não importa (editar a questão não altera a prova, D173). O hash nunca muda (D51).
+	 *
+	 * <p>Trava (D175): toda escrita trava a linha da PROVA, e a trava é a primeira leitura da transação de escrita. A rota traz
+	 * só o id da questão, então o id da prova é lido ANTES, numa transação própria e curta (a prova de uma questão nunca
+	 * muda). Depois da trava a questão é lida de novo: se sumiu enquanto esperava, 404. Ler qualquer coisa antes da trava dentro
+	 * da mesma transação fixaria o snapshot do REPEATABLE READ e esconderia o que a transação anterior gravou. Por isso
+	 * {@code NEVER}: este método não pode ser chamado de dentro de outra transação.
+	 *
+	 * <p>Ordem (D79): 404 → 409 sem rascunho → 400 do subtópico e 409 SUBTOPICO_INATIVO (só se o subtópico for TROCADO, D172) →
+	 * 400 CAMPO_IMUTAVEL (numero ou provaId diferentes do atual, mesmo que o provaId enviado não exista).
+	 */
+	@Transactional(propagation = Propagation.NEVER)
+	public QuestaoVersao atualizar(UUID questaoPublicId, QuestaoAtualizacaoRequest dados) {
+		exigirAlternativas(dados.alternativas());
+		UUID provaPublicId = questoes.buscarProvaDaQuestao(questaoPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
+		return transacao.execute(estado -> atualizarComAProvaTravada(provaPublicId, questaoPublicId, dados));
+	}
+
+	private QuestaoVersao atualizarComAProvaTravada(UUID provaPublicId, UUID questaoPublicId, QuestaoAtualizacaoRequest dados) {
+		// PRIMEIRA leitura da transação.
+		Prova prova = provas.buscarComTrava(provaPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
+		Questao questao = questoes.findByPublicId(questaoPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
+		QuestaoVersao rascunho = versoes.findByQuestaoAndStatus(questao, StatusQuestao.RASCUNHO)
+				.orElseThrow(QuestaoService::semRascunho);
+		Subtopico subtopico = rascunho.getSubtopico();
+		if (!subtopico.getPublicId().equals(dados.subtopicoId())) {
+			subtopico = subtopicoDoPrograma(dados.subtopicoId(), prova);
+			exigirVisivel(subtopico);
+		}
+		exigirImutaveis(questao, prova, dados);
+		rascunho.editarRascunho(subtopico, dados.textoApoio(), dados.grupoApoio(), dados.enunciado(), dados.imagemUrl(),
+				textoPorLetra(dados.alternativas()), dados.gabarito(), dados.dificuldade(), dados.explicacao(),
+				relogio.instant().truncatedTo(ChronoUnit.MILLIS));
+		return gravar(rascunho);
+	}
+
+	/** numero e provaId são opcionais no PUT; enviados diferentes do atual dão 400 CAMPO_IMUTAVEL, por último (D42, D48, D79). */
+	private static void exigirImutaveis(Questao questao, Prova prova, QuestaoAtualizacaoRequest dados) {
+		if (dados.numero() != null && dados.numero() != questao.getNumero()) {
+			throw new InvalidRequestException(CodigoErro.CAMPO_IMUTAVEL, "O número de uma questão não pode ser alterado (numero).");
+		}
+		if (dados.provaId() != null && !dados.provaId().equals(prova.getPublicId())) {
+			throw new InvalidRequestException(CodigoErro.CAMPO_IMUTAVEL, "A prova de uma questão não pode ser alterada (provaId).");
+		}
+	}
+
+	/**
+	 * UM item do gabarito em lote, na prova que {@link #travarProvaEditavel} devolveu e na mesma transação (D174). A regra de
+	 * editar a questão mora aqui: só o rascunho aberto muda, inclusive o de uma questão já publicada que ganhou versão nova.
+	 * Nada é lançado: o lote precisa juntar todos os problemas e desfazer tudo no fim.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public SituacaoDoGabarito aplicarGabarito(Prova provaTravada, int numero, String gabarito) {
+		Optional<Questao> questao = questoes.findByProvaAndNumero(provaTravada, numero);
+		if (questao.isEmpty()) {
+			return SituacaoDoGabarito.QUESTAO_INEXISTENTE;
+		}
+		Optional<QuestaoVersao> rascunho = versoes.findByQuestaoAndStatus(questao.get(), StatusQuestao.RASCUNHO);
+		if (rascunho.isEmpty()) {
+			return SituacaoDoGabarito.SEM_RASCUNHO;
+		}
+		return rascunho.get().definirGabarito(gabarito) ? SituacaoDoGabarito.ALTERADO : SituacaoDoGabarito.SEM_MUDANCA;
 	}
 
 	/**
@@ -130,13 +219,13 @@ public class QuestaoService {
 	 */
 	@Transactional(propagation = Propagation.MANDATORY)
 	public ResultadoDoCadastro cadastrarNaProva(Prova provaTravada, QuestaoRequest dados) {
-		exigirAlternativas(dados);
+		exigirAlternativas(dados.alternativas());
 		return gravarNaProva(provaTravada, dados);
 	}
 
 	/** As 5 alternativas A a E: o HTTP já validou, mas o service não depende dele. */
-	private static void exigirAlternativas(QuestaoRequest dados) {
-		if (!AlternativasValidasValidator.valida(dados.alternativas())) {
+	private static void exigirAlternativas(List<AlternativaRequest> alternativas) {
+		if (!AlternativasValidasValidator.valida(alternativas)) {
 			throw InvalidRequestException.campoInvalido("alternativas",
 					"A questão precisa de exatamente 5 alternativas, com as letras A, B, C, D e E, cada uma uma vez.");
 		}
@@ -152,11 +241,9 @@ public class QuestaoService {
 			throw InvalidRequestException.campoInvalido("numero",
 					"O número deve ser de 1 até a quantidade de questões da prova (" + prova.getQuantidadeQuestoes() + ").");
 		}
-		Subtopico subtopico = subtopicos.findByPublicId(dados.subtopicoId()).filter(s -> mesmoPrograma(s, prova))
-				.orElseThrow(() -> InvalidRequestException.campoInvalido("subtopicoId", "O subtópico informado não existe."));
+		Subtopico subtopico = subtopicoDoPrograma(dados.subtopicoId(), prova);
 
-		Map<String, String> textoPorLetra = dados.alternativas().stream()
-				.collect(Collectors.toMap(AlternativaRequest::letra, AlternativaRequest::texto));
+		Map<String, String> textoPorLetra = textoPorLetra(dados.alternativas());
 		String hash = HashDaQuestao.calcular(prova.getPublicId(), dados.numero(), dados.textoApoio(), dados.grupoApoio(),
 				dados.enunciado(), dados.imagemUrl(), textoPorLetra);
 
@@ -166,14 +253,55 @@ public class QuestaoService {
 					? new ResultadoDoCadastro(Situacao.JA_EXISTIA, versaoExibida(existente.get()))
 					: new ResultadoDoCadastro(Situacao.CONFLITO, null);
 		}
-		if (!subtopico.visivelParaAluno()) {
-			throw new ConflictException(CodigoErro.SUBTOPICO_INATIVO, "O subtópico está desativado, ou é de uma matéria desativada.");
-		}
+		exigirVisivel(subtopico);
 		Questao questao = questoes.save(new Questao(prova, dados.numero(), hash));
-		QuestaoVersao primeira = versoes.saveAndFlush(new QuestaoVersao(questao, subtopico, dados.textoApoio(),
+		QuestaoVersao primeira = gravar(new QuestaoVersao(questao, subtopico, dados.textoApoio(),
 				dados.grupoApoio(), dados.enunciado(), dados.imagemUrl(), textoPorLetra, dados.gabarito(),
 				dados.dificuldade(), dados.explicacao()));
 		return new ResultadoDoCadastro(Situacao.CRIADA, primeira);
+	}
+
+	/** O subtópico precisa existir e ser do programa da prova (D157); senão, 400 no campo. */
+	private Subtopico subtopicoDoPrograma(UUID subtopicoId, Prova prova) {
+		return subtopicos.findByPublicId(subtopicoId).filter(s -> mesmoPrograma(s, prova))
+				.orElseThrow(QuestaoService::subtopicoInexistente);
+	}
+
+	/** Para ENTRAR numa questão, o subtópico precisa estar ativo, e a matéria dele também (D156, D172). */
+	private static void exigirVisivel(Subtopico subtopico) {
+		if (!subtopico.visivelParaAluno()) {
+			throw new ConflictException(CodigoErro.SUBTOPICO_INATIVO, "O subtópico está desativado, ou é de uma matéria desativada.");
+		}
+	}
+
+	/**
+	 * Grava a versão e já manda ao banco. A trava da prova não cobre o subtópico: se ele for apagado entre a leitura e a
+	 * gravação, a chave estrangeira recusa e isso é o mesmo 400 do subtópico inexistente (D177). Só ESSA restrição é
+	 * traduzida; qualquer outra violação sobe como está.
+	 */
+	private QuestaoVersao gravar(QuestaoVersao versao) {
+		try {
+			return versoes.saveAndFlush(versao);
+		}
+		catch (DataIntegrityViolationException ex) {
+			if (Restricoes.ehChaveEstrangeira(ex, SubtopicoService.FK_QUESTAO_VERSAO)) {
+				throw subtopicoInexistente();
+			}
+			throw ex;
+		}
+	}
+
+	private static Map<String, String> textoPorLetra(List<AlternativaRequest> alternativas) {
+		return alternativas.stream().collect(Collectors.toMap(AlternativaRequest::letra, AlternativaRequest::texto));
+	}
+
+	private static InvalidRequestException subtopicoInexistente() {
+		return InvalidRequestException.campoInvalido("subtopicoId", "O subtópico informado não existe.");
+	}
+
+	private static ConflictException semRascunho() {
+		return new ConflictException(CodigoErro.QUESTAO_SEM_RASCUNHO,
+				"A questão não tem rascunho aberto. Crie uma nova versão para alterá-la.");
 	}
 
 	/**

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Questão — /api/v1/admin/questoes",
-    "description": "Questão (Sprint 2, fatias 2b-i e 2b-ii): POST /admin/provas/{id}/questoes, GET /admin/questoes/{id} e GET /admin/questoes, só ADMIN. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). O caso da imagem usa localhost, o padrão de IMAGENS_HOSTS_PERMITIDOS em desenvolvimento. PROVA_NAO_EDITAVEL não está aqui: ainda não há rota que publique uma prova. Os dados ficam no banco local (ainda não há DELETE de questão).",
+    "description": "Questão (Sprint 2, fatias 2b-i e 2b-ii): POST /admin/provas/{id}/questoes, GET /admin/questoes/{id} e GET /admin/questoes, só ADMIN. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). O caso da imagem usa localhost, o padrão de IMAGENS_HOSTS_PERMITIDOS em desenvolvimento. PROVA_NAO_EDITAVEL não está aqui: ainda não há rota que publique uma prova. Os dados ficam no banco local (ainda não há DELETE de questão). Os PUT de questão e de gabarito (D171 a D174) entraram na fatia 4, passada 1. QUESTAO_SEM_RASCUNHO fica de fora: ainda não há rota que publique.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -2301,6 +2301,1059 @@
                   "value": "numero"
                 }
               ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT — editar o rascunho da questão",
+      "item": [
+        {
+          "name": "200 — troca o conteúdo do rascunho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"mesma versão 1\", function () { pm.expect(pm.response.json().versao).to.eql(1); });",
+                  "pm.test(\"gabarito B\", function () { pm.expect(pm.response.json().gabarito).to.eql(\"B\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — omitir o gabarito o APAGA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"gabarito nulo\", function () { pm.expect(pm.response.json().gabarito).to.eql(null); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — numero e provaId iguais aos atuais",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\",\"numero\":1,\"provaId\":\"{{provaId}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — numero diferente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CAMPO_IMUTAVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CAMPO_IMUTAVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\",\"numero\":2}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — provaId diferente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo CAMPO_IMUTAVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"CAMPO_IMUTAVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\",\"provaId\":\"00000000-0000-4000-8000-000000000000\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — subtópico que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"campo subtopicoId\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"subtopicoId\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"00000000-0000-4000-8000-000000000000\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — trocar para um subtópico inativo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo SUBTOPICO_INATIVO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"SUBTOPICO_INATIVO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoInativoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "404 — questão que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo QUESTAO_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — id com grupo curto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/11111111-1111-1111-1111-11111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "11111111-1111-1111-1111-11111111111"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "415 — corpo que não é JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 415\", function () { pm.response.to.have.status(415); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "texto solto",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "401 — sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Enunciado corrigido {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"B\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT — gabarito em lote e quantidade da prova",
+      "item": [
+        {
+          "name": "200 — aplica nas questões 1 e 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"atualizadas presente\", function () { pm.expect(pm.response.json().atualizadas).to.be.a(\"number\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"},{\"numero\":2,\"gabarito\":\"E\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — repetir não muda nada (atualizadas 0)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"zero\", function () { pm.expect(pm.response.json().atualizadas).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"},{\"numero\":2,\"gabarito\":\"E\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — numero repetido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"campo itens[1].numero\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"itens[1].numero\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"},{\"numero\":1,\"gabarito\":\"B\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — gabarito nulo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"campo itens[0].gabarito\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"itens[0].gabarito\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":null}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — numero que a prova não tem",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"campo itens[1].numero\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"itens[1].numero\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":\"C\"},{\"numero\":5,\"gabarito\":\"C\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "400 — lista vazia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"campo itens\", function () { pm.expect(pm.response.json().campos.map(x => x.campo)).to.include(\"itens\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "404 — prova que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo PROVA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/00000000-0000-4000-8000-000000000000/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "00000000-0000-4000-8000-000000000000",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "401 — sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "409 — reduzir a quantidade abaixo do maior numero cadastrado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE\"); });",
+                  "pm.test(\"maiorNumero\", function () { pm.expect(pm.response.json().detalhes.maiorNumero).to.be.above(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova da coleção de questão {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         }

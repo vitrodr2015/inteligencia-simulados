@@ -394,4 +394,80 @@ class ProvaControllerTest {
 				.andExpect(jsonPath("$.conteudo[*].titulo").value(org.hamcrest.Matchers.contains("Nova", "Meio", "Velha")));
 	}
 
+	// ----- PUT (fatia 4, passada 1; D170). As regras que dependem de questões cadastradas estão em QuestaoControllerTest -----
+
+	private ResultActions editar(String id, String json) throws Exception {
+		return mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(CRIAR + "/" + id)
+				.contentType(MediaType.APPLICATION_JSON).content(json));
+	}
+
+	@Test
+	void deve_devolver_200_com_a_prova_inteira_trocada_inclusive_a_quantidade_quando_faz_put() throws Exception {
+		String id = criar(valido());
+
+		editar(id, corpo("Novo título", "Outra", 2027, 2, 200, 60, "https://exemplo.invalid/nova")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(id))
+				.andExpect(jsonPath("$.titulo").value("Novo título"))
+				.andExpect(jsonPath("$.banca").value("Outra"))
+				.andExpect(jsonPath("$.ano").value(2027))
+				.andExpect(jsonPath("$.semestre").value(2))
+				.andExpect(jsonPath("$.duracaoMinutos").value(200))
+				.andExpect(jsonPath("$.quantidadeQuestoes").value(60))
+				.andExpect(jsonPath("$.fonteUrl").value("https://exemplo.invalid/nova"))
+				.andExpect(jsonPath("$.status").value("RASCUNHO"))
+				.andExpect(jsonPath("$.questoesCadastradas").value(0));
+		mockMvc.perform(get(BASE + "/" + id)).andExpect(jsonPath("$.titulo").value("Novo título"))
+				.andExpect(jsonPath("$.quantidadeQuestoes").value(60));
+	}
+
+	@Test
+	void deve_zerar_os_opcionais_omitidos_e_ignorar_campos_do_servidor_quando_faz_put() throws Exception {
+		String id = criar(valido());
+
+		editar(id, "{\"titulo\":\"  Só o essencial  \",\"duracaoMinutos\":90,\"quantidadeQuestoes\":30,\"status\":\"PUBLICADA\","
+				+ "\"id\":\"11111111-1111-1111-1111-111111111111\",\"publicadaEm\":\"2000-01-01T00:00:00.000Z\"}")
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(id))
+				.andExpect(jsonPath("$.titulo").value("Só o essencial"))
+				.andExpect(jsonPath("$.banca").value((Object) null))
+				.andExpect(jsonPath("$.ano").value((Object) null))
+				.andExpect(jsonPath("$.semestre").value((Object) null))
+				.andExpect(jsonPath("$.fonteUrl").value((Object) null))
+				.andExpect(jsonPath("$.status").value("RASCUNHO"))
+				.andExpect(jsonPath("$.publicadaEm").value((Object) null));
+	}
+
+	@Test
+	void deve_validar_o_corpo_do_put_com_as_regras_da_criacao_antes_de_procurar_a_prova() throws Exception {
+		String inexistente = UUID.randomUUID().toString();
+
+		campoInvalido(editar(inexistente, "{\"duracaoMinutos\":90,\"quantidadeQuestoes\":30}"), "titulo");
+		campoInvalido(editar(inexistente, "{\"titulo\":\"T\",\"duracaoMinutos\":90}"), "quantidadeQuestoes");
+		campoInvalido(editar(inexistente, "{\"titulo\":\"T\",\"duracaoMinutos\":90,\"quantidadeQuestoes\":301}"),
+				"quantidadeQuestoes");
+		campoInvalido(editar(inexistente, "{\"titulo\":\"T\",\"duracaoMinutos\":601,\"quantidadeQuestoes\":1}"),
+				"duracaoMinutos");
+		verificarErro(editar(inexistente, "{\"titulo\":\"T\",\"duracaoMinutos\":90,\"quantidadeQuestoes\":\"30\"}"), 400,
+				"Bad Request", CodigoErro.CORPO_ILEGIVEL);
+		verificarErro(editar(inexistente, valido()), 404, "Not Found", CodigoErro.PROVA_NAO_ENCONTRADA);
+		verificarErro(editar("abc", valido()), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+	}
+
+	@Test
+	void deve_dar_409_prova_duplicada_so_quando_a_identidade_e_de_outra_prova() throws Exception {
+		String primeira = criar(valido());
+		String segunda = criar(corpo("Outra", "Vunesp", 2026, 2, 180, 50, null));
+
+		editar(primeira, valido()).andExpect(status().isOk());
+		verificarErro(editar(segunda, valido()), 409, "Conflict", CodigoErro.PROVA_DUPLICADA);
+	}
+
+	@Test
+	void deve_devolver_415_no_put_quando_o_corpo_nao_e_json() throws Exception {
+		String id = criar(valido());
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(CRIAR + "/" + id)
+				.contentType(MediaType.TEXT_PLAIN).content("x")).andExpect(status().isUnsupportedMediaType());
+	}
+
 }

@@ -51,6 +51,14 @@ import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.InvalidRequestException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.programa.Programa;
+import java.sql.SQLException;
+import java.time.Instant;
+import org.hibernate.exception.ConstraintViolationException;
+import org.hibernate.exception.ConstraintViolationException.ConstraintKind;
+import org.springframework.dao.DataIntegrityViolationException;
+import br.simulado.etec.catalogo.dto.QuestaoAtualizacaoRequest;
+import br.simulado.etec.catalogo.model.Alternativa;
+import br.simulado.etec.catalogo.service.QuestaoService.SituacaoDoGabarito;
 
 @ExtendWith(MockitoExtension.class)
 class QuestaoServiceTest {
@@ -66,6 +74,12 @@ class QuestaoServiceTest {
 
 	@Mock
 	private SubtopicoRepository subtopicos;
+
+	@Mock
+	private org.springframework.transaction.PlatformTransactionManager transacoes;
+
+	@Mock
+	private java.time.Clock relogio;
 
 	@InjectMocks
 	private QuestaoService servico;
@@ -518,6 +532,342 @@ class QuestaoServiceTest {
 
 		assertThatThrownBy(() -> servico.buscar(id, null)).isInstanceOf(ResourceNotFoundException.class)
 				.satisfies(e -> assertThat(((ApiException) e).getCodigo()).isEqualTo(CodigoErro.QUESTAO_NAO_ENCONTRADA));
+	}
+
+	// ----- editar o rascunho (PUT, D171, D172 e D175) -----
+
+	private static final Instant MOMENTO = Instant.parse("2026-11-27T12:00:00.000Z");
+
+	/** A questão 3 da prova, com um rascunho completo no subtópico da prova. */
+	private QuestaoVersao rascunhoExistente() {
+		Questao questao = new Questao(prova, 3, "a".repeat(64));
+		return new QuestaoVersao(questao, subtopico, "Apoio", 1, "Original", null,
+				Map.of("A", "um", "B", "dois", "C", "três", "D", "quatro", "E", "cinco"), "C",
+				br.simulado.etec.catalogo.model.Dificuldade.FACIL, "Porque sim");
+	}
+
+	private QuestaoAtualizacaoRequest edicao(UUID provaId, Integer numero, UUID subtopicoId, String enunciado) {
+		return new QuestaoAtualizacaoRequest(provaId, numero, subtopicoId, null, null, enunciado, null, cinco(), null, null, null);
+	}
+
+	private QuestaoAtualizacaoRequest edicao(String enunciado) {
+		return edicao(null, null, subtopico.getPublicId(), enunciado);
+	}
+
+	private void prepararEdicao(QuestaoVersao rascunho) {
+		Questao questao = rascunho.getQuestao();
+		when(questoes.buscarProvaDaQuestao(questao.getPublicId())).thenReturn(Optional.of(prova.getPublicId()));
+		when(provas.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.findByPublicId(questao.getPublicId())).thenReturn(Optional.of(questao));
+		when(versoes.findByQuestaoAndStatus(questao, StatusQuestao.RASCUNHO)).thenReturn(Optional.of(rascunho));
+	}
+
+	private void prepararGravacao() {
+		when(relogio.instant()).thenReturn(MOMENTO);
+		when(versoes.saveAndFlush(any(QuestaoVersao.class))).thenAnswer(c -> c.getArgument(0));
+	}
+
+	private Subtopico outroSubtopico() {
+		Subtopico outro = new Subtopico(materia, "Geometria");
+		when(subtopicos.findByPublicId(outro.getPublicId())).thenReturn(Optional.of(outro));
+		return outro;
+	}
+
+	@Test
+	void deve_ler_a_prova_da_questao_antes_da_transacao_e_travar_antes_de_reler() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		prepararGravacao();
+
+		servico.atualizar(rascunho.getQuestao().getPublicId(), edicao("Novo"));
+
+		InOrder ordem = inOrder(questoes, transacoes, provas, versoes);
+		ordem.verify(questoes).buscarProvaDaQuestao(rascunho.getQuestao().getPublicId());
+		ordem.verify(transacoes).getTransaction(any());
+		ordem.verify(provas).buscarComTrava(prova.getPublicId());
+		ordem.verify(questoes).findByPublicId(rascunho.getQuestao().getPublicId());
+		ordem.verify(versoes).findByQuestaoAndStatus(rascunho.getQuestao(), StatusQuestao.RASCUNHO);
+		ordem.verify(versoes).saveAndFlush(rascunho);
+		ordem.verify(transacoes).commit(any());
+	}
+
+	@Test
+	void deve_substituir_o_rascunho_nas_mesmas_linhas_sem_tocar_no_numero_nem_no_hash() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		prepararGravacao();
+		List<Alternativa> linhasAntes = rascunho.getAlternativas();
+		List<AlternativaRequest> novas = List.of(new AlternativaRequest("E", "cinco"), new AlternativaRequest("A", "UM"),
+				new AlternativaRequest("B", "dois"), new AlternativaRequest("C", "três"), new AlternativaRequest("D", "quatro"));
+
+		QuestaoVersao salva = servico.atualizar(rascunho.getQuestao().getPublicId(), new QuestaoAtualizacaoRequest(null, 3,
+				subtopico.getPublicId(), null, null, "Novo enunciado", null, novas, null, null, null));
+
+		assertThat(salva).isSameAs(rascunho);
+		assertThat(salva.getEnunciado()).isEqualTo("Novo enunciado");
+		assertThat(salva.getGabarito()).as("omitir o gabarito o apaga (D111)").isNull();
+		assertThat(salva.getTextoApoio()).isNull();
+		assertThat(salva.getGrupoApoio()).isNull();
+		assertThat(salva.getDificuldade()).isNull();
+		assertThat(salva.getExplicacao()).isNull();
+		assertThat(salva.getAlternativas()).extracting("texto").containsExactly("UM", "dois", "três", "quatro", "cinco");
+		assertThat(salva.getAlternativas()).as("as MESMAS 5 linhas: o texto muda no lugar")
+				.usingElementComparator((a, b) -> a == b ? 0 : 1).containsExactlyElementsOf(linhasAntes);
+		assertThat(salva.getQuestao().getHashConteudo()).as("o hash nunca muda (D51)").isEqualTo("a".repeat(64));
+		assertThat(salva.getQuestao().getNumero()).isEqualTo(3);
+		assertThat(salva.getVersao()).as("o PUT não cria versão").isEqualTo(1);
+		assertThat(salva.getStatus()).isEqualTo(StatusQuestao.RASCUNHO);
+	}
+
+	@Test
+	void deve_anotar_o_momento_na_versao_quando_so_o_texto_de_uma_alternativa_muda() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		prepararGravacao();
+		List<AlternativaRequest> soUma = new ArrayList<>(cinco());
+		soUma.set(2, new AlternativaRequest("C", "outro texto"));
+
+		servico.atualizar(rascunho.getQuestao().getPublicId(), new QuestaoAtualizacaoRequest(null, null,
+				subtopico.getPublicId(), "Apoio", 1, "Original", null, soUma, "C",
+				br.simulado.etec.catalogo.model.Dificuldade.FACIL, "Porque sim"));
+
+		assertThat(ReflectionTestUtils.getField(rascunho, "atualizadoEm")).isEqualTo(MOMENTO);
+	}
+
+	@Test
+	void deve_nao_anotar_momento_nenhum_quando_o_conteudo_enviado_e_igual_ao_gravado() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		prepararGravacao();
+
+		servico.atualizar(rascunho.getQuestao().getPublicId(), new QuestaoAtualizacaoRequest(null, null,
+				subtopico.getPublicId(), "Apoio", 1, "Original", null, cinco(), "C",
+				br.simulado.etec.catalogo.model.Dificuldade.FACIL, "Porque sim"));
+
+		assertThat(ReflectionTestUtils.getField(rascunho, "atualizadoEm")).isNull();
+	}
+
+	@Test
+	void deve_aceitar_o_mesmo_subtopico_desativado_sem_conferir_nada_nele() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		prepararGravacao();
+		subtopico.desativar();
+
+		QuestaoVersao salva = servico.atualizar(rascunho.getQuestao().getPublicId(), edicao("Novo"));
+
+		assertThat(salva.getSubtopico()).isSameAs(subtopico);
+		verify(subtopicos, never()).findByPublicId(any());
+	}
+
+	@Test
+	void deve_trocar_o_subtopico_quando_o_novo_esta_ativo() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		prepararGravacao();
+		Subtopico outro = outroSubtopico();
+
+		QuestaoVersao salva = servico.atualizar(rascunho.getQuestao().getPublicId(), edicao(null, null, outro.getPublicId(), "N"));
+
+		assertThat(salva.getSubtopico()).isSameAs(outro);
+	}
+
+	@Test
+	void deve_recusar_com_409_subtopico_inativo_antes_do_campo_imutavel_quando_o_subtopico_trocado_esta_desativado() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		Subtopico outro = outroSubtopico();
+		outro.desativar();
+
+		assertThatThrownBy(() -> servico.atualizar(rascunho.getQuestao().getPublicId(),
+				edicao(UUID.randomUUID(), 9, outro.getPublicId(), "N")))
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("SUBTOPICO_INATIVO"));
+		assertThat(rascunho.getEnunciado()).isEqualTo("Original");
+		verify(versoes, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void deve_recusar_com_400_no_campo_subtopicoid_quando_o_subtopico_trocado_nao_existe() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		UUID inexistente = UUID.randomUUID();
+		when(subtopicos.findByPublicId(inexistente)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.atualizar(rascunho.getQuestao().getPublicId(), edicao(null, 9, inexistente, "N")))
+				.isInstanceOfSatisfying(InvalidRequestException.class, e -> {
+					assertThat(e.getCodigo()).isEqualTo(CodigoErro.VALIDACAO_FALHOU);
+					assertThat(e.getCampos()).extracting("campo").containsExactly("subtopicoId");
+				});
+	}
+
+	@Test
+	void deve_dar_409_sem_rascunho_antes_de_qualquer_outra_regra() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		Questao questao = rascunho.getQuestao();
+		when(questoes.buscarProvaDaQuestao(questao.getPublicId())).thenReturn(Optional.of(prova.getPublicId()));
+		when(provas.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.findByPublicId(questao.getPublicId())).thenReturn(Optional.of(questao));
+		when(versoes.findByQuestaoAndStatus(questao, StatusQuestao.RASCUNHO)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.atualizar(questao.getPublicId(), edicao(UUID.randomUUID(), 9, UUID.randomUUID(), "N")))
+				.isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_SEM_RASCUNHO"));
+		verify(subtopicos, never()).findByPublicId(any());
+		verify(versoes, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void deve_editar_o_rascunho_mesmo_com_a_prova_publicada() {
+		ReflectionTestUtils.setField(prova, "status", StatusProva.PUBLICADA);
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		prepararGravacao();
+
+		assertThat(servico.atualizar(rascunho.getQuestao().getPublicId(), edicao("Novo")).getEnunciado()).isEqualTo("Novo");
+		assertThat(prova.getStatus()).as("a prova não muda").isEqualTo(StatusProva.PUBLICADA);
+	}
+
+	@Test
+	void deve_recusar_com_campo_imutavel_numero_ou_provaid_diferentes_e_nao_alterar_nada() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		UUID questaoId = rascunho.getQuestao().getPublicId();
+
+		assertThatThrownBy(() -> servico.atualizar(questaoId, edicao(null, 4, subtopico.getPublicId(), "N")))
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("CAMPO_IMUTAVEL"));
+		assertThatThrownBy(() -> servico.atualizar(questaoId, edicao(UUID.randomUUID(), 3, subtopico.getPublicId(), "N")))
+				.as("provaId diferente, mesmo que não exista").satisfies(e -> assertThat(codigoDe(e)).isEqualTo("CAMPO_IMUTAVEL"));
+
+		assertThat(rascunho.getEnunciado()).isEqualTo("Original");
+		verify(versoes, never()).saveAndFlush(any());
+	}
+
+	@Test
+	void deve_aceitar_numero_e_provaid_iguais_aos_atuais() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		prepararGravacao();
+
+		servico.atualizar(rascunho.getQuestao().getPublicId(), edicao(prova.getPublicId(), 3, subtopico.getPublicId(), "Igual"));
+
+		assertThat(rascunho.getEnunciado()).isEqualTo("Igual");
+	}
+
+	@Test
+	void deve_dar_404_sem_abrir_transacao_quando_a_questao_nao_existe() {
+		UUID id = UUID.randomUUID();
+		when(questoes.buscarProvaDaQuestao(id)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.atualizar(id, edicao("N")))
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_NAO_ENCONTRADA"));
+		verify(transacoes, never()).getTransaction(any());
+		verify(provas, never()).buscarComTrava(any());
+	}
+
+	@Test
+	void deve_dar_404_quando_a_questao_some_enquanto_espera_a_trava() {
+		UUID id = UUID.randomUUID();
+		when(questoes.buscarProvaDaQuestao(id)).thenReturn(Optional.of(prova.getPublicId()));
+		when(provas.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.findByPublicId(id)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.atualizar(id, edicao("N")))
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_NAO_ENCONTRADA"));
+	}
+
+	@Test
+	void deve_validar_as_alternativas_tambem_no_put_sem_ler_nada() {
+		assertThatThrownBy(() -> servico.atualizar(UUID.randomUUID(), new QuestaoAtualizacaoRequest(null, null,
+				subtopico.getPublicId(), null, null, "E", null, cinco().subList(0, 4), null, null, null)))
+				.isInstanceOf(InvalidRequestException.class);
+		verify(questoes, never()).buscarProvaDaQuestao(any());
+	}
+
+	@Test
+	void deve_recusar_alteracao_na_entidade_quando_a_versao_nao_e_rascunho() {
+		QuestaoVersao publicada = rascunhoExistente();
+		ReflectionTestUtils.setField(publicada, "status", StatusQuestao.PUBLICADA);
+
+		assertThatThrownBy(() -> publicada.definirGabarito("A")).isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> publicada.editarRascunho(subtopico, null, null, "X", null,
+				Map.of("A", "1", "B", "2", "C", "3", "D", "4", "E", "5"), null, null, null, MOMENTO))
+				.isInstanceOf(IllegalStateException.class);
+		assertThat(publicada.getEnunciado()).isEqualTo("Original");
+	}
+
+	// ----- subtópico apagado no meio da gravação (D177) -----
+
+	private static DataIntegrityViolationException chaveEstrangeira(String restricao) {
+		return new DataIntegrityViolationException("erro de integridade",
+				new ConstraintViolationException("erro", new SQLException("x"), "insert", ConstraintKind.FOREIGN_KEY, restricao));
+	}
+
+	@Test
+	void deve_traduzir_para_400_no_subtopico_a_fk_do_subtopico_apagado_durante_o_cadastro() {
+		prepararCaminhoFeliz();
+		when(questoes.findByProvaAndNumero(prova, 1)).thenReturn(Optional.empty());
+		when(questoes.save(any(Questao.class))).thenAnswer(c -> c.getArgument(0));
+		when(versoes.saveAndFlush(any(QuestaoVersao.class))).thenThrow(chaveEstrangeira("fk_questao_versao_subtopico"));
+
+		assertThatThrownBy(() -> servico.cadastrar(prova.getPublicId(), dados(1)))
+				.isInstanceOfSatisfying(InvalidRequestException.class,
+						e -> assertThat(e.getCampos()).extracting("campo").containsExactly("subtopicoId"));
+	}
+
+	@Test
+	void deve_traduzir_para_400_no_subtopico_a_fk_do_subtopico_apagado_durante_o_put() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		prepararEdicao(rascunho);
+		when(relogio.instant()).thenReturn(MOMENTO);
+		when(versoes.saveAndFlush(rascunho)).thenThrow(chaveEstrangeira("questao_versao.fk_questao_versao_subtopico"));
+
+		assertThatThrownBy(() -> servico.atualizar(rascunho.getQuestao().getPublicId(), edicao("N")))
+				.isInstanceOfSatisfying(InvalidRequestException.class,
+						e -> assertThat(e.getCampos()).extracting("campo").containsExactly("subtopicoId"));
+	}
+
+	@Test
+	void deve_deixar_subir_qualquer_outra_violacao_de_integridade_na_gravacao_da_versao() {
+		prepararCaminhoFeliz();
+		when(questoes.findByProvaAndNumero(prova, 1)).thenReturn(Optional.empty());
+		when(questoes.save(any(Questao.class))).thenAnswer(c -> c.getArgument(0));
+		DataIntegrityViolationException outra = chaveEstrangeira("fk_questao_versao_questao");
+		when(versoes.saveAndFlush(any(QuestaoVersao.class))).thenThrow(outra);
+
+		assertThatThrownBy(() -> servico.cadastrar(prova.getPublicId(), dados(1))).isSameAs(outra);
+	}
+
+	// ----- um item do gabarito (D174) -----
+
+	@Test
+	void deve_alterar_o_gabarito_do_rascunho_e_dizer_que_alterou() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		when(questoes.findByProvaAndNumero(prova, 3)).thenReturn(Optional.of(rascunho.getQuestao()));
+		when(versoes.findByQuestaoAndStatus(rascunho.getQuestao(), StatusQuestao.RASCUNHO)).thenReturn(Optional.of(rascunho));
+
+		assertThat(servico.aplicarGabarito(prova, 3, "E")).isEqualTo(SituacaoDoGabarito.ALTERADO);
+		assertThat(rascunho.getGabarito()).isEqualTo("E");
+		assertThat(rascunho.getQuestao().getHashConteudo()).isEqualTo("a".repeat(64));
+	}
+
+	@Test
+	void deve_dizer_que_nao_houve_mudanca_quando_o_gabarito_ja_e_o_mesmo() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		when(questoes.findByProvaAndNumero(prova, 3)).thenReturn(Optional.of(rascunho.getQuestao()));
+		when(versoes.findByQuestaoAndStatus(rascunho.getQuestao(), StatusQuestao.RASCUNHO)).thenReturn(Optional.of(rascunho));
+
+		assertThat(servico.aplicarGabarito(prova, 3, "C")).isEqualTo(SituacaoDoGabarito.SEM_MUDANCA);
+	}
+
+	@Test
+	void deve_distinguir_questao_inexistente_de_questao_sem_rascunho() {
+		Questao semRascunho = new Questao(prova, 4, "b".repeat(64));
+		when(questoes.findByProvaAndNumero(prova, 4)).thenReturn(Optional.of(semRascunho));
+		when(versoes.findByQuestaoAndStatus(semRascunho, StatusQuestao.RASCUNHO)).thenReturn(Optional.empty());
+		when(questoes.findByProvaAndNumero(prova, 5)).thenReturn(Optional.empty());
+
+		assertThat(servico.aplicarGabarito(prova, 4, "A")).isEqualTo(SituacaoDoGabarito.SEM_RASCUNHO);
+		assertThat(servico.aplicarGabarito(prova, 5, "A")).isEqualTo(SituacaoDoGabarito.QUESTAO_INEXISTENTE);
 	}
 
 }

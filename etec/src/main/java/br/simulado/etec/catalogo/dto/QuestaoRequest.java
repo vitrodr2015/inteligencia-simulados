@@ -83,7 +83,7 @@ public record QuestaoRequest(
 		explicacao = emBrancoViraNulo(explicacao);
 	}
 
-	private static String emBrancoViraNulo(String texto) {
+	static String emBrancoViraNulo(String texto) {
 		return (texto == null || texto.isBlank()) ? null : texto.strip();
 	}
 

@@ -690,4 +690,218 @@ class QuestaoControllerTest {
 				.andExpect(jsonPath("$.id").value(id));
 	}
 
+	// ----- PUT de questão (fatia 4, passada 1; D171 e D172). A paridade das validações com o POST é provada no MySQL real -----
+
+	private ResultActions editarQuestao(String id, String json) throws Exception {
+		return mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/admin/questoes/" + id)
+				.contentType(MediaType.APPLICATION_JSON).content(json));
+	}
+
+	/** Corpo de PUT mínimo (sem numero nem provaId), com um extra opcional. */
+	private String corpoDoPut(String enunciado, String extra) {
+		return "{\"subtopicoId\":\"" + subtopicoId + "\",\"enunciado\":\"" + enunciado + "\",\"alternativas\":" + cinco()
+				+ (extra.isEmpty() ? "" : "," + extra) + "}";
+	}
+
+	/** Sem versão nova nesta passada: o jeito de ter uma questão sem rascunho aberto é publicar direto no banco. */
+	private void publicarNoBanco(String questaoPublicId) {
+		assertThat(jdbc.update("UPDATE questao_versao SET status = 'PUBLICADA' WHERE questao_id = "
+				+ "(SELECT id FROM questao WHERE public_id = ?)", java.util.UUID.fromString(questaoPublicId))).isEqualTo(1);
+	}
+
+	@Test
+	void deve_devolver_200_com_a_questao_inteira_trocada_e_apagar_o_gabarito_omitido_quando_faz_put() throws Exception {
+		String id = JsonPath.read(cadastrar(corpo(7, "Original", "\"gabarito\":\"C\",\"explicacao\":\"Porque sim\""))
+				.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
+
+		editarQuestao(id, corpoDoPut("Corrigido", "\"dificuldade\":\"MEDIA\"")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(id))
+				.andExpect(jsonPath("$.versao").value(1))
+				.andExpect(jsonPath("$.provaId").value(provaId))
+				.andExpect(jsonPath("$.numero").value(7))
+				.andExpect(jsonPath("$.enunciado").value("Corrigido"))
+				.andExpect(jsonPath("$.gabarito").value((Object) null))
+				.andExpect(jsonPath("$.explicacao").value((Object) null))
+				.andExpect(jsonPath("$.dificuldade").value("MEDIA"))
+				.andExpect(jsonPath("$.status").value("RASCUNHO"));
+		mockMvc.perform(get("/api/v1/admin/questoes/" + id)).andExpect(jsonPath("$.enunciado").value("Corrigido"))
+				.andExpect(jsonPath("$.gabarito").value((Object) null));
+	}
+
+	@Test
+	void deve_trocar_o_texto_das_alternativas_no_put_sem_bater_no_indice_unico() throws Exception {
+		String id = cadastrarEObterId(1);
+
+		editarQuestao(id, "{\"subtopicoId\":\"" + subtopicoId + "\",\"enunciado\":\"E\",\"alternativas\":"
+				+ alternativas("1", "2", "3", "4", "5") + "}").andExpect(status().isOk())
+				.andExpect(jsonPath("$.alternativas[0].texto").value("1"))
+				.andExpect(jsonPath("$.alternativas[4].texto").value("5"));
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM alternativa", Integer.class)).isEqualTo(5);
+	}
+
+	@Test
+	void deve_aceitar_numero_e_provaid_iguais_e_recusar_diferentes_com_campo_imutavel() throws Exception {
+		String id = cadastrarEObterId(5);
+
+		editarQuestao(id, corpoDoPut("E", "\"numero\":5,\"provaId\":\"" + provaId + "\"")).andExpect(status().isOk());
+		verificarErro(editarQuestao(id, corpoDoPut("Outro", "\"numero\":6")), 400, "Bad Request", CodigoErro.CAMPO_IMUTAVEL);
+		verificarErro(editarQuestao(id, corpoDoPut("Outro", "\"provaId\":\"" + java.util.UUID.randomUUID() + "\"")), 400,
+				"Bad Request", CodigoErro.CAMPO_IMUTAVEL).andExpect(jsonPath("$.campos").doesNotExist());
+		mockMvc.perform(get("/api/v1/admin/questoes/" + id)).andExpect(jsonPath("$.enunciado").value("E"));
+	}
+
+	@Test
+	void deve_seguir_a_ordem_formato_404_409_e_campo_imutavel_no_put() throws Exception {
+		String id = cadastrarEObterId(5);
+		String inexistente = java.util.UUID.randomUUID().toString();
+
+		verificarErro(editarQuestao(inexistente, "{}"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU);
+		verificarErro(editarQuestao(inexistente, corpoDoPut("E", "\"numero\":9")), 404, "Not Found",
+				CodigoErro.QUESTAO_NAO_ENCONTRADA);
+		publicarNoBanco(id);
+		verificarErro(editarQuestao(id, corpoDoPut("E", "\"numero\":9")), 409, "Conflict", CodigoErro.QUESTAO_SEM_RASCUNHO);
+		verificarErro(editarQuestao("abc", corpoDoPut("E", "")), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+	}
+
+	@Test
+	void deve_exigir_subtopico_ativo_no_put_so_quando_ele_e_trocado() throws Exception {
+		String id = cadastrarEObterId(5);
+		String materia = JsonPath.read(mockMvc.perform(post("/api/v1/materias").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"nome\":\"Física\"}")).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(),
+				"$.id");
+		String outro = JsonPath.read(mockMvc.perform(post("/api/v1/subtopicos").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"materiaId\":\"" + materia + "\",\"nome\":\"Ótica\"}")).andExpect(status().isCreated()).andReturn()
+				.getResponse().getContentAsString(), "$.id");
+		for (String desativar : new String[] { subtopicoId, outro }) {
+			mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+					.patch("/api/v1/subtopicos/" + desativar + "/disable")).andExpect(status().isOk());
+		}
+
+		editarQuestao(id, corpoDoPut("Mesmo subtópico desativado", "")).andExpect(status().isOk());
+		verificarErro(editarQuestao(id, corpoDoPut("E", "\"subtopicoId\":\"" + outro + "\"")), 409, "Conflict",
+				CodigoErro.SUBTOPICO_INATIVO);
+		verificarErro(editarQuestao(id, corpoDoPut("E", "\"subtopicoId\":\"" + java.util.UUID.randomUUID() + "\"")), 400,
+				"Bad Request", CodigoErro.VALIDACAO_FALHOU).andExpect(jsonPath("$.campos[0].campo").value("subtopicoId"));
+	}
+
+	// ----- PUT da prova com questões cadastradas (D170) -----
+
+	private ResultActions editarProva(String id, int quantidade) throws Exception {
+		return mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/admin/provas/" + id)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"titulo\":\"Prova\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":" + quantidade + "}"));
+	}
+
+	@Test
+	void deve_recusar_com_409_reduzir_a_quantidade_abaixo_do_maior_numero_cadastrado() throws Exception {
+		cadastrarEObterId(3);
+		cadastrarEObterId(12);
+
+		verificarErro(editarProva(provaId, 11), 409, "Conflict", CodigoErro.PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE)
+				.andExpect(jsonPath("$.detalhes.maiorNumero").value(12));
+		editarProva(provaId, 12).andExpect(status().isOk()).andExpect(jsonPath("$.quantidadeQuestoes").value(12))
+				.andExpect(jsonPath("$.questoesCadastradas").value(2));
+		cadastrar(corpo(13)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.campos[0].campo").value("numero"));
+	}
+
+	// ----- gabarito em lote (D174) -----
+
+	private ResultActions gabarito(String prova, String itens) throws Exception {
+		return mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+				.put("/api/v1/admin/provas/" + prova + "/gabarito").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"itens\":" + itens + "}"));
+	}
+
+	private static String item(int numero, String letraEmJson) {
+		return "{\"numero\":" + numero + ",\"gabarito\":" + letraEmJson + "}";
+	}
+
+	private String gabaritoDe(String questaoPublicId) throws Exception {
+		return JsonPath.read(mockMvc.perform(get("/api/v1/admin/questoes/" + questaoPublicId)).andReturn().getResponse()
+				.getContentAsString(), "$.gabarito");
+	}
+
+	@Test
+	void deve_aplicar_o_gabarito_so_nas_citadas_e_contar_so_as_que_mudaram() throws Exception {
+		String um = cadastrarEObterId(1);
+		String dois = cadastrarEObterId(2);
+		String tres = cadastrarEObterId(3);
+
+		gabarito(provaId, "[" + item(1, "\"A\"") + "," + item(2, "\"B\"") + "]").andExpect(status().isOk())
+				.andExpect(content().string("{\"atualizadas\":2}"));
+		gabarito(provaId, "[" + item(1, "\"A\"") + "," + item(2, "\"E\"") + "]").andExpect(content().string("{\"atualizadas\":1}"));
+		gabarito(provaId, "[" + item(1, "\"A\"") + "," + item(2, "\"E\"") + "]").andExpect(content().string("{\"atualizadas\":0}"));
+
+		assertThat(gabaritoDe(um)).isEqualTo("A");
+		assertThat(gabaritoDe(dois)).isEqualTo("E");
+		assertThat(gabaritoDe(tres)).as("fora do lote: intacta").isNull();
+	}
+
+	@org.junit.jupiter.params.ParameterizedTest
+	@ValueSource(strings = { "null", "\"\"", "\" \"", "\"F\"", "\"a\"", "\"AB\"" })
+	void deve_recusar_com_400_gabarito_nulo_vazio_ou_fora_de_a_a_e_sem_apagar_o_que_havia(String letra) throws Exception {
+		String um = cadastrarEObterId(1);
+		gabarito(provaId, "[" + item(1, "\"C\"") + "]").andExpect(status().isOk());
+
+		verificarErro(gabarito(provaId, "[" + item(1, letra) + "]"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+				.andExpect(jsonPath("$.campos[0].campo").value("itens[0].gabarito"));
+
+		assertThat(gabaritoDe(um)).isEqualTo("C");
+	}
+
+	@Test
+	void deve_validar_o_formato_do_lote_de_gabarito() throws Exception {
+		String cemEUm = java.util.stream.IntStream.rangeClosed(1, 101).mapToObj(n -> item(n, "\"A\""))
+				.collect(java.util.stream.Collectors.joining(",", "[", "]"));
+
+		for (String itens : new String[] { "[]", cemEUm, "null" }) {
+			verificarErro(gabarito(provaId, itens), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+					.andExpect(jsonPath("$.campos[0].campo").value("itens"));
+		}
+		verificarErro(gabarito(provaId, "[null]"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+				.andExpect(jsonPath("$.campos[0].campo").value("itens[0]"));
+		verificarErro(gabarito(provaId, "[{\"gabarito\":\"A\"}]"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+				.andExpect(jsonPath("$.campos[0].campo").value("itens[0].numero"));
+		for (int numero : new int[] { 0, -1, 301 }) {
+			verificarErro(gabarito(provaId, "[" + item(numero, "\"A\"") + "]"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+					.andExpect(jsonPath("$.campos[0].campo").value("itens[0].numero"));
+		}
+		verificarErro(gabarito(provaId, "[{\"numero\":\"1\",\"gabarito\":\"A\"}]"), 400, "Bad Request", CodigoErro.CORPO_ILEGIVEL);
+		verificarErro(gabarito("abc", "[" + item(1, "\"A\"") + "]"), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+		verificarErro(gabarito(provaId, "[" + item(1, "\"A\"") + "," + item(1, "\"B\"") + "]"), 400, "Bad Request",
+				CodigoErro.VALIDACAO_FALHOU).andExpect(jsonPath("$.campos[0].campo").value("itens[1].numero"));
+	}
+
+	@Test
+	void deve_seguir_a_ordem_404_prova_inexistentes_e_sem_rascunho_sem_gravar_nada() throws Exception {
+		String um = cadastrarEObterId(1);
+		String dois = cadastrarEObterId(2);
+		String tres = cadastrarEObterId(3);
+		publicarNoBanco(dois);
+		publicarNoBanco(tres);
+
+		verificarErro(gabarito(java.util.UUID.randomUUID().toString(), "[" + item(1, "\"A\"") + "]"), 404, "Not Found",
+				CodigoErro.PROVA_NAO_ENCONTRADA);
+		// 400 primeiro: todos os inexistentes (um dentro da quantidade e um acima dela), mesmo havendo publicadas no lote
+		verificarErro(gabarito(provaId, "[" + item(1, "\"A\"") + "," + item(2, "\"A\"") + "," + item(40, "\"A\"") + ","
+				+ item(200, "\"A\"") + "]"), 400, "Bad Request", CodigoErro.VALIDACAO_FALHOU)
+				.andExpect(jsonPath("$.campos.length()").value(2))
+				.andExpect(jsonPath("$.campos[0].campo").value("itens[2].numero"))
+				.andExpect(jsonPath("$.campos[1].campo").value("itens[3].numero"));
+		// depois o 409, com TODOS os números sem rascunho
+		verificarErro(gabarito(provaId, "[" + item(1, "\"A\"") + "," + item(3, "\"A\"") + "," + item(2, "\"A\"") + "]"), 409,
+				"Conflict", CodigoErro.QUESTAO_SEM_RASCUNHO)
+				.andExpect(jsonPath("$.detalhes.numerosSemRascunho").value(org.hamcrest.Matchers.contains(3, 2)));
+
+		assertThat(gabaritoDe(um)).as("tudo ou nada").isNull();
+	}
+
+	@Test
+	void deve_dar_409_prova_nao_editavel_antes_de_olhar_os_itens_do_gabarito() throws Exception {
+		jdbc.update("UPDATE prova SET status = 'PUBLICADA', publicada_em = CURRENT_TIMESTAMP WHERE public_id = ?",
+				java.util.UUID.fromString(provaId));
+
+		verificarErro(gabarito(provaId, "[" + item(40, "\"A\"") + "]"), 409, "Conflict", CodigoErro.PROVA_NAO_EDITAVEL);
+	}
+
 }

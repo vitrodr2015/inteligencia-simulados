@@ -152,6 +152,30 @@ class SwaggerLigadoTest {
 	}
 
 	@Test
+	void deve_documentar_a_edicao_e_o_gabarito_em_lote_com_o_aviso_de_que_o_put_apaga_o_gabarito() throws Exception {
+		String prova = "$.paths['/api/v1/admin/provas/{id}'].put";
+		String questao = "$.paths['/api/v1/admin/questoes/{id}'].put";
+		String gabarito = "$.paths['/api/v1/admin/provas/{id}/gabarito'].put";
+		var documento = mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+		for (String operacao : new String[] { prova, questao, gabarito }) {
+			for (String codigo : new String[] { "200", "400", "404", "409" }) {
+				documento.andExpect(jsonPath(operacao + ".responses." + codigo).exists());
+			}
+			documento.andExpect(jsonPath(operacao + ".responses.401").doesNotExist())
+					.andExpect(jsonPath(operacao + ".responses.403").doesNotExist())
+					.andExpect(jsonPath(operacao + ".responses.201").doesNotExist());
+		}
+		documento
+				.andExpect(jsonPath(questao + ".description")
+						.value(org.hamcrest.Matchers.containsString("omite o gabarito APAGA o gabarito")))
+				.andExpect(jsonPath("$.components.schemas.QuestaoAtualizacaoRequest.properties.gabarito.description")
+						.value(org.hamcrest.Matchers.containsString("APAGA")))
+				.andExpect(jsonPath("$.components.schemas.GabaritoRequest").exists())
+				.andExpect(jsonPath("$.components.schemas.ItemDoGabaritoRequest").exists())
+				.andExpect(jsonPath("$.components.schemas.GabaritoResponse.properties.atualizadas").exists());
+	}
+
+	@Test
 	void deve_documentar_os_filtros_e_o_sort_da_listagem_de_provas_sem_example() throws Exception {
 		String listagem = "$.paths['/api/v1/provas'].get";
 		mockMvc.perform(get("/v3/api-docs"))

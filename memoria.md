@@ -125,7 +125,7 @@ Plano aprovado em 2026-11-24 (respostas às dúvidas H1 a H11). Marcação: ✅ 
 3. ✅ D148: a Sprint 2 usa a V7 e as seguintes; a migration do D92 (`data_nascimento` anulável) vai para a próxima numeração livre, na ordem da fila. Não existe "V7 reservada para o D92".
 4. ✅ D146 (fatia 2b-i): a FK do subtópico fica em `questao_versao.subtopico_id` ON DELETE RESTRICT (e não em `questao`); o `DELETE /subtopicos/{id}` ganha o 409 por questões, de qualquer status.
 5. ⏳ Não criar a tabela `importacao` agora.
-6. ⏳ Editar uma questão de prova já publicada NÃO altera a prova (registrar no contrato quando a fatia da edição chegar).
+6. ✅ D173 (fatia 4, passada 1): editar uma questão de prova já publicada NÃO altera a prova.
 7. D22 (questão anulada) segue fora.
 8. ⏳ Teste de concorrência da importação no MySQL real, na fatia da Importação.
 9. Origem das questões e direitos autorais: NÃO bloqueia a construção; a decisão é necessária antes do primeiro conteúdo real no banco. O modelo comporta um campo de origem depois, por migration aditiva.
@@ -172,6 +172,17 @@ Plano aprovado em 2026-11-24 (respostas às dúvidas H1 a H11). Marcação: ✅ 
 - **413:** o `LimiteDeCorpoDaImportacao` (`RequestBodyAdvice` só do controller da importação) lê no máximo limite + 1 bytes ANTES do Jackson, então o 413 nunca nasce dentro da leitura dele.
 - **Medido (máquina local, só informativo):** lote de 100 itens ≈ 1,6 s criando e ≈ 0,8 s reimportando.
 - **Infra de teste:** `AbstractImportacaoIntegrationTest` (apaga as provas e o que foi importado nelas); `AbstractQuestaoIntegrationTest` passou a ser `public`; o 413 por HTTP real roda no contexto COMPARTILHADO (nenhum contexto novo).
+
+### Fatia 4, passada 1 (edição do rascunho, gabarito em lote e trava), branch `feature/s4-1-edicao`
+
+- ✅ **Implementado:** `PUT /admin/provas/{id}` (`ProvaService.atualizar`), `PUT /admin/questoes/{id}` (`QuestaoService.atualizar`, DTO próprio `QuestaoAtualizacaoRequest`), `PUT /admin/provas/{id}/gabarito` (domínio `admin`: `GabaritoController`, `GabaritoService`, `GabaritoRequest`/`Response`; a regra de uma questão é `QuestaoService.aplicarGabarito`); 503 `RECURSO_OCUPADO` no `GlobalExceptionHandler`; tradução da FK do subtópico apagado no meio; regra na SecurityConfig, matriz, Swagger, Postman. Sem migration.
+- **Decisões:** D170 a D177; D178 (publicar a prova publica as questões em cascata; publicar avulsa só em prova publicada) é **decidida, para a passada 2**.
+- **Códigos novos:** `PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE`, `QUESTAO_SEM_RASCUNHO`, `RECURSO_OCUPADO`.
+- **Invariante da trava (D175):** a trava da prova é a primeira leitura da transação de escrita. Nas rotas por id de questão, `QuestaoService.atualizar` é `Propagation.NEVER`: lê o id da prova fora (query com `@Transactional(readOnly = true)` própria, para devolver a conexão ao pool) e abre a transação com `TransactionTemplate`. **Nunca anotar esse método com `@Transactional` comum nem chamá-lo de dentro de uma transação.** Ler antes da trava dentro da transação não só esconde dados: com a publicação concorrente, o UPDATE (que grava todas as colunas) desfaria a publicação.
+- **Armadilha das alternativas:** o PUT muda o texto nas mesmas linhas; trocar a coleção bate em `uk_alternativa_versao_letra`. Mudar só o texto de uma alternativa não suja a versão, por isso a entidade anota o `atualizadoEm`.
+- **503 é global (D176):** só `PessimisticLockingFailureException`; a falha de versão otimista continua 500. Muda também o achado da Tarefa 06: o deadlock de índice único em POST simultâneos de matéria agora responde 503, e não 500.
+- **Infra de teste:** `AbstractEdicaoIntegrationTest` (apaga as provas do teste; publica e abre versão por JDBC, o que a API ainda não faz; trava por outra conexão e espera pelo `innodb_trx` como root). O 503 real baixa o `innodb_lock_wait_timeout` das sessões do pool (pega todas, ajusta, devolve e restaura), sem contexto novo.
+- **Para a passada 2 (D178):** com publicação avulsa só em prova publicada, numa prova em rascunho nenhuma questão estará publicada: o 409 `QUESTAO_SEM_RASCUNHO` do gabarito em lote fica inalcançável pela API, e a regra da D43 (apagar prova com questão publicada) também. Decidir na passada 2 e na 3.
 
 Reservada (aprovada, NÃO implementada): ⏳ D147 (`ScoringStrategy` com uma implementação, a da ETEC, e a configuração da prova em dados, ambas na fatia da Tentativa, para não nascer código sem chamador). D145 (tipo da questão interno, só `MULTIPLA_ESCOLHA`) e D146 (item 4) foram implementados na fatia 2b-i; D152, D153, D155 e D156 viraram decisões na 2b-i.
 

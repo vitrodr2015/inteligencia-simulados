@@ -124,6 +124,21 @@ class GlobalExceptionHandlerTest {
 			throw new IllegalStateException(TEXTO_SENSIVEL);
 		}
 
+		@GetMapping("/trava-esgotada")
+		public String travaEsgotada() {
+			throw new org.springframework.dao.CannotAcquireLockException(TEXTO_SENSIVEL);
+		}
+
+		@GetMapping("/vitima-de-deadlock")
+		public String vitimaDeDeadlock() {
+			throw new org.springframework.dao.PessimisticLockingFailureException(TEXTO_SENSIVEL);
+		}
+
+		@GetMapping("/versao-otimista")
+		public String versaoOtimista() {
+			throw new org.springframework.dao.OptimisticLockingFailureException(TEXTO_SENSIVEL);
+		}
+
 		@GetMapping("/propriedade-inexistente")
 		public String propriedadeInexistente() {
 			throw new PropertyReferenceException("campoSecretoInexistente", TypeInformation.of(String.class), List.of());
@@ -343,6 +358,26 @@ class GlobalExceptionHandlerTest {
 	}
 
 	// ----- 500 -----
+
+	@org.junit.jupiter.params.ParameterizedTest
+	@org.junit.jupiter.params.provider.ValueSource(strings = { "trava-esgotada", "vitima-de-deadlock" })
+	void deve_devolver_503_recurso_ocupado_com_retry_after_quando_a_trava_falha_sem_vazar_nada(String rota) throws Exception {
+		ResultActions resposta = mockMvc.perform(get("/api/v1/teste/" + rota));
+
+		verificarFormato(resposta, 503, "Service Unavailable", CodigoErro.RECURSO_OCUPADO)
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Retry-After", "5"))
+				.andExpect(jsonPath("$.campos").doesNotExist())
+				.andExpect(jsonPath("$.detalhes").doesNotExist());
+		assertThat(resposta.andReturn().getResponse().getContentAsString()).doesNotContain("SELECT").doesNotContain("a@b.com")
+				.doesNotContain("br.simulado").doesNotContain("Lock");
+	}
+
+	@Test
+	void deve_manter_a_falha_de_versao_otimista_como_500_porque_nao_e_trava() throws Exception {
+		verificarFormato(mockMvc.perform(get("/api/v1/teste/versao-otimista")), 500, "Internal Server Error",
+				CodigoErro.ERRO_INTERNO).andExpect(
+						org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().doesNotExist("Retry-After"));
+	}
 
 	@Test
 	void deve_devolver_500_generico_sem_vazar_nada_quando_ocorre_um_erro_inesperado() throws Exception {

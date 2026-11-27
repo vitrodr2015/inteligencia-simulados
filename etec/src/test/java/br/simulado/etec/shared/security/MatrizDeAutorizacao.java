@@ -73,6 +73,17 @@ public final class MatrizDeAutorizacao {
 				+ "{\"letra\":\"E\",\"texto\":\"e\"}]}]}";
 	}
 
+	private static String edicaoDeProva(Ctx c) {
+		return "{\"titulo\":\"Prova editada " + c.sufixo() + "\",\"duracaoMinutos\":120,\"quantidadeQuestoes\":50}";
+	}
+
+	/** Troca o subtópico da questão pelo da execução (ativo), sem numero nem provaId. */
+	private static String edicaoDeQuestao(Ctx c) {
+		return "{\"subtopicoId\":\"" + c.subtopicoId() + "\",\"enunciado\":\"Enunciado editado " + c.sufixo()
+				+ "\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"a\"},{\"letra\":\"B\",\"texto\":\"b\"},"
+				+ "{\"letra\":\"C\",\"texto\":\"c\"},{\"letra\":\"D\",\"texto\":\"d\"},{\"letra\":\"E\",\"texto\":\"e\"}]}";
+	}
+
 	private static String json(String chave, String valor) {
 		return "{\"" + chave + "\":\"" + valor + "\"}";
 	}
@@ -177,10 +188,12 @@ public final class MatrizDeAutorizacao {
 					403, 404);
 			linha("prova com id malformado", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/abc", null, 401, 403, 403, 400);
 		}
-		// o que ainda NÃO existe em provas é negado, inclusive para o ADMIN (D121): PUT, DELETE, PATCH e o resto de /admin/**
-		for (String metodo : new String[] { "PUT", "DELETE", "PATCH" }) {
+		// o que ainda NÃO existe em provas é negado, inclusive para o ADMIN (D121): DELETE, PATCH e o resto de /admin/**
+		for (String metodo : new String[] { "DELETE", "PATCH", "POST" }) {
 			linha(metodo + " em /admin/provas/{id} (ainda não existe)", metodo, null, c -> "/api/v1/admin/provas/" + c.provaId(),
 					c -> "{}", 401, 403, 403, 403);
+		}
+		for (String metodo : new String[] { "PUT", "DELETE", "PATCH" }) {
 			linha(metodo + " em /provas/{id} (ainda não existe)", metodo, null, c -> "/api/v1/provas/" + c.provaId(), c -> "{}",
 					401, 403, 403, 403);
 			linha(metodo + " na coleção /admin/provas (ainda não existe)", metodo, null, c -> "/api/v1/admin/provas", c -> "{}",
@@ -196,8 +209,46 @@ public final class MatrizDeAutorizacao {
 				null, 401, 403, 403, 403);
 		linha("publicar prova (ainda não existe)", "PATCH", null, c -> "/api/v1/provas/" + c.provaId() + "/publish", null, 401,
 				403, 403, 403);
-		linha("gabarito da prova (ainda não existe)", "PUT", null, c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito",
-				c -> "{\"itens\":[]}", 401, 403, 403, 403);
+		linha("publicar prova por /admin (não existe)", "PATCH", null,
+				c -> "/api/v1/admin/provas/" + c.provaId() + "/publish", null, 401, 403, 403, 403);
+
+		// ----- edição do rascunho (fatia 4, passada 1): três PUT, só ADMIN -----
+		linha("editar prova", "PUT", "/api/v1/admin/provas/{id}", c -> "/api/v1/admin/provas/" + c.provaId(),
+				MatrizDeAutorizacao::edicaoDeProva, 401, 403, 403, 200);
+		linha("editar prova com corpo inválido", "PUT", "/api/v1/admin/provas/{id}",
+				c -> "/api/v1/admin/provas/" + c.provaId(), c -> "{}", 401, 403, 403, 400);
+		linha("editar prova inexistente", "PUT", "/api/v1/admin/provas/{id}", c -> "/api/v1/admin/provas/" + c.idInexistente(),
+				MatrizDeAutorizacao::edicaoDeProva, 401, 403, 403, 404);
+		linha("editar prova com id malformado", "PUT", "/api/v1/admin/provas/{id}", c -> "/api/v1/admin/provas/abc", c -> "{}",
+				401, 403, 403, 400);
+		linha("editar questão", "PUT", "/api/v1/admin/questoes/{id}", c -> "/api/v1/admin/questoes/" + c.questaoId(),
+				MatrizDeAutorizacao::edicaoDeQuestao, 401, 403, 403, 200);
+		linha("editar questão com corpo inválido", "PUT", "/api/v1/admin/questoes/{id}",
+				c -> "/api/v1/admin/questoes/" + c.questaoId(), c -> "{}", 401, 403, 403, 400);
+		linha("editar questão inexistente", "PUT", "/api/v1/admin/questoes/{id}",
+				c -> "/api/v1/admin/questoes/" + c.idInexistente(), MatrizDeAutorizacao::edicaoDeQuestao, 401, 403, 403, 404);
+		linha("editar questão com id malformado", "PUT", "/api/v1/admin/questoes/{id}", c -> "/api/v1/admin/questoes/abc",
+				c -> "{}", 401, 403, 403, 400);
+		// o campo desconhecido é ignorado (D86): está no corpo só para a execução criar a questão numero 1 nesta prova
+		linha("gabarito em lote", "PUT", "/api/v1/admin/provas/{id}/gabarito",
+				c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito",
+				c -> "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"}],\"criaAQuestao\":\"" + c.questaoId() + "\"}", 401, 403, 403,
+				200);
+		linha("gabarito com lote vazio", "PUT", "/api/v1/admin/provas/{id}/gabarito",
+				c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito", c -> "{\"itens\":[]}", 401, 403, 403, 400);
+		linha("gabarito de número que a prova não tem", "PUT", "/api/v1/admin/provas/{id}/gabarito",
+				c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito", c -> "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"}]}",
+				401, 403, 403, 400);
+		linha("gabarito em prova inexistente", "PUT", "/api/v1/admin/provas/{id}/gabarito",
+				c -> "/api/v1/admin/provas/" + c.idInexistente() + "/gabarito",
+				c -> "{\"itens\":[{\"numero\":1,\"gabarito\":\"A\"}]}", 401, 403, 403, 404);
+		linha("gabarito com id de prova malformado", "PUT", "/api/v1/admin/provas/{id}/gabarito",
+				c -> "/api/v1/admin/provas/abc/gabarito", c -> "{}", 401, 403, 403, 400);
+		for (String metodo : new String[] { "GET", "HEAD", "POST", "PATCH", "DELETE" }) {
+			linha(metodo + " em /admin/provas/{id}/gabarito (não existe)", metodo, null,
+					c -> "/api/v1/admin/provas/" + c.provaId() + "/gabarito",
+					metodo.equals("POST") || metodo.equals("PATCH") ? c -> "{}" : null, 401, 403, 403, 403);
+		}
 		// importação em lote (fatia 3): uma rota, só POST, só ADMIN
 		linha("importar um lote", "POST", "/api/v1/admin/importacoes", c -> "/api/v1/admin/importacoes",
 				c -> loteDeUmaQuestao(c.provaId(), c), 401, 403, 403, 200);
@@ -242,9 +293,13 @@ public final class MatrizDeAutorizacao {
 			linha("questão com id malformado", metodo, "/api/v1/admin/questoes/{id}", c -> "/api/v1/admin/questoes/abc", null, 401,
 					403, 403, 400);
 		}
-		for (String metodo : new String[] { "PUT", "DELETE", "PATCH" }) {
+		for (String metodo : new String[] { "DELETE", "PATCH", "POST" }) {
 			linha(metodo + " em /admin/questoes/{id} (ainda não existe)", metodo, null,
 					c -> "/api/v1/admin/questoes/" + c.questaoId(), c -> "{}", 401, 403, 403, 403);
+		}
+		linha("GET em /admin/questoes/{id}/versoes (não existe)", "GET", null,
+				c -> "/api/v1/admin/questoes/" + c.questaoId() + "/versoes", null, 401, 403, 403, 403);
+		for (String metodo : new String[] { "PUT", "DELETE", "PATCH" }) {
 			linha(metodo + " em /admin/provas/{id}/questoes (ainda não existe)", metodo, null,
 					c -> "/api/v1/admin/provas/" + c.provaId() + "/questoes", c -> "{}", 401, 403, 403, 403);
 			linha(metodo + " na coleção /admin/questoes (ainda não existe)", metodo, null, c -> "/api/v1/admin/questoes", c -> "{}",

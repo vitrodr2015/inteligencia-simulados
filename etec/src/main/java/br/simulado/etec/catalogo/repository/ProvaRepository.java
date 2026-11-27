@@ -29,4 +29,8 @@ public interface ProvaRepository extends JpaRepository<Prova, Long>, JpaSpecific
 	/** Checagem prévia da unicidade (D150): só faz sentido com banca, ano e semestre preenchidos. A banca compara pela collation da coluna. */
 	boolean existsByProgramaAndBancaAndAnoAndSemestre(ProgramaDeProva programa, String banca, Integer ano, Integer semestre);
 
+	/** Para o PUT: a própria prova pode manter a banca, o ano e o semestre dela. */
+	boolean existsByProgramaAndBancaAndAnoAndSemestreAndPublicIdNot(ProgramaDeProva programa, String banca, Integer ano,
+			Integer semestre, UUID publicId);
+
 }

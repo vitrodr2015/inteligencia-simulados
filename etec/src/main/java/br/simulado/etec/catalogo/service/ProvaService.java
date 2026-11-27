@@ -30,7 +30,7 @@ import br.simulado.etec.shared.persistencia.Restricoes;
 import br.simulado.etec.shared.programa.Programa;
 
 /**
- * Regras da prova (contrato, seção 4.3). Nesta fatia: criar (sempre em RASCUNHO), listar e buscar, só para o ADMIN (D154).
+ * Regras da prova (contrato, seção 4.3): criar (sempre em RASCUNHO), editar o rascunho (D170), listar e buscar, só para o ADMIN (D154).
  * Leituras em transação somente leitura.
  */
 @Service
@@ -93,6 +93,49 @@ public class ProvaService {
 				throw provaDuplicada();
 			}
 			throw ex;
+		}
+	}
+
+	/**
+	 * PUT da prova (D170): substituição total, só em RASCUNHO, inclusive da quantidadeQuestoes. A linha da prova fica TRAVADA, e
+	 * a trava é a primeira leitura da transação: um cadastro de questão simultâneo ou já está gravado (e conta no maior numero)
+	 * ou espera e passa a valer a quantidade nova.
+	 *
+	 * <p>Ordem (D79): 404 → 409 PROVA_NAO_EDITAVEL → 409 PROVA_DUPLICADA → 409 PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE. As
+	 * checagens vêm ANTES de alterar a entidade, senão uma consulta faria o JPA gravar a alteração no meio delas.
+	 */
+	@Transactional
+	public Prova atualizar(UUID id, ProvaRequest dados) {
+		Prova prova = repositorio.buscarComTrava(id).orElseThrow(ProvaService::naoEncontrada);
+		exigirRascunho(prova);
+		boolean identificada = dados.banca() != null && dados.ano() != null && dados.semestre() != null;
+		if (identificada && repositorio.existsByProgramaAndBancaAndAnoAndSemestreAndPublicIdNot(prova.getPrograma(),
+				dados.banca(), dados.ano(), dados.semestre(), id)) {
+			throw provaDuplicada();
+		}
+		questoes.buscarMaiorNumero(prova).filter(maior -> maior > dados.quantidadeQuestoes()).ifPresent(maior -> {
+			throw new ConflictException(CodigoErro.PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE,
+					"A prova tem questão cadastrada com número maior que a quantidade informada.",
+					Map.of("maiorNumero", maior));
+		});
+		prova.editar(dados.titulo(), dados.banca(), dados.ano(), dados.semestre(), dados.duracaoMinutos(),
+				dados.quantidadeQuestoes(), dados.fonteUrl());
+		try {
+			return repositorio.saveAndFlush(prova);
+		}
+		catch (DataIntegrityViolationException ex) {
+			// Corrida: outra prova pegou a mesma identidade entre a checagem e a gravação.
+			if (Restricoes.ehUnicidade(ex, UK_PROVA)) {
+				throw provaDuplicada();
+			}
+			throw ex;
+		}
+	}
+
+	/** Só a prova em RASCUNHO se altera (409 PROVA_NAO_EDITAVEL); a regra e a mensagem moram aqui. */
+	static void exigirRascunho(Prova prova) {
+		if (prova.getStatus() != StatusProva.RASCUNHO) {
+			throw new ConflictException(CodigoErro.PROVA_NAO_EDITAVEL, "A prova não está em rascunho e não pode ser alterada.");
 		}
 	}
 
