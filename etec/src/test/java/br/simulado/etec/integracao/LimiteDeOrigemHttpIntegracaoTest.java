@@ -61,6 +61,8 @@ class LimiteDeOrigemHttpIntegracaoTest {
 			quarta.then().statusCode(429).header("Retry-After", "60").header("Cache-Control", "no-store")
 					.contentType("application/json").body("codigo", Matchers.equalTo("LIMITE_EXCEDIDO"));
 			assertThat(quarta.header("Access-Control-Allow-Origin")).as("CORS também no 429 do filtro").isEqualTo(CORS);
+			assertThat(quarta.header("Access-Control-Expose-Headers")).as("o front em outra origem lê a espera do 429 (D180)")
+					.contains("Retry-After");
 			app.http().body("{}").post("/api/v1/auth/signin").then().statusCode(429);
 
 			app.relogio.avancar(Duration.ofSeconds(60));

@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import br.simulado.etec.catalogo.model.Prova;
 import br.simulado.etec.catalogo.model.Questao;
 import br.simulado.etec.catalogo.model.QuestaoVersao;
 import br.simulado.etec.catalogo.model.StatusQuestao;
@@ -41,6 +42,15 @@ public interface QuestaoVersaoRepository extends JpaRepository<QuestaoVersao, Lo
 	@Query(value = "select v.id" + VERSAO_EXIBIDA + " order by q.numero asc, q.id asc", countQuery = "select count(v.id)" + VERSAO_EXIBIDA)
 	Page<Long> buscarIdsDasVersoesExibidas(@Param("provaId") UUID provaId, @Param("subtopicoId") UUID subtopicoId,
 			@Param("status") StatusQuestao status, Pageable paginacao);
+
+	/**
+	 * Para a publicação da prova (D178): as versões em RASCUNHO e PUBLICADA das questões dela, com o subtópico, a matéria e as
+	 * alternativas na mesma instrução, sem uma consulta por questão. A lista pode repetir a versão (uma linha por alternativa).
+	 */
+	@Query("select v from QuestaoVersao v join fetch v.questao q join fetch v.subtopico s join fetch s.materia "
+			+ "left join fetch v.alternativas where q.prova = :prova "
+			+ "and v.status <> br.simulado.etec.catalogo.model.StatusQuestao.ARQUIVADA")
+	List<QuestaoVersao> buscarVivasDaProva(@Param("prova") Prova prova);
 
 	/**
 	 * Segunda consulta: as versões dos ids da página com TUDO o que a saída usa (questão, prova, subtópico e alternativas) em uma

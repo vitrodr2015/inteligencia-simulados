@@ -38,6 +38,8 @@ public enum CodigoErro {
 	PROVA_NAO_EDITAVEL,
 	// Edição (fatia 4, passada 1; D170): a quantidadeQuestoes não pode ficar abaixo do maior numero já cadastrado
 	PROVA_COM_QUESTOES_ACIMA_DA_QUANTIDADE,
+	// Publicação (D178): há questão de 1 a quantidadeQuestoes que impede publicar; detalhes.questoesPendentes
+	PROVA_COM_QUESTOES_PENDENTES,
 	// Edição (D171, D174): só o rascunho aberto se altera; sem ele, é preciso criar uma nova versão
 	QUESTAO_SEM_RASCUNHO,
 	// Trava não obtida a tempo ou deadlock no banco (503 com Retry-After, D176)

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -32,7 +33,8 @@ import jakarta.validation.Valid;
 
 /**
  * Só HTTP: valida a entrada, chama o service e monta a resposta. A documentação fica em {@link ProvaControllerDocs}. A criação
- * e a edição moram em {@code /admin/provas} (D149, D170) e a leitura em {@code /provas}; tudo é só do ADMIN por enquanto (D154).
+ * e a edição moram em {@code /admin/provas} (D149, D170); a leitura e o publicar (D178) em {@code /provas}. Tudo é só do ADMIN
+ * por enquanto (D154).
  */
 @RestController
 @RequestMapping(path = "/api/v1", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -57,6 +59,12 @@ public class ProvaController implements ProvaControllerDocs {
 	@PutMapping(path = "/admin/provas/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<ProvaResponse> atualizar(@PathVariable UUID id, @Valid @RequestBody ProvaRequest dados) {
 		return ResponseEntity.ok(comContagem(servico.atualizar(id, dados)));
+	}
+
+	@Override
+	@PatchMapping("/provas/{id}/publish")
+	public ResponseEntity<ProvaResponse> publicar(@PathVariable UUID id) {
+		return ResponseEntity.ok(comContagem(servico.publicar(id)));
 	}
 
 	@Override

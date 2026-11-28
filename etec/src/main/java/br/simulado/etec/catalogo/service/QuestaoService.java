@@ -1,11 +1,15 @@
 package br.simulado.etec.catalogo.service;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,12 +40,14 @@ import br.simulado.etec.catalogo.repository.ProvaRepository;
 import br.simulado.etec.catalogo.repository.QuestaoRepository;
 import br.simulado.etec.catalogo.repository.QuestaoVersaoRepository;
 import br.simulado.etec.catalogo.repository.SubtopicoRepository;
+import br.simulado.etec.shared.config.ImagensProperties;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.InvalidRequestException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
 import br.simulado.etec.shared.persistencia.Restricoes;
+import br.simulado.etec.shared.validacao.HostDeImagemPermitidoValidator;
 
 /**
  * Regras da questão (contrato, seção 5). O cadastro unitário é o caminho PRIMÁRIO (D152). O cadastro tem duas partes,
@@ -93,6 +99,25 @@ public class QuestaoService {
 		QUESTAO_INEXISTENTE
 	}
 
+	/** Por que uma questão impede a publicação da prova (D178). Os nomes saem na API, em detalhes.questoesPendentes[].motivo. */
+	public enum MotivoDePendencia {
+		/** A prova não tem questão com esse numero. */
+		QUESTAO_AUSENTE,
+		/** A questão não tem rascunho aberto para publicar. Defensivo: numa prova em rascunho a API não publica questão avulsa. */
+		QUESTAO_SEM_RASCUNHO,
+		SEM_GABARITO,
+		/** O subtópico, ou a matéria dele, está desativado. */
+		SUBTOPICO_INATIVO,
+		/** Defensivo: o cadastro e o PUT já recusam subtópico de outro programa. */
+		SUBTOPICO_DE_OUTRO_PROGRAMA,
+		/** O host da imagem não está na lista de hoje (a lista é configuração e pode ter mudado). */
+		IMAGEM_NAO_PERMITIDA
+	}
+
+	/** Uma pendência de publicação. A mesma questão aparece uma vez por motivo. */
+	public record Pendencia(int numero, MotivoDePendencia motivo) {
+	}
+
 	private final ProvaRepository provas;
 
 	private final QuestaoRepository questoes;
@@ -105,14 +130,18 @@ public class QuestaoService {
 
 	private final Clock relogio;
 
+	private final ImagensProperties imagens;
+
 	public QuestaoService(ProvaRepository provas, QuestaoRepository questoes, QuestaoVersaoRepository versoes,
-			SubtopicoRepository subtopicos, PlatformTransactionManager gerenteDeTransacao, Clock relogio) {
+			SubtopicoRepository subtopicos, PlatformTransactionManager gerenteDeTransacao, Clock relogio,
+			ImagensProperties imagens) {
 		this.provas = provas;
 		this.questoes = questoes;
 		this.versoes = versoes;
 		this.subtopicos = subtopicos;
 		this.transacao = new TransactionTemplate(gerenteDeTransacao);
 		this.relogio = relogio;
+		this.imagens = imagens;
 	}
 
 	/** O cadastro unitário: trava a prova, cadastra nela e traduz o conflito de conteúdo no 409. */
@@ -207,6 +236,70 @@ public class QuestaoService {
 			return SituacaoDoGabarito.SEM_RASCUNHO;
 		}
 		return rascunho.get().definirGabarito(gabarito) ? SituacaoDoGabarito.ALTERADO : SituacaoDoGabarito.SEM_MUDANCA;
+	}
+
+	/**
+	 * A parte das questões na publicação da prova (D178), na prova que quem chama TRAVOU (como primeira leitura da transação) e na
+	 * mesma transação. Primeiro confere TODAS as questões de 1 a quantidadeQuestoes e junta todas as pendências, em ordem de
+	 * numero, sem gravar nada; havendo alguma, devolve a lista. Sem nenhuma, publica todos os rascunhos com o mesmo
+	 * {@code momento} e devolve a lista vazia.
+	 *
+	 * <p>Se uma questão já tiver versão publicada além do rascunho (a API ainda não produz isso numa prova em rascunho), a
+	 * publicada é arquivada e isso vai ao banco ANTES de o rascunho ser publicado: o índice único de "uma publicada por questão"
+	 * é conferido a cada instrução, e o JPA não garante a ordem das instruções sem o flush.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public List<Pendencia> publicarQuestoesDaProva(Prova provaTravada, Instant momento) {
+		Set<Integer> numeros = questoes.findByProva(provaTravada).stream().map(Questao::getNumero).collect(Collectors.toSet());
+		Map<Integer, QuestaoVersao> rascunhos = new HashMap<>();
+		Map<Integer, QuestaoVersao> publicadas = new HashMap<>();
+		for (QuestaoVersao versao : versoes.buscarVivasDaProva(provaTravada)) {
+			(versao.getStatus() == StatusQuestao.RASCUNHO ? rascunhos : publicadas).put(versao.getQuestao().getNumero(), versao);
+		}
+
+		List<Pendencia> pendencias = new ArrayList<>();
+		List<QuestaoVersao> aPublicar = new ArrayList<>();
+		for (int numero = 1; numero <= provaTravada.getQuantidadeQuestoes(); numero++) {
+			if (!numeros.contains(numero)) {
+				pendencias.add(new Pendencia(numero, MotivoDePendencia.QUESTAO_AUSENTE));
+				continue;
+			}
+			QuestaoVersao rascunho = rascunhos.get(numero);
+			if (rascunho == null) {
+				pendencias.add(new Pendencia(numero, MotivoDePendencia.QUESTAO_SEM_RASCUNHO));
+				continue;
+			}
+			for (MotivoDePendencia motivo : impedimentos(rascunho, provaTravada)) {
+				pendencias.add(new Pendencia(numero, motivo));
+			}
+			aPublicar.add(rascunho);
+		}
+		if (!pendencias.isEmpty()) {
+			return pendencias;
+		}
+		aPublicar.stream().map(rascunho -> publicadas.get(rascunho.getQuestao().getNumero())).filter(Objects::nonNull)
+				.forEach(QuestaoVersao::arquivar);
+		versoes.flush();
+		aPublicar.forEach(rascunho -> rascunho.publicar(momento));
+		return List.of();
+	}
+
+	/** Tudo o que impede ESTE rascunho de ser publicado, na ordem dos motivos. */
+	private List<MotivoDePendencia> impedimentos(QuestaoVersao rascunho, Prova prova) {
+		List<MotivoDePendencia> motivos = new ArrayList<>();
+		if (rascunho.getGabarito() == null) {
+			motivos.add(MotivoDePendencia.SEM_GABARITO);
+		}
+		if (!rascunho.getSubtopico().visivelParaAluno()) {
+			motivos.add(MotivoDePendencia.SUBTOPICO_INATIVO);
+		}
+		if (!mesmoPrograma(rascunho.getSubtopico(), prova)) {
+			motivos.add(MotivoDePendencia.SUBTOPICO_DE_OUTRO_PROGRAMA);
+		}
+		if (!HostDeImagemPermitidoValidator.hostPermitido(rascunho.getImagemUrl(), imagens)) {
+			motivos.add(MotivoDePendencia.IMAGEM_NAO_PERMITIDA);
+		}
+		return motivos;
 	}
 
 	/**

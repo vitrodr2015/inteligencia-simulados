@@ -102,7 +102,7 @@ class CorsPropertiesTest {
 			assertThat(configuracao.getAllowedHeaders()).containsExactly("Authorization", "Content-Type");
 			assertThat(configuracao.getAllowCredentials()).isFalse();
 			assertThat(configuracao.getMaxAge()).isEqualTo(3600L);
-			assertThat(configuracao.getExposedHeaders()).containsExactly("Location");
+			assertThat(configuracao.getExposedHeaders()).containsExactly("Location", "Retry-After");
 			assertThat(ctx.getBean("corsFilter")).isInstanceOf(CorsFilter.class);
 		});
 	}

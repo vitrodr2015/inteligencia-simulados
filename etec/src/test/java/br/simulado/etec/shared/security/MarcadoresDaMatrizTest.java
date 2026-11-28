@@ -59,6 +59,12 @@ class MarcadoresDaMatrizTest {
 			return criar("questao");
 		}
 
+		@Override
+		public String provaCompleta(String materiaId) {
+			assertThat(materiaId).startsWith("materia-");
+			return criar("provacompleta");
+		}
+
 		List<String> tipos() {
 			return criacoes.stream().map(id -> id.substring(0, id.indexOf('-'))).toList();
 		}
@@ -140,6 +146,14 @@ class MarcadoresDaMatrizTest {
 			assertThat(segunda).doesNotContain("/" + idDaPrimeira + "/");
 		}
 		assertThat(segunda).isNotEqualTo(primeira);
+	}
+
+	@org.junit.jupiter.api.Test
+	void deve_criar_a_prova_completa_como_recurso_proprio_so_com_a_materia() {
+		String resolvido = recursos.resolver("/api/v1/provas/{provaCompletaId}/publish");
+
+		assertThat(resolvido).contains("provacompleta-").doesNotContain("{");
+		assertThat(fabrica.tipos()).containsExactly("materia", "provacompleta");
 	}
 
 	// ----- falha rápida -----

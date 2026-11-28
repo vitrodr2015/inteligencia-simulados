@@ -87,6 +87,9 @@ public class SecurityConfig {
 	static final String[] EDICAO = { "/api/v1/admin/provas/{id}", "/api/v1/admin/questoes/{id}",
 			"/api/v1/admin/provas/{id}/gabarito" };
 
+	/** Publicar a prova, com as questões em cascata (fatia 4, passada 2a; D178). Só PATCH, só ADMIN. */
+	static final String[] PUBLICAR_PROVA = { "/api/v1/provas/{id}/publish" };
+
 	/** Importação em lote (fatia 3): uma rota, só POST, só ADMIN. */
 	static final String[] IMPORTACAO = { "/api/v1/admin/importacoes" };
 
@@ -148,6 +151,8 @@ public class SecurityConfig {
 					leitura(regras, QUESTAO_LEITURA, url -> url.hasAuthority(Authorities.ROLE_ADMIN));
 					// ----- só ADMIN (edição do rascunho, fatia 4) -----
 					regras.requestMatchers(HttpMethod.PUT, EDICAO).hasAuthority(Authorities.ROLE_ADMIN);
+					// ----- só ADMIN (publicar a prova, D178) -----
+					regras.requestMatchers(HttpMethod.PATCH, PUBLICAR_PROVA).hasAuthority(Authorities.ROLE_ADMIN);
 					// ----- só ADMIN (importação em lote, fatia 3) -----
 					regras.requestMatchers(HttpMethod.POST, IMPORTACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					// D113: o resto de /actuator e /error = 401 para anônimo e 403 para autenticado, nunca 404.

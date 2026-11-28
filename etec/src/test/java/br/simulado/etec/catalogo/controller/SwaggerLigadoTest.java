@@ -176,6 +176,22 @@ class SwaggerLigadoTest {
 	}
 
 	@Test
+	void deve_documentar_o_publicar_da_prova_sem_corpo_com_os_motivos_de_pendencia() throws Exception {
+		String publicar = "$.paths['/api/v1/provas/{id}/publish'].patch";
+		var documento = mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+		for (String codigo : new String[] { "200", "400", "404", "409" }) {
+			documento.andExpect(jsonPath(publicar + ".responses." + codigo).exists());
+		}
+		documento.andExpect(jsonPath(publicar + ".responses.401").doesNotExist())
+				.andExpect(jsonPath(publicar + ".requestBody").doesNotExist());
+		for (br.simulado.etec.catalogo.service.QuestaoService.MotivoDePendencia motivo : br.simulado.etec.catalogo.service.QuestaoService.MotivoDePendencia
+				.values()) {
+			documento.andExpect(jsonPath(publicar + ".description")
+					.value(org.hamcrest.Matchers.containsString(motivo.name())));
+		}
+	}
+
+	@Test
 	void deve_documentar_os_filtros_e_o_sort_da_listagem_de_provas_sem_example() throws Exception {
 		String listagem = "$.paths['/api/v1/provas'].get";
 		mockMvc.perform(get("/v3/api-docs"))

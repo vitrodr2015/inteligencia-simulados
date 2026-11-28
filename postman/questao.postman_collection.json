@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Questão — /api/v1/admin/questoes",
-    "description": "Questão (Sprint 2, fatias 2b-i e 2b-ii): POST /admin/provas/{id}/questoes, GET /admin/questoes/{id} e GET /admin/questoes, só ADMIN. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). O caso da imagem usa localhost, o padrão de IMAGENS_HOSTS_PERMITIDOS em desenvolvimento. PROVA_NAO_EDITAVEL não está aqui: ainda não há rota que publique uma prova. Os dados ficam no banco local (ainda não há DELETE de questão). Os PUT de questão e de gabarito (D171 a D174) entraram na fatia 4, passada 1. QUESTAO_SEM_RASCUNHO fica de fora: ainda não há rota que publique.",
+    "description": "Questão (Sprint 2, fatias 2b-i e 2b-ii): POST /admin/provas/{id}/questoes, GET /admin/questoes/{id} e GET /admin/questoes, só ADMIN. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). O caso da imagem usa localhost, o padrão de IMAGENS_HOSTS_PERMITIDOS em desenvolvimento. PROVA_NAO_EDITAVEL não está aqui: ainda não há rota que publique uma prova. Os dados ficam no banco local (ainda não há DELETE de questão). Os PUT de questão e de gabarito (D171 a D174) entraram na fatia 4, passada 1. QUESTAO_SEM_RASCUNHO fica de fora: ainda não há rota que publique. O publicar da prova (D178) entrou na fatia 4, passada 2a.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -59,6 +59,14 @@
     },
     {
       "key": "studentTokenExpira",
+      "value": ""
+    },
+    {
+      "key": "provaParaPublicarId",
+      "value": ""
+    },
+    {
+      "key": "questaoPublicadaId",
       "value": ""
     }
   ],
@@ -3349,6 +3357,385 @@
             "body": {
               "mode": "raw",
               "raw": "{\"titulo\":\"Prova da coleção de questão {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PATCH — publicar a prova e o que fica fechado",
+      "item": [
+        {
+          "name": "Criar uma prova de 1 questão",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"provaParaPublicarId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Para publicar {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cadastrar a questão com gabarito",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"questaoPublicadaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaPublicarId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaPublicarId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Para publicar {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"A\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — publica a prova e a questão",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"publicada com data\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"PUBLICADA\"); pm.expect(j.publicadaEm).to.be.a(\"string\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaParaPublicarId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaParaPublicarId}}",
+                "publish"
+              ]
+            }
+          }
+        },
+        {
+          "name": "A questão ficou PUBLICADA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"status\", function () { pm.expect(pm.response.json().status).to.eql(\"PUBLICADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "409 — publicar de novo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo PROVA_NAO_EDITAVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_EDITAVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaParaPublicarId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaParaPublicarId}}",
+                "publish"
+              ]
+            }
+          }
+        },
+        {
+          "name": "409 — PUT da prova publicada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo PROVA_NAO_EDITAVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_EDITAVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaPublicarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaPublicarId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Outra\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — cadastro na prova publicada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo PROVA_NAO_EDITAVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_EDITAVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaPublicarId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaPublicarId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Para publicar {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}],\"gabarito\":\"A\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — gabarito em lote na prova publicada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo PROVA_NAO_EDITAVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_EDITAVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaPublicarId}}/gabarito",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaPublicarId}}",
+                "gabarito"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"itens\":[{\"numero\":1,\"gabarito\":\"B\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — PUT da questão publicada (sem rascunho)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo QUESTAO_SEM_RASCUNHO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_SEM_RASCUNHO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Depois\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
               "options": {
                 "raw": {
                   "language": "json"

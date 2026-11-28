@@ -184,6 +184,17 @@ Plano aprovado em 2026-11-24 (respostas às dúvidas H1 a H11). Marcação: ✅ 
 - **Infra de teste:** `AbstractEdicaoIntegrationTest` (apaga as provas do teste; publica e abre versão por JDBC, o que a API ainda não faz; trava por outra conexão e espera pelo `innodb_trx` como root). O 503 real baixa o `innodb_lock_wait_timeout` das sessões do pool (pega todas, ajusta, devolve e restaura), sem contexto novo.
 - **Para a passada 2 (D178):** com publicação avulsa só em prova publicada, numa prova em rascunho nenhuma questão estará publicada: o 409 `QUESTAO_SEM_RASCUNHO` do gabarito em lote fica inalcançável pela API, e a regra da D43 (apagar prova com questão publicada) também. Decidir na passada 2 e na 3.
 
+### Fatia 4, passada 2a (publicar a prova), branch `feature/s4-2a-publicar-prova`
+
+- ✅ **Implementado:** `PATCH /provas/{id}/publish` (`ProvaService.publicar` + `QuestaoService.publicarQuestoesDaProva`), migration `V11__add_check_publicada_em_questao_versao.sql`, `Retry-After` exposto no CORS; regra na SecurityConfig, matriz, Swagger, Postman.
+- **Decisões:** D178 (completada), D179 (V11) e D180 (CORS). Código novo: `PROVA_COM_QUESTOES_PENDENTES`.
+- **Invariante:** a trava da prova é a primeira leitura de `publicar`. Lendo antes, o snapshot velho publicaria com dados antigos e o UPDATE (todas as colunas) desfaria o que a outra transação gravou.
+- **Cascata:** confere TUDO antes de gravar qualquer coisa. O arquivamento de uma publicada anterior (defensivo) vai ao banco com `flush` ANTES de o rascunho ser publicado, por causa do índice único de publicada vigente.
+- **Depois de publicada:** PUT de questão dá `QUESTAO_SEM_RASCUNHO` (D171, decidido pela versão); as demais escritas dão `PROVA_NAO_EDITAVEL`.
+- **Infra de teste:** o auxiliar `inserirVersaoCompleta` passou a preencher `publicada_em` quando o status não é RASCUNHO (V11); `comAProvaTravada` e `esperarNaFilaDaTrava(n)` ficam na `AbstractEdicaoIntegrationTest` (com 2 na fila, a ordem de chegada fixa o desfecho da corrida); `MigracaoV11IntegracaoTest` usa schema próprio no contêiner compartilhado; a matriz tem o marcador `{provaCompletaId}`.
+- **Falta (passada 2b):** publicar questão avulsa (só em prova publicada) e nova versão. Até lá não há como corrigir uma prova publicada.
+- **Primeiro deploy:** a V11 falha se houver versão publicada ou arquivada sem `publicada_em` (só possível com SQL manual).
+
 Reservada (aprovada, NÃO implementada): ⏳ D147 (`ScoringStrategy` com uma implementação, a da ETEC, e a configuração da prova em dados, ambas na fatia da Tentativa, para não nascer código sem chamador). D145 (tipo da questão interno, só `MULTIPLA_ESCOLHA`) e D146 (item 4) foram implementados na fatia 2b-i; D152, D153, D155 e D156 viraram decisões na 2b-i.
 
 Ordem das fatias: (1) programa e ganchos de dados ✅; (2) modelo de Prova e Questão + Importação + leitura do admin; (3) edição (PUT, versões, gabarito em lote, publicar, apagar); (4) leitura do aluno junto da Tentativa, com o DTO sem gabarito (D75) e a `ScoringStrategy`.

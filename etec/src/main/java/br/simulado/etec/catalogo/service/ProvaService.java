@@ -1,6 +1,10 @@
 package br.simulado.etec.catalogo.service;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -21,6 +25,7 @@ import br.simulado.etec.catalogo.repository.ProgramaRepository;
 import br.simulado.etec.catalogo.repository.ProvaRepository;
 import br.simulado.etec.catalogo.repository.QuestaoRepository;
 import br.simulado.etec.catalogo.repository.QuestaoRepository.ContagemPorProva;
+import br.simulado.etec.catalogo.service.QuestaoService.Pendencia;
 import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
@@ -30,7 +35,8 @@ import br.simulado.etec.shared.persistencia.Restricoes;
 import br.simulado.etec.shared.programa.Programa;
 
 /**
- * Regras da prova (contrato, seção 4.3): criar (sempre em RASCUNHO), editar o rascunho (D170), listar e buscar, só para o ADMIN (D154).
+ * Regras da prova (contrato, seção 4.3): criar (sempre em RASCUNHO), editar o rascunho (D170), publicar (D178), listar e buscar,
+ * só para o ADMIN (D154).
  * Leituras em transação somente leitura.
  */
 @Service
@@ -53,10 +59,38 @@ public class ProvaService {
 
 	private final QuestaoRepository questoes;
 
-	public ProvaService(ProvaRepository repositorio, ProgramaRepository programas, QuestaoRepository questoes) {
+	private final QuestaoService servicoDeQuestoes;
+
+	private final Clock relogio;
+
+	public ProvaService(ProvaRepository repositorio, ProgramaRepository programas, QuestaoRepository questoes,
+			QuestaoService servicoDeQuestoes, Clock relogio) {
 		this.repositorio = repositorio;
 		this.programas = programas;
 		this.questoes = questoes;
+		this.servicoDeQuestoes = servicoDeQuestoes;
+		this.relogio = relogio;
+	}
+
+	/**
+	 * Publica a prova e, em cascata, as questões dela (D178), numa transação só: tudo ou nada. A linha da prova é TRAVADA como
+	 * primeira leitura, então nenhum cadastro, importação, edição ou gabarito corre no meio. Ordem (D79): 404 → 409
+	 * PROVA_NAO_EDITAVEL (não é rascunho, inclusive a já publicada) → 409 PROVA_COM_QUESTOES_PENDENTES, com TODAS as
+	 * pendências. A prova e todas as versões levam o mesmo publicada_em.
+	 */
+	@Transactional
+	public Prova publicar(UUID id) {
+		Prova prova = repositorio.buscarComTrava(id).orElseThrow(ProvaService::naoEncontrada);
+		exigirRascunho(prova);
+		Instant momento = relogio.instant().truncatedTo(ChronoUnit.MILLIS);
+		List<Pendencia> pendencias = servicoDeQuestoes.publicarQuestoesDaProva(prova, momento);
+		if (!pendencias.isEmpty()) {
+			throw new ConflictException(CodigoErro.PROVA_COM_QUESTOES_PENDENTES,
+					"A prova não pode ser publicada: há questões pendentes. Nada foi publicado.",
+					Map.of("questoesPendentes", pendencias));
+		}
+		prova.publicar(momento);
+		return repositorio.saveAndFlush(prova);
 	}
 
 	/**

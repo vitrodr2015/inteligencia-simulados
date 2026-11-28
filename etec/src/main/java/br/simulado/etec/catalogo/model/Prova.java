@@ -1,6 +1,7 @@
 package br.simulado.etec.catalogo.model;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -122,6 +123,15 @@ public class Prova {
 		this.duracaoMinutos = duracaoMinutos;
 		this.quantidadeQuestoes = quantidadeQuestoes;
 		this.fonteUrl = fonteUrl;
+	}
+
+	/** Publica a prova (D178): status e data juntos, como o CHECK do banco exige. Quem chama já conferiu as questões. */
+	public void publicar(Instant momento) {
+		if (this.status != StatusProva.RASCUNHO) {
+			throw new IllegalStateException("Só uma prova em RASCUNHO pode ser publicada.");
+		}
+		this.status = StatusProva.PUBLICADA;
+		this.publicadaEm = Objects.requireNonNull(momento, "momento");
 	}
 
 	public Long getId() {

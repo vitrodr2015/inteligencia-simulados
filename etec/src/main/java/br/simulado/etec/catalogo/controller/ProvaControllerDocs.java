@@ -46,6 +46,18 @@ public interface ProvaControllerDocs {
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<ProvaResponse> atualizar(@Parameter(description = "Id público da prova (UUID).") UUID id, ProvaRequest dados);
 
+	@Operation(summary = "Publica a prova e as questões dela (só ADMIN)",
+			description = "Sem corpo. Publica a prova e, em cascata, o rascunho de todas as questões, numa transação só. A prova precisa estar em RASCUNHO (publicar de novo dá 409) e ter as questões de 1 a quantidadeQuestoes, cada uma com rascunho aberto, gabarito, subtópico ativo (de matéria ativa) do programa da prova e imagem de um host permitido na configuração atual. Havendo qualquer problema, nada é publicado, e detalhes.questoesPendentes traz TODOS, como {numero, motivo}, em ordem de número: QUESTAO_AUSENTE, QUESTAO_SEM_RASCUNHO, SEM_GABARITO, SUBTOPICO_INATIVO, SUBTOPICO_DE_OUTRO_PROGRAMA ou IMAGEM_NAO_PERMITIDA. Publicar não tem volta: depois, a prova não aceita edição, questão nova, importação nem gabarito em lote.")
+	@ApiResponse(responseCode = "200", description = "Prova publicada, com publicadaEm preenchido.",
+			content = @Content(schema = @Schema(implementation = ProvaResponse.class)))
+	@ApiResponse(responseCode = "400", description = "Id malformado.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "404", description = "Prova não encontrada (PROVA_NAO_ENCONTRADA).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "PROVA_NAO_EDITAVEL (não é rascunho, inclusive a já publicada) ou PROVA_COM_QUESTOES_PENDENTES (detalhes.questoesPendentes).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<ProvaResponse> publicar(@Parameter(description = "Id público da prova (UUID).") UUID id);
+
 	@Operation(summary = "Lista as provas (só ADMIN)",
 			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia. Com sort por ano, as provas sem ano ficam no fim na ordem decrescente (o padrão) e no início na crescente.")
 	@Parameter(name = "sort", in = ParameterIn.QUERY, description = "Ordenação no formato campo,direção (asc ou desc). Campos aceitos: ano e semestre (o nome do campo diferencia maiúsculas). Padrão: ano,desc. Sem direção vale asc (intencional, D102). Um único sort por pedido: mais de um dá 400, e qualquer outro valor também.")
