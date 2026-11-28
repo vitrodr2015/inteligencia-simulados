@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -59,6 +60,13 @@ public class ProvaController implements ProvaControllerDocs {
 	@PutMapping(path = "/admin/provas/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<ProvaResponse> atualizar(@PathVariable UUID id, @Valid @RequestBody ProvaRequest dados) {
 		return ResponseEntity.ok(comContagem(servico.atualizar(id, dados)));
+	}
+
+	@Override
+	@DeleteMapping("/admin/provas/{id}")
+	public ResponseEntity<Void> apagar(@PathVariable UUID id) {
+		servico.apagar(id);
+		return ResponseEntity.noContent().build();
 	}
 
 	@Override

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Importação — /api/v1/admin/importacoes",
-    "description": "Importação de questões em lote (fatia 3): POST /admin/importacoes, só ADMIN, tudo ou nada, de 1 a 100 questões e corpo de até 2 MiB. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). PROVA_NAO_EDITAVEL não está aqui: ainda não há rota que publique uma prova. Os dados ficam no banco local (ainda não há DELETE de questão).",
+    "description": "Importação de questões em lote (fatia 3): POST /admin/importacoes, só ADMIN, tudo ou nada, de 1 a 100 questões e corpo de até 2 MiB. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). A recusa da importação numa prova publicada (PROVA_NAO_EDITAVEL) não está nesta coleção: a rota de publicar existe (PATCH /provas/{id}/publish, D178) e o caso está coberto pelos testes de integração. Os dados ficam no banco local: a coleção não apaga o que cria (o DELETE de questão e de prova existe desde a D184 e a D185).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [

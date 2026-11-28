@@ -85,11 +85,31 @@ public class ProvaService {
 		Instant momento = relogio.instant().truncatedTo(ChronoUnit.MILLIS);
 		List<Pendencia> pendencias = servicoDeQuestoes.publicarQuestoesDaProva(prova, momento);
 		if (!pendencias.isEmpty()) {
-			throw QuestaoService.recusaPorPendencias("A prova não pode ser publicada: há questões pendentes. Nada foi publicado.",
-					pendencias);
+			throw QuestaoService.recusaPorPendencias(CodigoErro.PROVA_COM_QUESTOES_PENDENTES,
+					"A prova não pode ser publicada: há questões pendentes. Nada foi publicado.", pendencias);
 		}
 		prova.publicar(momento);
 		return repositorio.saveAndFlush(prova);
+	}
+
+	/**
+	 * Apaga a prova em RASCUNHO e, antes dela, todas as questões dela (D185), numa transação só: tudo ou nada. A linha da prova
+	 * é TRAVADA como primeira leitura; quem esperava a trava não a encontra mais. Ordem (D79): 404 → 409 PROVA_NAO_EDITAVEL →
+	 * 409 PROVA_COM_QUESTOES_PUBLICADAS com detalhes.numerosPublicados (defesa de invariante: a publicação é em cascata, então
+	 * a API não deixa uma prova em rascunho com questão publicada).
+	 */
+	@Transactional
+	public void apagar(UUID id) {
+		Prova prova = repositorio.buscarComTrava(id).orElseThrow(ProvaService::naoEncontrada);
+		exigirRascunho(prova);
+		List<Integer> jaPublicados = servicoDeQuestoes.apagarQuestoesDaProva(prova);
+		if (!jaPublicados.isEmpty()) {
+			throw new ConflictException(CodigoErro.PROVA_COM_QUESTOES_PUBLICADAS,
+					"A prova tem questão que já foi publicada e não pode ser apagada. Nada foi apagado.",
+					Map.of("numerosPublicados", jaPublicados));
+		}
+		repositorio.delete(prova);
+		repositorio.flush();
 	}
 
 	/**

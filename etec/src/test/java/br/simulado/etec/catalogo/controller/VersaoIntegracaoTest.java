@@ -5,10 +5,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -194,7 +191,7 @@ class VersaoIntegracaoTest extends AbstractPublicacaoIntegrationTest {
 		List<Map<String, Object>> publicada = fotoDaVersao(questao, 1);
 		List<Map<String, Object>> rascunho = fotoDaVersao(questao, 2);
 
-		assertThat(pendencias(publicarQuestao(questao))).containsExactly("1 SUBTOPICO_INATIVO");
+		assertThat(pendenciasDaQuestao(publicarQuestao(questao))).containsExactly("1 SUBTOPICO_INATIVO");
 
 		assertThat(historico(questao)).containsExactly("1 PUBLICADA", "2 RASCUNHO");
 		assertThat(fotoDaVersao(questao, 1)).isEqualTo(publicada);
@@ -223,7 +220,7 @@ class VersaoIntegracaoTest extends AbstractPublicacaoIntegrationTest {
 		}
 		List<Object> antes = fotoDaProva(ids.get(0));
 
-		assertThat(pendencias(publicarQuestao(questao))).containsExactly("1 " + motivo);
+		assertThat(pendenciasDaQuestao(publicarQuestao(questao))).containsExactly("1 " + motivo);
 
 		assertThat(historico(questao)).containsExactly("1 PUBLICADA", "2 RASCUNHO");
 		assertThat(fotoDaProva(ids.get(0))).usingRecursiveComparison().isEqualTo(antes);
@@ -239,7 +236,7 @@ class VersaoIntegracaoTest extends AbstractPublicacaoIntegrationTest {
 		trocarImagemDoRascunho(questao, "https://saiu-da-lista.exemplo.invalid/a.png");
 		requisicao().patch("/api/v1/subtopicos/" + subtopico + "/disable").then().statusCode(200);
 
-		assertThat(pendencias(publicarQuestao(questao))).containsExactly("2 SEM_GABARITO", "2 SUBTOPICO_INATIVO",
+		assertThat(pendenciasDaQuestao(publicarQuestao(questao))).containsExactly("2 SEM_GABARITO", "2 SUBTOPICO_INATIVO",
 				"2 IMAGEM_NAO_PERMITIDA");
 		assertThat(historico(questao)).containsExactly("1 PUBLICADA", "2 RASCUNHO");
 	}
@@ -278,12 +275,6 @@ class VersaoIntegracaoTest extends AbstractPublicacaoIntegrationTest {
 		assertThat(historico(questao)).containsExactly("1 ARQUIVADA", "2 PUBLICADA");
 	}
 
-	private static void comoRoot(String sql) throws SQLException {
-		try (Connection root = DriverManager.getConnection(MYSQL.getJdbcUrl(), "root", MYSQL.getPassword());
-				Statement comando = root.createStatement()) {
-			comando.execute(sql);
-		}
-	}
 
 	@Test
 	void deve_recusar_publicar_avulsa_numa_prova_em_rascunho_mesmo_com_tudo_pronto() {

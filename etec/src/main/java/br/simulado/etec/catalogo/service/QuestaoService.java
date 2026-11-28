@@ -210,7 +210,7 @@ public class QuestaoService {
 	/**
 	 * Publica UMA questão (D182). Só vale em prova PUBLICADA (numa prova em rascunho quem publica é a cascata) e só publica o
 	 * rascunho aberto; as conferências são as MESMAS da cascata. Ordem: 404 → 409 PROVA_NAO_PUBLICADA → 409
-	 * QUESTAO_SEM_RASCUNHO → 409 PROVA_COM_QUESTOES_PENDENTES. A publicada anterior vira ARQUIVADA na mesma transação. A prova
+	 * QUESTAO_SEM_RASCUNHO → 409 QUESTAO_COM_PENDENCIAS. A publicada anterior vira ARQUIVADA na mesma transação. A prova
 	 * não muda (D173).
 	 */
 	@Transactional(propagation = Propagation.NEVER)
@@ -224,12 +224,61 @@ public class QuestaoService {
 					.orElseThrow(QuestaoService::semRascunho);
 			List<Pendencia> pendencias = pendenciasDe(rascunho, prova);
 			if (!pendencias.isEmpty()) {
-				throw recusaPorPendencias("A questão não pode ser publicada: há pendências. Nada foi publicado.", pendencias);
+				throw recusaPorPendencias(CodigoErro.QUESTAO_COM_PENDENCIAS,
+						"A questão não pode ser publicada: há pendências. Nada foi publicado.", pendencias);
 			}
 			List<QuestaoVersao> anteriores = versoes.findByQuestaoAndStatus(questao, StatusQuestao.PUBLICADA).stream().toList();
 			publicarNoLugarDas(anteriores, List.of(rascunho), relogio.instant().truncatedTo(ChronoUnit.MILLIS));
 			return rascunho;
 		});
+	}
+
+	/**
+	 * Apaga (D184). Só RASCUNHO se apaga: versão PUBLICADA ou ARQUIVADA, e a identidade que a tem, ficam para sempre (D183).
+	 *
+	 * <p>Questão que já foi publicada: some só o rascunho aberto, e a questão volta ao estado publicado; sem rascunho, 409
+	 * QUESTAO_SEM_RASCUNHO. Questão NUNCA publicada: some inteira (alternativas, versão e identidade), e o numero fica livre
+	 * para cadastrar ou reimportar; isso só vale com a prova em RASCUNHO (senão 409 PROVA_NAO_EDITAVEL, defensivo: numa
+	 * prova publicada a API não deixa uma questão sem publicada). A prova não muda.
+	 */
+	@Transactional(propagation = Propagation.NEVER)
+	public void apagar(UUID questaoPublicId) {
+		comAProvaDaQuestaoTravada(questaoPublicId, (prova, questao) -> {
+			Optional<QuestaoVersao> rascunho = versoes.findByQuestaoAndStatus(questao, StatusQuestao.RASCUNHO);
+			if (versoes.existsByQuestaoAndStatusNot(questao, StatusQuestao.RASCUNHO)) {
+				versoes.delete(rascunho.orElseThrow(() -> new ConflictException(CodigoErro.QUESTAO_SEM_RASCUNHO,
+						"A questão já foi publicada e não tem rascunho aberto: não há o que apagar.")));
+			}
+			else {
+				ProvaService.exigirRascunho(prova);
+				rascunho.ifPresent(versoes::delete);
+				versoes.flush();
+				questoes.delete(questao);
+			}
+			return null;
+		});
+	}
+
+	/**
+	 * Apaga todas as questões da prova que {@link ProvaService} travou, na transação dela (D185). Se alguma já foi publicada,
+	 * não apaga nada e devolve os numeros delas. Só rascunhos são escolhidos para apagar. Se a conferência falhasse, a exclusão
+	 * não passaria: o Hibernate recusa apagar a questão que uma versão carregada (a publicada) ainda referencia, e a chave
+	 * estrangeira RESTRICT barra a que não é carregada (a arquivada). Isso NÃO protege contra leitura velha: quem garante que o
+	 * que parece rascunho ainda é rascunho é a trava da prova. De baixo para cima, como as chaves RESTRICT pedem, com um flush
+	 * entre as tabelas.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public List<Integer> apagarQuestoesDaProva(Prova provaTravada) {
+		List<Integer> jaPublicados = versoes.buscarNumerosJaPublicados(provaTravada);
+		if (!jaPublicados.isEmpty()) {
+			return jaPublicados;
+		}
+		versoes.deleteAll(versoes.buscarVivasDaProva(provaTravada).stream()
+				.filter(versao -> versao.getStatus() == StatusQuestao.RASCUNHO).toList());
+		versoes.flush();
+		questoes.deleteAll(questoes.findByProva(provaTravada));
+		questoes.flush();
+		return List.of();
 	}
 
 	/**
@@ -351,10 +400,12 @@ public class QuestaoService {
 		return impedimentos(rascunho, prova).stream().map(motivo -> new Pendencia(numero, motivo)).toList();
 	}
 
-	/** O 409 de publicação recusada, com o mesmo formato nas duas rotas: detalhes.questoesPendentes = {numero, motivo}. */
-	static ConflictException recusaPorPendencias(String mensagem, List<Pendencia> pendencias) {
-		return new ConflictException(CodigoErro.PROVA_COM_QUESTOES_PENDENTES, mensagem,
-				Map.of("questoesPendentes", pendencias));
+	/**
+	 * O 409 de publicação recusada, montado num lugar só, com o mesmo corpo nas duas rotas
+	 * (detalhes.questoesPendentes = {numero, motivo}). Só o codigo muda: o da prova e o da questão avulsa (D187).
+	 */
+	static ConflictException recusaPorPendencias(CodigoErro codigo, String mensagem, List<Pendencia> pendencias) {
+		return new ConflictException(codigo, mensagem, Map.of("questoesPendentes", pendencias));
 	}
 
 	/** Tudo o que impede ESTE rascunho de ser publicado, na ordem dos motivos. */

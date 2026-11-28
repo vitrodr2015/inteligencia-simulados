@@ -77,6 +77,12 @@ class MarcadoresDaMatrizTest {
 			return criar("revisao");
 		}
 
+		@Override
+		public String provaPublicada(String materiaId) {
+			assertThat(materiaId).startsWith("materia-");
+			return criar("provapublicada");
+		}
+
 		List<String> tipos() {
 			return criacoes.stream().map(id -> id.substring(0, id.indexOf('-'))).toList();
 		}
@@ -174,6 +180,14 @@ class MarcadoresDaMatrizTest {
 
 		assertThat(resolvido).contains("publicada-").contains("revisao-").doesNotContain("{");
 		assertThat(fabrica.tipos()).containsExactly("materia", "publicada", "revisao");
+	}
+
+	@Test
+	void deve_criar_a_prova_publicada_como_recurso_proprio_so_com_a_materia() {
+		String resolvido = recursos.resolver("/api/v1/admin/provas/{provaPublicadaId}");
+
+		assertThat(resolvido).contains("provapublicada-").doesNotContain("{");
+		assertThat(fabrica.tipos()).containsExactly("materia", "provapublicada");
 	}
 
 	// ----- falha rápida -----

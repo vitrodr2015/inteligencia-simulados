@@ -44,6 +44,10 @@ public enum CodigoErro {
 	QUESTAO_SEM_RASCUNHO,
 	// Nova versão (D181): a questão já tem um rascunho aberto
 	QUESTAO_COM_RASCUNHO,
+	// Publicação avulsa recusada (D187): a questão tem pendências. A cascata da prova usa PROVA_COM_QUESTOES_PENDENTES
+	QUESTAO_COM_PENDENCIAS,
+	// Apagar prova (D185, defesa de invariante): há questão que já foi publicada
+	PROVA_COM_QUESTOES_PUBLICADAS,
 	// Publicação avulsa de questão (D182): só vale em prova publicada
 	PROVA_NAO_PUBLICADA,
 	// Trava não obtida a tempo ou deadlock no banco (503 com Retry-After, D176)

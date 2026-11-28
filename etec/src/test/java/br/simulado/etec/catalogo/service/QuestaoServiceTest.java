@@ -1115,7 +1115,7 @@ class QuestaoServiceTest {
 
 		assertThatThrownBy(() -> servico.publicar(publicada.getQuestao().getPublicId()))
 				.isInstanceOfSatisfying(ConflictException.class, e -> {
-					assertThat(codigoDe(e)).isEqualTo("PROVA_COM_QUESTOES_PENDENTES");
+					assertThat(codigoDe(e)).isEqualTo("QUESTAO_COM_PENDENCIAS");
 					assertThat(e.getDetalhes()).containsEntry("questoesPendentes",
 							List.of(new Pendencia(3, MotivoDePendencia.SEM_GABARITO),
 									new Pendencia(3, MotivoDePendencia.SUBTOPICO_INATIVO),
@@ -1172,6 +1172,119 @@ class QuestaoServiceTest {
 		}
 
 		verify(transacoes, never()).getTransaction(any());
+	}
+
+	// ----- apagar (D184 e D185) -----
+
+	@Test
+	void deve_apagar_a_questao_nunca_publicada_com_a_versao_antes_da_identidade() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		Questao questao = rascunho.getQuestao();
+		aQuestaoExiste(questao);
+		aVersaoNoStatus(questao, StatusQuestao.RASCUNHO, rascunho);
+		when(versoes.existsByQuestaoAndStatusNot(questao, StatusQuestao.RASCUNHO)).thenReturn(false);
+
+		servico.apagar(questao.getPublicId());
+
+		InOrder ordem = inOrder(questoes, transacoes, provas, versoes);
+		ordem.verify(questoes).buscarProvaDaQuestao(questao.getPublicId());
+		ordem.verify(transacoes).getTransaction(any());
+		ordem.verify(provas).buscarComTrava(prova.getPublicId());
+		ordem.verify(questoes).findByPublicId(questao.getPublicId());
+		ordem.verify(versoes).delete(rascunho);
+		ordem.verify(versoes).flush();
+		ordem.verify(questoes).delete(questao);
+		ordem.verify(transacoes).commit(any());
+	}
+
+	@Test
+	void deve_apagar_so_o_rascunho_da_questao_que_ja_foi_publicada() {
+		QuestaoVersao publicada = publicadaExistente();
+		QuestaoVersao rascunho = sucessora(publicada, "B", null);
+		Questao questao = publicada.getQuestao();
+		prova.publicar(MOMENTO);
+		aQuestaoExiste(questao);
+		aVersaoNoStatus(questao, StatusQuestao.RASCUNHO, rascunho);
+		when(versoes.existsByQuestaoAndStatusNot(questao, StatusQuestao.RASCUNHO)).thenReturn(true);
+
+		servico.apagar(questao.getPublicId());
+
+		verify(versoes).delete(rascunho);
+		verify(versoes, never()).delete(publicada);
+		verify(questoes, never()).delete(any(Questao.class));
+		assertThat(publicada.getStatus()).isEqualTo(StatusQuestao.PUBLICADA);
+	}
+
+	@Test
+	void deve_recusar_apagar_a_questao_ja_publicada_que_nao_tem_rascunho() {
+		Questao questao = publicadaExistente().getQuestao();
+		aQuestaoExiste(questao);
+		aVersaoNoStatus(questao, StatusQuestao.RASCUNHO, null);
+		when(versoes.existsByQuestaoAndStatusNot(questao, StatusQuestao.RASCUNHO)).thenReturn(true);
+
+		assertThatThrownBy(() -> servico.apagar(questao.getPublicId())).isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_SEM_RASCUNHO"));
+
+		verify(versoes, never()).delete(any(QuestaoVersao.class));
+		verify(questoes, never()).delete(any(Questao.class));
+	}
+
+	@Test
+	void deve_recusar_apagar_a_questao_nunca_publicada_de_uma_prova_publicada() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		Questao questao = rascunho.getQuestao();
+		prova.publicar(MOMENTO);
+		aQuestaoExiste(questao);
+		aVersaoNoStatus(questao, StatusQuestao.RASCUNHO, rascunho);
+		when(versoes.existsByQuestaoAndStatusNot(questao, StatusQuestao.RASCUNHO)).thenReturn(false);
+
+		assertThatThrownBy(() -> servico.apagar(questao.getPublicId())).isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("PROVA_NAO_EDITAVEL"));
+
+		verify(versoes, never()).delete(any(QuestaoVersao.class));
+		verify(questoes, never()).delete(any(Questao.class));
+	}
+
+	@Test
+	void deve_dar_404_ao_apagar_questao_que_nao_existe_sem_abrir_transacao() {
+		UUID id = UUID.randomUUID();
+		when(questoes.buscarProvaDaQuestao(id)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.apagar(id)).isInstanceOf(ResourceNotFoundException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_NAO_ENCONTRADA"));
+
+		verify(transacoes, never()).getTransaction(any());
+	}
+
+	@Test
+	void deve_apagar_somente_os_rascunhos_e_depois_as_questoes_da_prova_com_flush_entre_eles() {
+		Prova duas = provaCom(2);
+		QuestaoVersao um = pronta(duas, 1);
+		QuestaoVersao dois = pronta(duas, 2);
+		// a conferência dos já publicados responde vazio de propósito: mesmo assim a publicada não é carregada para apagar
+		QuestaoVersao publicada = pronta(duas, 2);
+		publicada.publicar(MOMENTO);
+		aProvaTem(duas, um, publicada, dois);
+		when(versoes.buscarNumerosJaPublicados(duas)).thenReturn(List.of());
+
+		assertThat(servico.apagarQuestoesDaProva(duas)).isEmpty();
+
+		InOrder ordem = inOrder(versoes, questoes);
+		ordem.verify(versoes).deleteAll(List.of(um, dois));
+		ordem.verify(versoes).flush();
+		ordem.verify(questoes).deleteAll(List.of(um.getQuestao(), publicada.getQuestao(), dois.getQuestao()));
+		ordem.verify(questoes).flush();
+	}
+
+	@Test
+	void deve_nao_apagar_nada_quando_alguma_questao_da_prova_ja_foi_publicada() {
+		Prova duas = provaCom(2);
+		when(versoes.buscarNumerosJaPublicados(duas)).thenReturn(List.of(2));
+
+		assertThat(servico.apagarQuestoesDaProva(duas)).containsExactly(2);
+
+		verify(versoes, never()).deleteAll(any());
+		verify(questoes, never()).deleteAll(any());
 	}
 
 }

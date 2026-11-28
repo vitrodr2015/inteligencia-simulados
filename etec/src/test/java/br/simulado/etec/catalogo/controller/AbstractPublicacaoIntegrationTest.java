@@ -37,9 +37,18 @@ abstract class AbstractPublicacaoIntegrationTest extends AbstractEdicaoIntegrati
 				.collect(Collectors.toList()))).then().statusCode(200);
 	}
 
-	/** As pendências do 409, cada uma como "numero MOTIVO", na ordem em que vieram. */
+	/** As pendências do 409 da publicação da PROVA, cada uma como "numero MOTIVO", na ordem em que vieram. */
 	protected static List<String> pendencias(Response resposta) {
-		verificarErro(resposta, 409, "Conflict", "PROVA_COM_QUESTOES_PENDENTES");
+		return pendencias(resposta, "PROVA_COM_QUESTOES_PENDENTES");
+	}
+
+	/** O mesmo, para o 409 da publicação avulsa de QUESTÃO (D187). */
+	protected static List<String> pendenciasDaQuestao(Response resposta) {
+		return pendencias(resposta, "QUESTAO_COM_PENDENCIAS");
+	}
+
+	private static List<String> pendencias(Response resposta, String codigo) {
+		verificarErro(resposta, 409, "Conflict", codigo);
 		List<Map<String, Object>> lista = resposta.path("detalhes.questoesPendentes");
 		return lista.stream().map(p -> p.get("numero") + " " + p.get("motivo")).collect(Collectors.toList());
 	}
@@ -87,6 +96,16 @@ abstract class AbstractPublicacaoIntegrationTest extends AbstractEdicaoIntegrati
 					+ "WHERE q.prova_id = ? AND (v.status <> 'RASCUNHO' OR v.publicada_em IS NOT NULL)", Integer.class, id))
 					.as("nada publicado").isZero();
 		}
+	}
+
+	// ----- apagar (D184 e D185) -----
+
+	protected Response apagarQuestao(String questao) {
+		return requisicao().delete("/api/v1/admin/questoes/" + questao);
+	}
+
+	protected Response apagarProva(String prova) {
+		return requisicao().delete("/api/v1/admin/provas/" + prova);
 	}
 
 	// ----- versões e publicação avulsa (D181 e D182) -----

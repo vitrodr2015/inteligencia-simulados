@@ -58,6 +58,17 @@ public interface ProvaControllerDocs {
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<ProvaResponse> publicar(@Parameter(description = "Id público da prova (UUID).") UUID id);
 
+	@Operation(summary = "Apaga uma prova em rascunho (só ADMIN)",
+			description = "Só vale em prova em RASCUNHO. Apaga a prova e todas as questões dela, numa transação só: ou tudo, ou nada. Não tem volta. Prova publicada não se apaga. Se alguma questão já foi publicada, nada é apagado, e detalhes.numerosPublicados traz os números (a API não produz esse estado numa prova em rascunho).")
+	@ApiResponse(responseCode = "204", description = "Prova apagada.")
+	@ApiResponse(responseCode = "400", description = "Id malformado.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "404", description = "Prova não encontrada (PROVA_NAO_ENCONTRADA).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "PROVA_NAO_EDITAVEL (não está em rascunho) ou PROVA_COM_QUESTOES_PUBLICADAS (detalhes.numerosPublicados).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<Void> apagar(@Parameter(description = "Id público da prova (UUID).") UUID id);
+
 	@Operation(summary = "Lista as provas (só ADMIN)",
 			description = "Lista paginada, com filtros opcionais e ordenação. Página além do fim devolve 200 com a lista vazia. Com sort por ano, as provas sem ano ficam no fim na ordem decrescente (o padrão) e no início na crescente.")
 	@Parameter(name = "sort", in = ParameterIn.QUERY, description = "Ordenação no formato campo,direção (asc ou desc). Campos aceitos: ano e semestre (o nome do campo diferencia maiúsculas). Padrão: ano,desc. Sem direção vale asc (intencional, D102). Um único sort por pedido: mais de um dá 400, e qualquer outro valor também.")

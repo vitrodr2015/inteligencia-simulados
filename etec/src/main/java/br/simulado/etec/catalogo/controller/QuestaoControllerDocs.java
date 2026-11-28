@@ -19,7 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 /** Documentação OpenAPI da questão (ADMIN). Só o que o código devolve hoje: 200, 201, 400, 404 e 409. */
-@Tag(name = "Questões (admin)", description = "Cadastro unitário, edição do rascunho, versões, publicação e leitura de questão. Só ADMIN.")
+@Tag(name = "Questões (admin)", description = "Cadastro unitário, edição do rascunho, versões, publicação, exclusão e leitura de questão. Só ADMIN.")
 public interface QuestaoControllerDocs {
 
 	@Operation(summary = "Cadastra uma questão numa prova (só ADMIN)",
@@ -70,9 +70,20 @@ public interface QuestaoControllerDocs {
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	@ApiResponse(responseCode = "404", description = "Questão não encontrada (QUESTAO_NAO_ENCONTRADA).",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-	@ApiResponse(responseCode = "409", description = "PROVA_NAO_PUBLICADA, QUESTAO_SEM_RASCUNHO ou PROVA_COM_QUESTOES_PENDENTES (detalhes.questoesPendentes).",
+	@ApiResponse(responseCode = "409", description = "PROVA_NAO_PUBLICADA, QUESTAO_SEM_RASCUNHO ou QUESTAO_COM_PENDENCIAS (detalhes.questoesPendentes).",
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<QuestaoResponse> publicar(@Parameter(description = "Id público da questão (UUID).") UUID id);
+
+	@Operation(summary = "Apaga o rascunho de uma questão, ou a questão nunca publicada (só ADMIN)",
+			description = "Questão nunca publicada, em prova em rascunho: é apagada inteira, e o número fica livre para cadastrar ou reimportar. Questão que já foi publicada: apaga só o rascunho aberto, e a versão publicada continua valendo; o número da versão descartada pode ser usado de novo. Versão publicada ou arquivada nunca é apagada. Não tem volta.")
+	@ApiResponse(responseCode = "204", description = "Apagado.")
+	@ApiResponse(responseCode = "400", description = "Id malformado.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "404", description = "Questão não encontrada (QUESTAO_NAO_ENCONTRADA), inclusive a já apagada.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "QUESTAO_SEM_RASCUNHO (já publicada e sem rascunho aberto) ou PROVA_NAO_EDITAVEL (nunca publicada numa prova que não está em rascunho).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<Void> apagar(@Parameter(description = "Id público da questão (UUID).") UUID id);
 
 	@Operation(summary = "Lista as questões (só ADMIN)",
 			description = "Lista paginada. De cada questão vem só a versão mais recente: o rascunho aberto, se houver, senão a última publicada. Os filtros são opcionais e agem sobre essa versão. Um provaId ou subtopicoId que não existe não é erro: devolve a lista vazia. Ordem fixa por numero crescente. Página além do fim devolve 200 com a lista vazia.")
