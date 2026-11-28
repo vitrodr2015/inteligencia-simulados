@@ -81,9 +81,15 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 			}
 
 			@Override
-			public String questaoPublicada(String materiaId) {
+			public String provaPublicada(String materiaId) {
 				String prova = provaCompleta(materiaId);
 				requisicaoComo(Papel.ADMIN).patch("/api/v1/provas/" + prova + "/publish").then().statusCode(200);
+				return prova;
+			}
+
+			@Override
+			public String questaoPublicada(String materiaId) {
+				String prova = provaPublicada(materiaId);
 				return requisicaoComo(Papel.ADMIN).get("/api/v1/admin/questoes?provaId=" + prova).then().statusCode(200).extract()
 						.path("conteudo[0].id");
 			}

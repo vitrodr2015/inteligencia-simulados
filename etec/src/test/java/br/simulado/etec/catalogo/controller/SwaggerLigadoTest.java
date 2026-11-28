@@ -289,8 +289,31 @@ class SwaggerLigadoTest {
 		documento.andExpect(jsonPath(versoes + ".responses.200").doesNotExist())
 				.andExpect(jsonPath(versoes + ".responses.409.description")
 						.value(org.hamcrest.Matchers.containsString("QUESTAO_COM_RASCUNHO")));
-		for (String codigo : new String[] { "PROVA_NAO_PUBLICADA", "QUESTAO_SEM_RASCUNHO", "PROVA_COM_QUESTOES_PENDENTES" }) {
+		for (String codigo : new String[] { "PROVA_NAO_PUBLICADA", "QUESTAO_SEM_RASCUNHO", "QUESTAO_COM_PENDENCIAS" }) {
 			documento.andExpect(jsonPath(publicar + ".responses.409.description")
+					.value(org.hamcrest.Matchers.containsString(codigo)));
+		}
+	}
+
+	@Test
+	void deve_documentar_os_dois_deletes_com_204_400_404_409_e_os_codigos_de_recusa() throws Exception {
+		String questao = "$.paths['/api/v1/admin/questoes/{id}'].delete";
+		String prova = "$.paths['/api/v1/admin/provas/{id}'].delete";
+		var documento = mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+		for (String rota : new String[] { questao, prova }) {
+			for (String codigo : new String[] { "204", "400", "404", "409" }) {
+				documento.andExpect(jsonPath(rota + ".responses." + codigo).exists());
+			}
+			documento.andExpect(jsonPath(rota + ".responses.200").doesNotExist())
+					.andExpect(jsonPath(rota + ".responses.401").doesNotExist())
+					.andExpect(jsonPath(rota + ".requestBody").doesNotExist());
+		}
+		for (String codigo : new String[] { "QUESTAO_SEM_RASCUNHO", "PROVA_NAO_EDITAVEL" }) {
+			documento.andExpect(jsonPath(questao + ".responses.409.description")
+					.value(org.hamcrest.Matchers.containsString(codigo)));
+		}
+		for (String codigo : new String[] { "PROVA_NAO_EDITAVEL", "PROVA_COM_QUESTOES_PUBLICADAS" }) {
+			documento.andExpect(jsonPath(prova + ".responses.409.description")
 					.value(org.hamcrest.Matchers.containsString(codigo)));
 		}
 	}

@@ -23,6 +23,14 @@ public interface QuestaoVersaoRepository extends JpaRepository<QuestaoVersao, Lo
 	/** No máximo uma versão RASCUNHO e uma PUBLICADA por questão (índices únicos das colunas geradas, V10). */
 	Optional<QuestaoVersao> findByQuestaoAndStatus(Questao questao, StatusQuestao status);
 
+	/** Há versão fora de {@code status}? Com RASCUNHO responde "esta questão já foi publicada alguma vez" (D184). */
+	boolean existsByQuestaoAndStatusNot(Questao questao, StatusQuestao status);
+
+	/** Os numeros, em ordem, das questões da prova que têm alguma versão PUBLICADA ou ARQUIVADA (D185). */
+	@Query("select distinct q.numero from QuestaoVersao v join v.questao q where q.prova = :prova "
+			+ "and v.status <> br.simulado.etec.catalogo.model.StatusQuestao.RASCUNHO order by q.numero")
+	List<Integer> buscarNumerosJaPublicados(@Param("prova") Prova prova);
+
 	/** O maior numero de versão da questão, contando as arquivadas. A questão sempre tem ao menos uma versão. */
 	@Query("select max(v.versao) from QuestaoVersao v where v.questao = :questao")
 	int buscarMaiorVersao(@Param("questao") Questao questao);

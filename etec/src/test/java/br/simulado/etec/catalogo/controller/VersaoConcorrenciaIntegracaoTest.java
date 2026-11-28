@@ -136,7 +136,7 @@ class VersaoConcorrenciaIntegracaoTest extends AbstractPublicacaoIntegrationTest
 		Response resposta = comAProvaTravada(ids.get(0), () -> publicarQuestao(ids.get(1)), outra -> executar(outra,
 				"UPDATE questao_versao SET gabarito = NULL WHERE questao_id = " + questao + " AND status = 'RASCUNHO'"));
 
-		assertThat(pendencias(resposta)).containsExactly("1 SEM_GABARITO");
+		assertThat(pendenciasDaQuestao(resposta)).containsExactly("1 SEM_GABARITO");
 		assertThat(historico(ids.get(1))).containsExactly("1 PUBLICADA", "2 RASCUNHO");
 	}
 

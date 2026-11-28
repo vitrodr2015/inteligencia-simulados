@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Questão — /api/v1/admin/questoes",
-    "description": "Questão (Sprint 2, fatias 2b-i e 2b-ii): POST /admin/provas/{id}/questoes, GET /admin/questoes/{id} e GET /admin/questoes, só ADMIN. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). O caso da imagem usa localhost, o padrão de IMAGENS_HOSTS_PERMITIDOS em desenvolvimento. Os dados ficam no banco local (ainda não há DELETE de questão). Os PUT de questão e de gabarito (D171 a D174) entraram na fatia 4, passada 1. O publicar da prova (D178) entrou na fatia 4, passada 2a. A nova versão e o publicar de questão avulsa (D181 a D183) entraram na passada 2b, na pasta \"Versões\", que usa a questão publicada pela pasta anterior.",
+    "description": "Questão (Sprint 2, fatias 2b-i e 2b-ii): POST /admin/provas/{id}/questoes, GET /admin/questoes/{id} e GET /admin/questoes, só ADMIN. Rode na ordem (a primeira pasta cria matéria, subtópicos e prova com um sufixo novo a cada rodada). Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). O caso da imagem usa localhost, o padrão de IMAGENS_HOSTS_PERMITIDOS em desenvolvimento. Os dados ficam no banco local. Os PUT de questão e de gabarito (D171 a D174) entraram na fatia 4, passada 1. O publicar da prova (D178) entrou na fatia 4, passada 2a. A nova versão e o publicar de questão avulsa (D181 a D183) entraram na passada 2b, na pasta \"Versões\", que usa a questão publicada pela pasta anterior. Apagar questão e descartar rascunho (D184 a D187) entraram na passada 3, na pasta \"DELETE\", que usa a questão publicada pelas pastas anteriores.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -67,6 +67,14 @@
     },
     {
       "key": "questaoPublicadaId",
+      "value": ""
+    },
+    {
+      "key": "provaParaApagarId",
+      "value": ""
+    },
+    {
+      "key": "questaoParaApagarId",
       "value": ""
     }
   ],
@@ -3913,7 +3921,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
-                  "pm.test(\"codigo PROVA_COM_QUESTOES_PENDENTES\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_COM_QUESTOES_PENDENTES\"); });",
+                  "pm.test(\"codigo QUESTAO_COM_PENDENCIAS\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_COM_PENDENCIAS\"); });",
                   "pm.test(\"pendencia SEM_GABARITO na questao 1\", function () { pm.expect(pm.response.json().detalhes.questoesPendentes).to.eql([{ numero: 1, motivo: \"SEM_GABARITO\" }]); });"
                 ]
               }
@@ -4518,6 +4526,686 @@
       ]
     },
     {
+      "name": "DELETE — apagar questão e descartar rascunho",
+      "item": [
+        {
+          "name": "201 — prova de 2 questões para apagar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"provaParaApagarId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Para apagar {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":2}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "201 — cadastra a questão com o conteúdo errado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"questaoParaApagarId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaApagarId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaApagarId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Errada {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — antes de apagar, o conteúdo corrigido conflita",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo QUESTAO_NUMERO_EM_CONFLITO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_NUMERO_EM_CONFLITO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaParaApagarId}}\",\"questoes\":[{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Corrigida {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "204 — apaga a questão nunca publicada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"sem corpo\", function () { pm.expect(pm.response.text()).to.eql(\"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoParaApagarId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 — apagar de novo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo QUESTAO_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoParaApagarId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — reimporta o corrigido no mesmo número",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"1 criada\", function () { pm.expect(pm.response.json().questoesCriadas).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/importacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "importacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"provaId\":\"{{provaParaApagarId}}\",\"questoes\":[{\"numero\":1,\"subtopicoId\":\"{{subtopicoId}}\",\"enunciado\":\"Corrigida {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"um\"},{\"letra\":\"B\",\"texto\":\"dois\"},{\"letra\":\"C\",\"texto\":\"três\"},{\"letra\":\"D\",\"texto\":\"quatro\"},{\"letra\":\"E\",\"texto\":\"cinco\"}]}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "409 — apagar questão publicada sem rascunho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo QUESTAO_SEM_RASCUNHO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_SEM_RASCUNHO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "201 — abre a versão 3",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"versao 3\", function () { pm.expect(pm.response.json().versao).to.eql(3); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}/versoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}",
+                "versoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "204 — descarta só o rascunho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"sem corpo\", function () { pm.expect(pm.response.text()).to.eql(\"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — a questão voltou à versão 2 publicada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"versao 2\", function () { pm.expect(pm.response.json().versao).to.eql(2); });",
+                  "pm.test(\"PUBLICADA\", function () { pm.expect(pm.response.json().status).to.eql(\"PUBLICADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "201 — o número da versão descartada é reutilizado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"versao 3 de novo\", function () { pm.expect(pm.response.json().versao).to.eql(3); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}/versoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}",
+                "versoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "204 — descarta de novo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "409 — apagar a prova publicada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"codigo PROVA_NAO_EDITAVEL\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_EDITAVEL\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaPublicarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaPublicarId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "204 — apaga a prova em rascunho com a questão",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"sem corpo\", function () { pm.expect(pm.response.text()).to.eql(\"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaApagarId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 — a prova apagada não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo PROVA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaParaApagarId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 — apagar questão que não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo QUESTAO_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"QUESTAO_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "00000000-0000-4000-8000-000000000000"
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — apagar com id malformado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "abc"
+              ]
+            }
+          }
+        },
+        {
+          "name": "401 — apagar sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT não apaga",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoPublicadaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "questoes",
+                "{{questaoPublicadaId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Depois do cadastro: contador e DELETE de subtópico",
       "item": [
         {
@@ -4893,7 +5581,7 @@
           }
         },
         {
-          "name": "403 — DELETE de questão ainda não existe",
+          "name": "403 — DELETE na coleção /admin/questoes não existe",
           "event": [
             {
               "listen": "test",
@@ -4910,7 +5598,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/questoes/{{questaoId}}",
+              "raw": "{{baseUrl}}/api/v1/admin/questoes",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -4918,8 +5606,7 @@
                 "api",
                 "v1",
                 "admin",
-                "questoes",
-                "{{questaoId}}"
+                "questoes"
               ]
             }
           }

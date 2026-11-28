@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Prova — /api/v1/admin/provas e /api/v1/provas",
-    "description": "Rotas da Prova (Sprint 2, fatia 2a): POST /admin/provas, GET /provas e GET /provas/{id}, as três só do ADMIN (STUDENT e GUARDIAN levam 403 até a leitura do aluno, D154). Rode na ordem. Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). As provas criadas ficam no banco local (ainda não há DELETE de prova); o sufixo muda a cada rodada, então a coleção pode ser rodada de novo. Os PUT de prova (D170) entraram na fatia 4, passada 1. As recusas do publicar (D178) entraram na fatia 4, passada 2a. Depois de publicada, o que se corrige é a questão, por nova versão (D181 e D182): essas rotas estão na coleção de questão.",
+    "description": "Rotas da Prova (Sprint 2, fatia 2a): POST /admin/provas, GET /provas e GET /provas/{id}, as três só do ADMIN (STUDENT e GUARDIAN levam 403 até a leitura do aluno, D154). Rode na ordem. Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). As provas criadas ficam no banco local, menos a da pasta \"DELETE\" (D185); o sufixo muda a cada rodada, então a coleção pode ser rodada de novo. Os PUT de prova (D170) entraram na fatia 4, passada 1. As recusas do publicar (D178) entraram na fatia 4, passada 2a. Depois de publicada, o que se corrige é a questão, por nova versão (D181 e D182): essas rotas estão na coleção de questão.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -59,6 +59,10 @@
     },
     {
       "key": "provaIncompletaId",
+      "value": ""
+    },
+    {
+      "key": "provaParaApagarId",
       "value": ""
     }
   ],
@@ -3401,6 +3405,259 @@
       ]
     },
     {
+      "name": "DELETE — apagar prova em rascunho",
+      "item": [
+        {
+          "name": "201 — prova para apagar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"provaParaApagarId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Para apagar {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":5}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "401 — apagar sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaApagarId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "403 — STUDENT não apaga",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaApagarId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "204 — apaga a prova em rascunho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"sem corpo\", function () { pm.expect(pm.response.text()).to.eql(\"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaApagarId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 — a prova apagada não existe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo PROVA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaParaApagarId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 — apagar de novo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo PROVA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaParaApagarId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaParaApagarId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — apagar com id malformado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "abc"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Autorização",
       "item": [
         {
@@ -3701,7 +3958,7 @@
           }
         },
         {
-          "name": "403 — DELETE em /admin/provas/{id} ainda não existe",
+          "name": "403 — DELETE na coleção /admin/provas não existe",
           "event": [
             {
               "listen": "test",
@@ -3718,7 +3975,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}",
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -3726,8 +3983,7 @@
                 "api",
                 "v1",
                 "admin",
-                "provas",
-                "{{provaId}}"
+                "provas"
               ]
             }
           }

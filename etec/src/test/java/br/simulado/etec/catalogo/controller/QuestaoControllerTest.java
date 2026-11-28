@@ -1015,7 +1015,7 @@ class QuestaoControllerTest {
 		novaVersao(questao).andExpect(status().isCreated());
 		editarQuestao(questao, corpoDoPut("Sem gabarito", "")).andExpect(status().isOk());
 
-		verificarErro(publicarQuestao(questao), 409, "Conflict", CodigoErro.PROVA_COM_QUESTOES_PENDENTES)
+		verificarErro(publicarQuestao(questao), 409, "Conflict", CodigoErro.QUESTAO_COM_PENDENCIAS)
 				.andExpect(jsonPath("$.detalhes.questoesPendentes.length()").value(1))
 				.andExpect(jsonPath("$.detalhes.questoesPendentes[0].numero").value(1))
 				.andExpect(jsonPath("$.detalhes.questoesPendentes[0].motivo").value("SEM_GABARITO"));
@@ -1031,6 +1031,78 @@ class QuestaoControllerTest {
 		for (String id : new String[] { "abc", UUID_CURTO }) {
 			verificarErro(novaVersao(id), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
 			verificarErro(publicarQuestao(id), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+		}
+	}
+
+	// ----- apagar (D184 e D185). As chaves RESTRICT, o tudo ou nada e a concorrência estão no MySQL real -----
+
+	private ResultActions apagar(String caminho) throws Exception {
+		return mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(caminho));
+	}
+
+	@Test
+	void deve_devolver_204_sem_corpo_ao_apagar_a_questao_nunca_publicada_e_404_depois() throws Exception {
+		String questao = cadastrarEObterId(1);
+
+		apagar("/api/v1/admin/questoes/" + questao).andExpect(status().isNoContent()).andExpect(content().string(""));
+
+		verificarErro(mockMvc.perform(get("/api/v1/admin/questoes/" + questao)), 404, "Not Found",
+				CodigoErro.QUESTAO_NAO_ENCONTRADA);
+		verificarErro(apagar("/api/v1/admin/questoes/" + questao), 404, "Not Found", CodigoErro.QUESTAO_NAO_ENCONTRADA);
+		cadastrar(corpo(1)).andExpect(status().isCreated());
+	}
+
+	@Test
+	void deve_descartar_so_o_rascunho_pelo_delete_e_dar_409_sem_rascunho() throws Exception {
+		String questao = questaoDeProvaPublicada();
+		verificarErro(apagar("/api/v1/admin/questoes/" + questao), 409, "Conflict", CodigoErro.QUESTAO_SEM_RASCUNHO);
+		novaVersao(questao).andExpect(status().isCreated());
+
+		apagar("/api/v1/admin/questoes/" + questao).andExpect(status().isNoContent()).andExpect(content().string(""));
+
+		mockMvc.perform(get("/api/v1/admin/questoes/" + questao)).andExpect(jsonPath("$.versao").value(1))
+				.andExpect(jsonPath("$.status").value("PUBLICADA"));
+	}
+
+	@Test
+	void deve_devolver_204_ao_apagar_a_prova_em_rascunho_com_as_questoes_e_409_na_publicada() throws Exception {
+		String duas = criarProva(2);
+		String um = cadastrarNaProva(duas, 1, "\"gabarito\":\"A\"");
+		cadastrarNaProva(duas, 2, "");
+
+		apagar("/api/v1/admin/provas/" + duas).andExpect(status().isNoContent()).andExpect(content().string(""));
+
+		verificarErro(mockMvc.perform(get("/api/v1/provas/" + duas)), 404, "Not Found", CodigoErro.PROVA_NAO_ENCONTRADA);
+		verificarErro(mockMvc.perform(get("/api/v1/admin/questoes/" + um)), 404, "Not Found",
+				CodigoErro.QUESTAO_NAO_ENCONTRADA);
+		verificarErro(apagar("/api/v1/admin/provas/" + duas), 404, "Not Found", CodigoErro.PROVA_NAO_ENCONTRADA);
+
+		String publicada = criarProva(1);
+		cadastrarNaProva(publicada, 1, "\"gabarito\":\"A\"");
+		publicar(publicada).andExpect(status().isOk());
+		verificarErro(apagar("/api/v1/admin/provas/" + publicada), 409, "Conflict", CodigoErro.PROVA_NAO_EDITAVEL);
+	}
+
+	@Test
+	void deve_devolver_409_com_os_numeros_publicados_ao_apagar_a_prova_em_rascunho_com_questao_publicada() throws Exception {
+		String duas = criarProva(2);
+		cadastrarNaProva(duas, 1, "");
+		publicarNoBanco(cadastrarNaProva(duas, 2, ""));
+
+		verificarErro(apagar("/api/v1/admin/provas/" + duas), 409, "Conflict", CodigoErro.PROVA_COM_QUESTOES_PUBLICADAS)
+				.andExpect(jsonPath("$.detalhes.numerosPublicados").value(org.hamcrest.Matchers.contains(2)));
+
+		mockMvc.perform(get("/api/v1/provas/" + duas)).andExpect(jsonPath("$.questoesCadastradas").value(2));
+	}
+
+	@Test
+	void deve_devolver_404_e_400_ao_apagar_com_id_inexistente_ou_malformado() throws Exception {
+		String inexistente = java.util.UUID.randomUUID().toString();
+		verificarErro(apagar("/api/v1/admin/questoes/" + inexistente), 404, "Not Found", CodigoErro.QUESTAO_NAO_ENCONTRADA);
+		verificarErro(apagar("/api/v1/admin/provas/" + inexistente), 404, "Not Found", CodigoErro.PROVA_NAO_ENCONTRADA);
+		for (String id : new String[] { "abc", UUID_CURTO }) {
+			verificarErro(apagar("/api/v1/admin/questoes/" + id), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+			verificarErro(apagar("/api/v1/admin/provas/" + id), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
 		}
 	}
 

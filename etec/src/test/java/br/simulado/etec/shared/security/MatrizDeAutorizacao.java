@@ -28,7 +28,8 @@ public final class MatrizDeAutorizacao {
 
 	/** Recursos criados (por um ADMIN) para cada execução de uma linha. */
 	public record Ctx(String materiaId, String subtopicoId, String materiaVaziaId, String provaId, String questaoId,
-			String provaCompletaId, String questaoPublicadaId, String questaoEmRevisaoId, String idInexistente, String sufixo) {
+			String provaCompletaId, String questaoPublicadaId, String questaoEmRevisaoId, String provaPublicadaId,
+			String idInexistente, String sufixo) {
 	}
 
 	/**
@@ -188,8 +189,19 @@ public final class MatrizDeAutorizacao {
 					403, 404);
 			linha("prova com id malformado", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/abc", null, 401, 403, 403, 400);
 		}
-		// o que ainda NÃO existe em provas é negado, inclusive para o ADMIN (D121): DELETE, PATCH e o resto de /admin/**
-		for (String metodo : new String[] { "DELETE", "PATCH", "POST" }) {
+		// apagar prova (D185): só em rascunho
+		linha("apagar prova em rascunho sem questão", "DELETE", "/api/v1/admin/provas/{id}",
+				c -> "/api/v1/admin/provas/" + c.provaId(), null, 401, 403, 403, 204);
+		linha("apagar prova em rascunho com questão", "DELETE", "/api/v1/admin/provas/{id}",
+				c -> "/api/v1/admin/provas/" + c.provaCompletaId(), null, 401, 403, 403, 204);
+		linha("apagar prova publicada", "DELETE", "/api/v1/admin/provas/{id}",
+				c -> "/api/v1/admin/provas/" + c.provaPublicadaId(), null, 401, 403, 403, 409);
+		linha("apagar prova inexistente", "DELETE", "/api/v1/admin/provas/{id}",
+				c -> "/api/v1/admin/provas/" + c.idInexistente(), null, 401, 403, 403, 404);
+		linha("apagar prova com id malformado", "DELETE", "/api/v1/admin/provas/{id}", c -> "/api/v1/admin/provas/abc", null,
+				401, 403, 403, 400);
+		// o que ainda NÃO existe em provas é negado, inclusive para o ADMIN (D121): PATCH, POST e o resto de /admin/**
+		for (String metodo : new String[] { "PATCH", "POST" }) {
 			linha(metodo + " em /admin/provas/{id} (ainda não existe)", metodo, null, c -> "/api/v1/admin/provas/" + c.provaId(),
 					c -> "{}", 401, 403, 403, 403);
 		}
@@ -305,7 +317,18 @@ public final class MatrizDeAutorizacao {
 			linha("questão com id malformado", metodo, "/api/v1/admin/questoes/{id}", c -> "/api/v1/admin/questoes/abc", null, 401,
 					403, 403, 400);
 		}
-		for (String metodo : new String[] { "DELETE", "PATCH", "POST" }) {
+		// apagar questão (D184): a nunca publicada some; da publicada, só o rascunho
+		linha("apagar questão nunca publicada", "DELETE", "/api/v1/admin/questoes/{id}",
+				c -> "/api/v1/admin/questoes/" + c.questaoId(), null, 401, 403, 403, 204);
+		linha("descartar o rascunho de questão publicada", "DELETE", "/api/v1/admin/questoes/{id}",
+				c -> "/api/v1/admin/questoes/" + c.questaoEmRevisaoId(), null, 401, 403, 403, 204);
+		linha("apagar questão publicada sem rascunho", "DELETE", "/api/v1/admin/questoes/{id}",
+				c -> "/api/v1/admin/questoes/" + c.questaoPublicadaId(), null, 401, 403, 403, 409);
+		linha("apagar questão inexistente", "DELETE", "/api/v1/admin/questoes/{id}",
+				c -> "/api/v1/admin/questoes/" + c.idInexistente(), null, 401, 403, 403, 404);
+		linha("apagar questão com id malformado", "DELETE", "/api/v1/admin/questoes/{id}",
+				c -> "/api/v1/admin/questoes/abc", null, 401, 403, 403, 400);
+		for (String metodo : new String[] { "PATCH", "POST" }) {
 			linha(metodo + " em /admin/questoes/{id} (ainda não existe)", metodo, null,
 					c -> "/api/v1/admin/questoes/" + c.questaoId(), c -> "{}", 401, 403, 403, 403);
 		}

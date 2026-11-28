@@ -201,8 +201,18 @@ Plano aprovado em 2026-11-24 (respostas às dúvidas H1 a H11). Marcação: ✅ 
 - **Decisões:** D181, D182 e D183. Códigos novos: `QUESTAO_COM_RASCUNHO` e `PROVA_NAO_PUBLICADA`.
 - **Pontos únicos (não duplicar):** `comAProvaDaQuestaoTravada` (a trava das rotas por id de questão: PUT, nova versão e publicar, todas `Propagation.NEVER`); `pendenciasDe` (o que impede publicar, usado pela cascata e pela avulsa); `publicarNoLugarDas` (arquiva, `flush`, publica); `recusaPorPendencias` (o 409).
 - **Cascata e numero acima de N:** a cascata só percorre 1..N e ignora o resto (há teste por SQL).
-- **Pendente:** até a passada 3 (apagar), rascunho aberto não se descarta. **Fechamento da Sprint 2:** rodar as coleções do Postman contra a aplicação local e gravar o relatório em `etec/docs/` (a regra está sem cumprir desde a fatia 3).
+- **Fechamento da Sprint 2:** rodar as coleções do Postman contra a aplicação local e gravar o relatório em `etec/docs/` (a regra está sem cumprir desde a fatia 3).
+- ✅ **Passada 3 feita** (seção seguinte).
 - **Infra de teste:** `naOrdemDaFila` subiu para a `AbstractEdicaoIntegrationTest`; os auxiliares de versão ficam na `AbstractPublicacaoIntegrationTest`; a matriz tem os marcadores `{questaoPublicadaId}` e `{questaoEmRevisaoId}`. Comparar linhas de `prova` e `questao` pede `usingRecursiveComparison` (o `public_id` vem como `byte[]`). Rodar teste dirigido com `clean`: o IDE grava em `target/` classes com "Unresolved compilation".
+
+### Fatia 4, passada 3 (apagar questão e prova), branch `feature/s4-3-apagar`
+
+- ✅ **Implementado:** `DELETE /admin/questoes/{id}` (`QuestaoService.apagar`) e `DELETE /admin/provas/{id}` (`ProvaService.apagar` + `QuestaoService.apagarQuestoesDaProva`); `QUESTAO_COM_PENDENCIAS` na publicação avulsa. Regra na SecurityConfig, matriz, Swagger, Postman. Sem migration.
+- **Decisões:** D184 a D187. Códigos novos: `QUESTAO_COM_PENDENCIAS` e `PROVA_COM_QUESTOES_PUBLICADAS`.
+- **Invariante (D183):** só rascunho é escolhido para apagar. Com uma conferência errada a exclusão falha (para a publicada quem barra é o Hibernate; para a arquivada, a chave RESTRICT). **Não trocar por DELETE em massa sem o filtro de rascunho.** Contra leitura velha só a trava protege: lendo antes dela, a sabotagem apagou versão recém-publicada.
+- **Importação esperando prova apagada:** 400 em `campos[provaId]` (D163), não 404.
+- **Infra de teste:** `comoRoot` subiu para a `AbstractEdicaoIntegrationTest` (gatilho temporário para falha no meio); a matriz ganhou o marcador `{provaPublicadaId}`.
+- **Fechamento da Sprint 2:** falta o smoke do Postman contra a aplicação local, com relatório em `etec/docs/`, e a leitura do aluno (D154), que vai na Sprint 3.
 
 Reservada (aprovada, NÃO implementada): ⏳ D147 (`ScoringStrategy` com uma implementação, a da ETEC, e a configuração da prova em dados, ambas na fatia da Tentativa, para não nascer código sem chamador). D145 (tipo da questão interno, só `MULTIPLA_ESCOLHA`) e D146 (item 4) foram implementados na fatia 2b-i; D152, D153, D155 e D156 viraram decisões na 2b-i.
 

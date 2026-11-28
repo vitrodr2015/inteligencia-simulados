@@ -421,4 +421,61 @@ class ProvaServiceTest {
 		org.mockito.Mockito.verifyNoInteractions(servicoDeQuestoes);
 	}
 
+	// ----- apagar (D185). O que some no banco, o tudo ou nada e a concorrência estão no MySQL real -----
+
+	@Test
+	void deve_travar_a_prova_apagar_as_questoes_e_so_entao_apagar_a_prova() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(servicoDeQuestoes.apagarQuestoesDaProva(prova)).thenReturn(java.util.List.of());
+
+		servico.apagar(prova.getPublicId());
+
+		InOrder ordem = org.mockito.Mockito.inOrder(repositorio, servicoDeQuestoes);
+		ordem.verify(repositorio).buscarComTrava(prova.getPublicId());
+		ordem.verify(servicoDeQuestoes).apagarQuestoesDaProva(prova);
+		ordem.verify(repositorio).delete(prova);
+		ordem.verify(repositorio).flush();
+		verify(repositorio, never()).findByPublicId(any());
+	}
+
+	@Test
+	void deve_recusar_apagar_a_prova_publicada_sem_tocar_nas_questoes() {
+		Prova prova = provaGravada();
+		prova.publicar(Instant.parse("2026-11-28T10:00:00Z"));
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+
+		assertThatThrownBy(() -> servico.apagar(prova.getPublicId())).isInstanceOfSatisfying(ConflictException.class,
+				e -> assertThat(e.getCodigo()).isEqualTo(CodigoErro.PROVA_NAO_EDITAVEL));
+
+		verify(servicoDeQuestoes, never()).apagarQuestoesDaProva(any());
+		verify(repositorio, never()).delete(any(Prova.class));
+	}
+
+	@Test
+	void deve_dar_409_com_os_numeros_ja_publicados_e_nao_apagar_a_prova() {
+		Prova prova = provaGravada();
+		when(repositorio.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(servicoDeQuestoes.apagarQuestoesDaProva(prova)).thenReturn(java.util.List.of(2, 3));
+
+		assertThatThrownBy(() -> servico.apagar(prova.getPublicId())).isInstanceOfSatisfying(ConflictException.class, e -> {
+			assertThat(e.getCodigo()).isEqualTo(CodigoErro.PROVA_COM_QUESTOES_PUBLICADAS);
+			assertThat(e.getDetalhes()).containsEntry("numerosPublicados", java.util.List.of(2, 3)).hasSize(1);
+		});
+
+		verify(repositorio, never()).delete(any(Prova.class));
+	}
+
+	@Test
+	void deve_dar_404_ao_apagar_uma_prova_que_nao_existe() {
+		java.util.UUID id = java.util.UUID.randomUUID();
+		when(repositorio.buscarComTrava(id)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servico.apagar(id)).isInstanceOfSatisfying(
+				br.simulado.etec.shared.exception.ResourceNotFoundException.class,
+				e -> assertThat(e.getCodigo()).isEqualTo(CodigoErro.PROVA_NAO_ENCONTRADA));
+
+		verify(repositorio, never()).delete(any(Prova.class));
+	}
+
 }

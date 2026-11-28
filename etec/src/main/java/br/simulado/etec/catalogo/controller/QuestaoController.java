@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,6 +70,13 @@ public class QuestaoController implements QuestaoControllerDocs {
 	public ResponseEntity<QuestaoResponse> criarVersao(@PathVariable UUID id) {
 		QuestaoResponse corpo = QuestaoMapper.paraResponse(servico.criarVersao(id));
 		return ResponseEntity.created(URI.create("/api/v1/admin/questoes/" + corpo.id())).body(corpo);
+	}
+
+	@Override
+	@DeleteMapping("/questoes/{id}")
+	public ResponseEntity<Void> apagar(@PathVariable UUID id) {
+		servico.apagar(id);
+		return ResponseEntity.noContent().build();
 	}
 
 	@Override

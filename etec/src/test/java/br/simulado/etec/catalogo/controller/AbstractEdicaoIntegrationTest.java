@@ -131,6 +131,14 @@ public abstract class AbstractEdicaoIntegrationTest extends AbstractQuestaoInteg
 
 	// ----- conexões de fora da aplicação -----
 
+	/** Um comando como root do contêiner, em autocommit: é o que criar e apagar um gatilho exige. */
+	protected static void comoRoot(String sql) throws SQLException {
+		try (Connection root = DriverManager.getConnection(MYSQL.getJdbcUrl(), "root", MYSQL.getPassword());
+				Statement comando = root.createStatement()) {
+			comando.execute(sql);
+		}
+	}
+
 	/** Uma conexão direta, fora do pool da aplicação, sem autocommit. */
 	protected static Connection outraTransacao() throws SQLException {
 		Connection conexao = DriverManager.getConnection(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());

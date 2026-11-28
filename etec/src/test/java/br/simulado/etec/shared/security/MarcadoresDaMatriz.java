@@ -38,6 +38,8 @@ final class MarcadoresDaMatriz {
 
 	static final String QUESTAO_EM_REVISAO = "{questaoEmRevisaoId}";
 
+	static final String PROVA_PUBLICADA = "{provaPublicadaId}";
+
 	/** Qualquer {@code {nome}}. Um objeto JSON não casa: depois da chave vêm aspas ou a chave que fecha. */
 	private static final Pattern MARCADOR = Pattern.compile("\\{[A-Za-z][A-Za-z0-9_]*\\}");
 
@@ -65,6 +67,9 @@ final class MarcadoresDaMatriz {
 		/** Uma questão de prova publicada própria, com um rascunho novo aberto e pronto para publicar. */
 		String questaoEmRevisao(String materiaId);
 
+		/** Uma prova PUBLICADA própria. */
+		String provaPublicada(String materiaId);
+
 	}
 
 	private final Fabrica fabrica;
@@ -78,7 +83,7 @@ final class MarcadoresDaMatriz {
 	/** O contexto que as linhas recebem: os recursos são marcadores; o id inexistente e o sufixo são valores de verdade. */
 	static Ctx contexto(String idInexistente, String sufixo) {
 		return new Ctx(MATERIA, SUBTOPICO, MATERIA_VAZIA, PROVA, QUESTAO, PROVA_COMPLETA, QUESTAO_PUBLICADA, QUESTAO_EM_REVISAO,
-				idInexistente, sufixo);
+				PROVA_PUBLICADA, idInexistente, sufixo);
 	}
 
 	/** Troca os marcadores do texto pelos ids, criando o que faltar; {@code null} continua {@code null} (linha sem corpo). */
@@ -88,7 +93,7 @@ final class MarcadoresDaMatriz {
 		}
 		String resolvido = texto;
 		for (String marcador : new String[] { MATERIA, SUBTOPICO, MATERIA_VAZIA, PROVA, QUESTAO, PROVA_COMPLETA, QUESTAO_PUBLICADA,
-				QUESTAO_EM_REVISAO }) {
+				QUESTAO_EM_REVISAO, PROVA_PUBLICADA }) {
 			if (resolvido.contains(marcador)) {
 				resolvido = resolvido.replace(marcador, valor(marcador));
 			}
@@ -120,6 +125,7 @@ final class MarcadoresDaMatriz {
 			case PROVA_COMPLETA -> fabrica.provaCompleta(valor(MATERIA));
 			case QUESTAO_PUBLICADA -> fabrica.questaoPublicada(valor(MATERIA));
 			case QUESTAO_EM_REVISAO -> fabrica.questaoEmRevisao(valor(MATERIA));
+			case PROVA_PUBLICADA -> fabrica.provaPublicada(valor(MATERIA));
 			default -> throw new IllegalStateException("Marcador não resolvido na linha da matriz: " + marcador + ".");
 		};
 		if (novo == null || novo.isBlank()) {
