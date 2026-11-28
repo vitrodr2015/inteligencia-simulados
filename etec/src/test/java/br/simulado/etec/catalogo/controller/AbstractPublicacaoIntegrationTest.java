@@ -8,10 +8,35 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import br.simulado.etec.usuarios.model.Papel;
 import io.restassured.response.Response;
 
 /** Ajudantes da publicação (D178, D182) e das versões (D181) contra MySQL real. A limpeza das provas é a da {@link AbstractEdicaoIntegrationTest}. */
 abstract class AbstractPublicacaoIntegrationTest extends AbstractEdicaoIntegrationTest {
+
+	/** Os campos da prova na visão do aluno (D190), na ordem do contrato. Nada além disto pode sair. */
+	protected static final List<String> CAMPOS_DO_ALUNO = List.of("id", "titulo", "banca", "ano", "semestre", "duracaoMinutos",
+			"quantidadeQuestoes", "fonteUrl", "publicadaEm");
+
+	/** Todas as páginas de GET /provas como o papel dado, com os parâmetros dados, na ordem em que a API devolve. */
+	protected List<Map<String, Object>> listarTodasComo(Papel papel, Map<String, ?> parametros) {
+		List<Map<String, Object>> todas = new ArrayList<>();
+		int pagina = 0;
+		int totalPaginas;
+		do {
+			Response resposta = requisicaoComo(papel).queryParams(new java.util.HashMap<>(parametros)).queryParam("size", 50)
+					.queryParam("page", pagina++).get("/api/v1/provas");
+			resposta.then().statusCode(200);
+			todas.addAll(resposta.jsonPath().getList("conteudo"));
+			totalPaginas = resposta.path("totalPaginas");
+		}
+		while (pagina < totalPaginas);
+		return todas;
+	}
+
+	protected static List<String> idsDe(List<Map<String, Object>> provas) {
+		return provas.stream().map(prova -> (String) prova.get("id")).collect(Collectors.toList());
+	}
 
 	protected Response publicar(String prova) {
 		return requisicao().patch("/api/v1/provas/" + prova + "/publish");

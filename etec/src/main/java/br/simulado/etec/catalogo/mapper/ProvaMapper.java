@@ -1,9 +1,10 @@
 package br.simulado.etec.catalogo.mapper;
 
+import br.simulado.etec.catalogo.dto.ProvaDoAlunoResponse;
 import br.simulado.etec.catalogo.dto.ProvaResponse;
 import br.simulado.etec.catalogo.model.Prova;
 
-/** Conversão entre a entidade e o DTO, escrita à mão. O programa (interno) não é copiado. */
+/** Conversão entre a entidade e os DTOs, escrita à mão. O programa (interno) não é copiado. */
 public final class ProvaMapper {
 
 	private ProvaMapper() {
@@ -24,6 +25,20 @@ public final class ProvaMapper {
 				prova.getPublicadaEm(),
 				prova.getCriadoEm(),
 				questoesCadastradas);
+	}
+
+	/** A visão do aluno (D190): só estes campos. */
+	public static ProvaDoAlunoResponse paraRespostaDoAluno(Prova prova) {
+		return new ProvaDoAlunoResponse(
+				prova.getPublicId(),
+				prova.getTitulo(),
+				prova.getBanca(),
+				prova.getAno(),
+				prova.getSemestre(),
+				prova.getDuracaoMinutos(),
+				prova.getQuantidadeQuestoes(),
+				prova.getFonteUrl(),
+				prova.getPublicadaEm());
 	}
 
 }

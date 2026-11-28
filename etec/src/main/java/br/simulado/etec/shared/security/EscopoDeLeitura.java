@@ -6,8 +6,8 @@ import br.simulado.etec.shared.exception.InvalidRequestException;
 import br.simulado.etec.usuarios.model.Papel;
 
 /**
- * O que o chamador pode VER numa leitura do catálogo (D28, D47, D103): ADMIN vê tudo, STUDENT só o que está ativo
- * (subtópico, só o de matéria ativa). É a ÚNICA ponte entre o papel e a camada de serviço: o resolvedor do controller
+ * O que o chamador pode VER numa leitura do catálogo (D28, D47, D103, D189): ADMIN vê tudo, STUDENT só o que está ativo
+ * (subtópico, só o de matéria ativa; prova, só a PUBLICADA). É a ÚNICA ponte entre o papel e a camada de serviço: o resolvedor do controller
  * calcula o escopo a partir do usuário do banco e o service o recebe por parâmetro, sem ler o contexto de segurança e
  * sem checagem de papel espalhada. Qualquer outro papel (GUARDIAN) falha FECHADO: a cadeia de segurança já o nega
  * antes, e aqui ele nunca recebe um escopo.
@@ -34,6 +34,22 @@ public enum EscopoDeLeitura {
 			throw new InvalidRequestException(CodigoErro.PARAMETRO_INVALIDO,
 					"O filtro ativo=false não está disponível para o seu perfil.");
 		}
+	}
+
+	/**
+	 * O STUDENT que envia {@code status} na listagem de provas, com QUALQUER valor (inclusive PUBLICADA, vazio ou inválido),
+	 * recebe 400 PARAMETRO_INVALIDO (D28, D47). Vale o valor cru do parâmetro; {@code null} é parâmetro ausente.
+	 */
+	public void validarFiltroDeStatus(String status) {
+		if (!veRascunhos() && status != null) {
+			throw new InvalidRequestException(CodigoErro.PARAMETRO_INVALIDO,
+					"O filtro status não está disponível para o seu perfil.");
+		}
+	}
+
+	/** {@code true} se o chamador enxerga provas em rascunho e a visão completa delas (D189, D190). */
+	public boolean veRascunhos() {
+		return this == TUDO;
 	}
 
 	/** {@code true} se o chamador enxerga registros inativos. */

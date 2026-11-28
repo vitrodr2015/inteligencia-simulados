@@ -58,6 +58,23 @@ class EscopoDeLeituraTest {
 	}
 
 	@Test
+	void deve_deixar_so_o_admin_ver_as_provas_em_rascunho() {
+		assertThat(EscopoDeLeitura.TUDO.veRascunhos()).isTrue();
+		assertThat(EscopoDeLeitura.SO_ATIVOS.veRascunhos()).isFalse();
+	}
+
+	@Test
+	void deve_recusar_o_filtro_status_do_student_com_qualquer_valor_com_400_parametro_invalido() {
+		for (String valor : new String[] { "PUBLICADA", "RASCUNHO", "qualquer", "" }) {
+			assertThatThrownBy(() -> EscopoDeLeitura.SO_ATIVOS.validarFiltroDeStatus(valor)).as(valor)
+					.isInstanceOfSatisfying(InvalidRequestException.class,
+							e -> assertThat(e.getCodigo()).isEqualTo(CodigoErro.PARAMETRO_INVALIDO));
+			assertThatCode(() -> EscopoDeLeitura.TUDO.validarFiltroDeStatus(valor)).as(valor).doesNotThrowAnyException();
+		}
+		assertThatCode(() -> EscopoDeLeitura.SO_ATIVOS.validarFiltroDeStatus(null)).doesNotThrowAnyException();
+	}
+
+	@Test
 	void deve_resolver_o_escopo_pelo_papel_do_principal() throws Exception {
 		autenticarComo(new UsuarioAutenticado(UUID.randomUUID(), Papel.STUDENT));
 		assertThat(resolvedor.resolveArgument(null, null, null, null)).isEqualTo(EscopoDeLeitura.SO_ATIVOS);

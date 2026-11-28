@@ -128,7 +128,7 @@ Plano aprovado em 2026-11-24 (respostas às dúvidas H1 a H11). Marcação: ✅ 
 6. ✅ D173 (fatia 4, passada 1): editar uma questão de prova já publicada NÃO altera a prova.
 7. D22 (questão anulada) segue fora.
 8. ⏳ Teste de concorrência da importação no MySQL real, na fatia da Importação.
-9. Origem das questões e direitos autorais: NÃO bloqueia a construção; a decisão é necessária antes do primeiro conteúdo real no banco. O modelo comporta um campo de origem depois, por migration aditiva.
+9. ✅ D188 (Sprint 3, fatia 1): na fase 1 as questões são de autoria própria; não há campo de origem. Reavaliar se houver fonte externa (então um campo entra por migration aditiva).
 10. ⏳ O snapshot da Tentativa referencia `questao_versao.id`.
 11. ⏳ "Um rascunho aberto e uma publicada por questão": coluna gerada com índice único no banco; testes no MySQL real (o H2 não representa isso); na publicação, arquiva a versão antiga antes de publicar a nova, na mesma transação.
 12. ⏳ Correções ao plano para as fatias seguintes: o gabarito é um CHECK simples (A a E), sem nada de tipo (o MySQL não deixa um CHECK consultar outra tabela); a FK de alternativa é RESTRICT e o service apaga as alternativas do rascunho antes de descartá-lo; os tamanhos das colunas saem dos limites do contrato.
@@ -224,6 +224,14 @@ Ordem das fatias: (1) programa e ganchos de dados ✅; (2) modelo de Prova e Que
 - Testes novos: `LimiteNoSigninIntegracaoTest` (LIM-11 e LIM-16) e `AgendamentoDasLimpezasIntegracaoTest` (AUT-25 e LIM-17), no contexto compartilhado.
 - **LIM-11:** login sem e-mail não conta no limite do signin, mas **conta** no limite geral de POST em `/auth/*` (D128), que roda antes de ler o corpo.
 - Exclusão de prova com 300 questões e 1500 alternativas: 2295 ms numa única medição local (teste temporário, não commitado).
+
+### Sprint 3, fatia 1 (leitura das provas pelo aluno), branch `feature/s5-1-provas-aluno`
+
+- ✅ **Implementado (D189 a D191):** STUDENT lê `GET /provas` e `GET /provas/{id}`, só PUBLICADAS, com `ProvaDoAlunoResponse` (DTO separado; `ProvaDeLeitura` é a interface selada dos dois). Sem rota nova e sem migration.
+- **Decisão de produto D188:** questões de autoria própria na fase 1; sem campo de origem.
+- **Escopo:** reusa o `EscopoDeLeitura` (`veRascunhos`, `validarFiltroDeStatus`). A restrição do aluno entra na consulta, antes da paginação.
+- **GUARDIAN em duas camadas:** a `SecurityConfig` e o `EscopoDeLeitura.de`.
+- **Respostas Q4 a Q21 e Q23 do plano da Sprint 3:** ainda não recebidas; necessárias antes da fatia de iniciar a tentativa.
 
 ## Pendências
 

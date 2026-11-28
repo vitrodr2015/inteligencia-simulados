@@ -13,6 +13,7 @@ import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 
+import br.simulado.etec.usuarios.model.Papel;
 import io.restassured.response.Response;
 
 /** A publicação da prova em cascata (D178) contra MySQL REAL: o fluxo inteiro, o tudo ou nada e o que fica fechado depois. */
@@ -196,16 +197,24 @@ class PublicacaoIntegracaoTest extends AbstractPublicacaoIntegrationTest {
 	}
 
 	@Test
-	void deve_deixar_o_aluno_sem_enxergar_nada_da_prova_publicada() {
+	void deve_deixar_o_aluno_ver_so_o_resumo_da_prova_publicada_sem_as_questoes_e_sem_poder_publicar() {
 		String prova = novaProva(1);
 		importarProntas(prova, criarSubtopico(), 1, 1);
+		requisicaoComoStudent().get("/api/v1/provas/" + prova).then().statusCode(404);
+		assertThat(idsDe(listarTodasComo(Papel.STUDENT, Map.of()))).doesNotContain(prova);
 		publicar(prova).then().statusCode(200);
 
-		for (String caminho : new String[] { "/api/v1/provas", "/api/v1/provas/" + prova,
-				"/api/v1/admin/questoes?provaId=" + prova }) {
-			requisicaoComoStudent().get(caminho).then().statusCode(403);
-		}
+		Response detalhe = requisicaoComoStudent().get("/api/v1/provas/" + prova);
+		detalhe.then().statusCode(200).body("id", equalTo(prova));
+		assertThat(detalhe.jsonPath().getMap("$").keySet()).map(Object::toString).containsExactlyElementsOf(CAMPOS_DO_ALUNO);
+		assertThat(listarTodasComo(Papel.STUDENT, Map.of())).filteredOn(item -> prova.equals(item.get("id"))).singleElement()
+				.satisfies(item -> assertThat(item.keySet()).containsExactlyElementsOf(CAMPOS_DO_ALUNO));
+
+		requisicaoComoStudent().get("/api/v1/admin/questoes?provaId=" + prova).then().statusCode(403);
 		requisicaoComoStudent().patch("/api/v1/provas/" + prova + "/publish").then().statusCode(403);
+		for (String caminho : new String[] { "/api/v1/provas", "/api/v1/provas/" + prova }) {
+			requisicaoComoGuardian().get(caminho).then().statusCode(403);
+		}
 	}
 
 	/**

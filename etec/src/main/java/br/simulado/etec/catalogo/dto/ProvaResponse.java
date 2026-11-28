@@ -53,6 +53,6 @@ public record ProvaResponse(
 		Instant criadoEm,
 
 		@Schema(description = "Quantas questões já foram cadastradas na prova, contando cada questão uma vez, em qualquer status (não as versões). É 0 na criação. Compare com quantidadeQuestoes, a quantidade declarada.")
-		long questoesCadastradas) {
+		long questoesCadastradas) implements ProvaDeLeitura {
 
 }

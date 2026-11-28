@@ -68,8 +68,9 @@ public class SecurityConfig {
 			"/api/v1/subtopicos/{id}/disable", "/api/v1/subtopicos/{id}/enable" };
 
 	/**
-	 * Provas (Sprint 2, fatia 2a): as três rotas são só do ADMIN. O STUDENT e o GUARDIAN levam 403 até a fatia da leitura do aluno
-	 * (D154, adiamento temporário da seção 2 do contrato). O resto de /admin/** continua negado (D121).
+	 * Provas: a criação é só do ADMIN; a leitura é do STUDENT e do ADMIN (D189, que revoga a D154 só para o STUDENT). O que o
+	 * aluno enxerga (só as PUBLICADAS, em DTO próprio) é decidido depois, pelo {@link EscopoDeLeitura}. O GUARDIAN leva 403
+	 * (D122). O resto de /admin/** continua negado (D121).
 	 */
 	static final String[] PROVA_CRIACAO = { "/api/v1/admin/provas" };
 
@@ -145,6 +146,8 @@ public class SecurityConfig {
 					leitura(regras, ME, url -> url.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN));
 					leitura(regras, CATALOGO_LEITURA,
 							url -> url.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN));
+					leitura(regras, PROVA_LEITURA,
+							url -> url.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN));
 					regras.requestMatchers(HttpMethod.POST, TROCA_DE_SENHA)
 							.hasAnyAuthority(Authorities.ROLE_STUDENT, Authorities.ROLE_ADMIN);
 					// ----- só ADMIN (escrita do catálogo) -----
@@ -152,9 +155,8 @@ public class SecurityConfig {
 					regras.requestMatchers(HttpMethod.PUT, CATALOGO_ITEM).hasAuthority(Authorities.ROLE_ADMIN);
 					regras.requestMatchers(HttpMethod.DELETE, CATALOGO_ITEM).hasAuthority(Authorities.ROLE_ADMIN);
 					regras.requestMatchers(HttpMethod.PATCH, CATALOGO_ESTADO).hasAuthority(Authorities.ROLE_ADMIN);
-					// ----- só ADMIN (provas, D154) -----
+					// ----- só ADMIN (criar prova) -----
 					regras.requestMatchers(HttpMethod.POST, PROVA_CRIACAO).hasAuthority(Authorities.ROLE_ADMIN);
-					leitura(regras, PROVA_LEITURA, url -> url.hasAuthority(Authorities.ROLE_ADMIN));
 					// ----- só ADMIN (questões, fatia 2b-i) -----
 					regras.requestMatchers(HttpMethod.POST, QUESTAO_CRIACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					leitura(regras, QUESTAO_LEITURA, url -> url.hasAuthority(Authorities.ROLE_ADMIN));
