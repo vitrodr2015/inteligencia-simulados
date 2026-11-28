@@ -42,6 +42,10 @@ public enum CodigoErro {
 	PROVA_COM_QUESTOES_PENDENTES,
 	// Edição (D171, D174): só o rascunho aberto se altera; sem ele, é preciso criar uma nova versão
 	QUESTAO_SEM_RASCUNHO,
+	// Nova versão (D181): a questão já tem um rascunho aberto
+	QUESTAO_COM_RASCUNHO,
+	// Publicação avulsa de questão (D182): só vale em prova publicada
+	PROVA_NAO_PUBLICADA,
 	// Trava não obtida a tempo ou deadlock no banco (503 com Retry-After, D176)
 	RECURSO_OCUPADO,
 

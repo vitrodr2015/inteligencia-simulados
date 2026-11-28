@@ -10,7 +10,7 @@ import java.util.stream.IntStream;
 
 import io.restassured.response.Response;
 
-/** Ajudantes da publicação da prova (D178) contra MySQL real. A limpeza das provas é a da {@link AbstractEdicaoIntegrationTest}. */
+/** Ajudantes da publicação (D178, D182) e das versões (D181) contra MySQL real. A limpeza das provas é a da {@link AbstractEdicaoIntegrationTest}. */
 abstract class AbstractPublicacaoIntegrationTest extends AbstractEdicaoIntegrationTest {
 
 	protected Response publicar(String prova) {
@@ -87,6 +87,58 @@ abstract class AbstractPublicacaoIntegrationTest extends AbstractEdicaoIntegrati
 					+ "WHERE q.prova_id = ? AND (v.status <> 'RASCUNHO' OR v.publicada_em IS NOT NULL)", Integer.class, id))
 					.as("nada publicado").isZero();
 		}
+	}
+
+	// ----- versões e publicação avulsa (D181 e D182) -----
+
+	protected Response novaVersao(String questao) {
+		return requisicao().post("/api/v1/admin/questoes/" + questao + "/versoes");
+	}
+
+	protected Response publicarQuestao(String questao) {
+		return requisicao().patch("/api/v1/admin/questoes/" + questao + "/publish");
+	}
+
+	protected Response lerVersao(String questao, int versao) {
+		return requisicao().get("/api/v1/admin/questoes/" + questao + "?versao=" + versao);
+	}
+
+	/** Cadastra a questão com gabarito A e devolve o id. */
+	protected String cadastrarPronta(String prova, String subtopico, int numero) {
+		return cadastrar(prova, questaoComGabarito(subtopico, numero, "A")).then().statusCode(201).extract().path("id");
+	}
+
+	/** Uma questão com versão 1 PUBLICADA numa prova de uma questão, publicada PELA API. Devolve [prova, questão]. */
+	protected List<String> questaoPublicada(String subtopico) {
+		String prova = novaProva(1);
+		String questao = cadastrarPronta(prova, subtopico, 1);
+		publicar(prova).then().statusCode(200);
+		return List.of(prova, questao);
+	}
+
+	/** Cada versão da questão como "numero STATUS", na ordem do numero da versão. */
+	protected List<String> historico(String questao) {
+		return jdbc.queryForList("SELECT CONCAT(versao, ' ', status) FROM questao_versao WHERE questao_id = ? ORDER BY versao",
+				String.class, idInternoDaQuestao(questao));
+	}
+
+	/** O enunciado da versão que está no status dado. */
+	protected String enunciadoDa(String questao, String status) {
+		return jdbc.queryForObject("SELECT enunciado FROM questao_versao WHERE questao_id = ? AND status = ?", String.class,
+				idInternoDaQuestao(questao), status);
+	}
+
+	/**
+	 * O que não pode mudar numa versão publicada nem quando ela é arquivada: a linha dela, menos o status, o atualizado_em e a
+	 * coluna gerada que depende do status, e as 5 linhas das alternativas inteiras.
+	 */
+	protected List<Map<String, Object>> conteudoDaVersao(String questao, int versao) {
+		List<Map<String, Object>> linhas = fotoDaVersao(questao, versao);
+		Map<String, Object> daVersao = new java.util.LinkedHashMap<>(linhas.get(0));
+		List.of("status", "atualizado_em", "publicada_vigente").forEach(coluna -> assertThat(daVersao.keySet()).contains(coluna));
+		daVersao.keySet().removeAll(List.of("status", "atualizado_em", "publicada_vigente"));
+		linhas.set(0, daVersao);
+		return linhas;
 	}
 
 }

@@ -9,6 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -61,6 +62,19 @@ public class QuestaoController implements QuestaoControllerDocs {
 	public ResponseEntity<QuestaoResponse> atualizar(@PathVariable UUID id,
 			@Valid @RequestBody QuestaoAtualizacaoRequest dados) {
 		return ResponseEntity.ok(QuestaoMapper.paraResponse(servico.atualizar(id, dados)));
+	}
+
+	@Override
+	@PostMapping("/questoes/{id}/versoes")
+	public ResponseEntity<QuestaoResponse> criarVersao(@PathVariable UUID id) {
+		QuestaoResponse corpo = QuestaoMapper.paraResponse(servico.criarVersao(id));
+		return ResponseEntity.created(URI.create("/api/v1/admin/questoes/" + corpo.id())).body(corpo);
+	}
+
+	@Override
+	@PatchMapping("/questoes/{id}/publish")
+	public ResponseEntity<QuestaoResponse> publicar(@PathVariable UUID id) {
+		return ResponseEntity.ok(QuestaoMapper.paraResponse(servico.publicar(id)));
 	}
 
 	@Override

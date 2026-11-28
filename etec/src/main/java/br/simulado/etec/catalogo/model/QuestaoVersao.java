@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.TreeMap;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -34,7 +35,8 @@ import jakarta.persistence.UniqueConstraint;
 /**
  * Uma versão do conteúdo de uma questão (contrato, seção 5). O subtópico é DA VERSÃO (D146). As colunas geradas
  * {@code rascunho_aberto} e {@code publicada_vigente} (índices únicos de "um rascunho e uma publicada por questão") existem só no
- * banco e não são mapeadas aqui. A API ainda só cria a versão 1, em RASCUNHO; a publicação da prova a publica (D178).
+ * banco e não são mapeadas aqui. A versão 1 nasce no cadastro, em RASCUNHO; as seguintes são cópias da publicada (D181). A
+ * publicada nunca muda de conteúdo: quando outra toma o lugar dela, vira ARQUIVADA e fica assim para sempre (D183).
  */
 @Entity
 @EntityListeners(AuditingEntityListener.class)
@@ -185,6 +187,19 @@ public class QuestaoVersao {
 		if (this.status != StatusQuestao.RASCUNHO) {
 			throw new IllegalStateException("Só a versão em RASCUNHO pode ser alterada.");
 		}
+	}
+
+	/**
+	 * Uma versão nova, em RASCUNHO, com TODO o conteúdo de outra (a publicada) em linhas novas, inclusive as 5 alternativas
+	 * (D181). A de origem não é tocada. O subtópico vai como está, mesmo desativado: quem o confere é a publicação.
+	 */
+	public static QuestaoVersao copiaDe(QuestaoVersao origem, int numeroDaVersao) {
+		Map<String, String> textoPorLetra = origem.alternativas.stream()
+				.collect(Collectors.toMap(Alternativa::getLetra, Alternativa::getTexto));
+		QuestaoVersao copia = new QuestaoVersao(origem.questao, origem.subtopico, origem.textoApoio, origem.grupoApoio,
+				origem.enunciado, origem.imagemUrl, textoPorLetra, origem.gabarito, origem.dificuldade, origem.explicacao);
+		copia.versao = numeroDaVersao;
+		return copia;
 	}
 
 	public Long getId() {

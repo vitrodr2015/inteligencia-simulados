@@ -65,6 +65,18 @@ class MarcadoresDaMatrizTest {
 			return criar("provacompleta");
 		}
 
+		@Override
+		public String questaoPublicada(String materiaId) {
+			assertThat(materiaId).startsWith("materia-");
+			return criar("publicada");
+		}
+
+		@Override
+		public String questaoEmRevisao(String materiaId) {
+			assertThat(materiaId).startsWith("materia-");
+			return criar("revisao");
+		}
+
 		List<String> tipos() {
 			return criacoes.stream().map(id -> id.substring(0, id.indexOf('-'))).toList();
 		}
@@ -154,6 +166,14 @@ class MarcadoresDaMatrizTest {
 
 		assertThat(resolvido).contains("provacompleta-").doesNotContain("{");
 		assertThat(fabrica.tipos()).containsExactly("materia", "provacompleta");
+	}
+
+	@Test
+	void deve_criar_as_questoes_publicada_e_em_revisao_como_recursos_proprios_so_com_a_materia() {
+		String resolvido = recursos.resolver("/{questaoPublicadaId}/{questaoEmRevisaoId}");
+
+		assertThat(resolvido).contains("publicada-").contains("revisao-").doesNotContain("{");
+		assertThat(fabrica.tipos()).containsExactly("materia", "publicada", "revisao");
 	}
 
 	// ----- falha rápida -----

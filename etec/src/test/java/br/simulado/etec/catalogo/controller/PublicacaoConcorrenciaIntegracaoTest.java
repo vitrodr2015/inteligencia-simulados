@@ -105,26 +105,6 @@ class PublicacaoConcorrenciaIntegracaoTest extends AbstractPublicacaoIntegration
 
 	// ----- os dois desfechos, com a ordem na fila da trava fixada -----
 
-	/**
-	 * Outra conexão segura a trava, os dois pedidos entram na fila um depois do outro e só então a trava é solta: quem chegou
-	 * primeiro passa primeiro. Assim cada desfecho da corrida é provado, e não só o que o acaso produzir.
-	 */
-	private List<Response> naOrdemDaFila(String prova, Callable<Response> primeiro, Callable<Response> segundo) throws Exception {
-		ExecutorService pool = Executors.newFixedThreadPool(2);
-		try (Connection outra = outraTransacao()) {
-			travarProva(outra, prova);
-			Future<Response> umLugar = pool.submit(primeiro);
-			esperarNaFilaDaTrava(1);
-			Future<Response> doisLugar = pool.submit(segundo);
-			esperarNaFilaDaTrava(2);
-			outra.rollback();
-			return List.of(umLugar.get(60, TimeUnit.SECONDS), doisLugar.get(60, TimeUnit.SECONDS));
-		}
-		finally {
-			pool.shutdownNow();
-		}
-	}
-
 	/** A escrita que completa a prova de 3 questões, pelo cadastro ou pela importação. */
 	private Callable<Response> completar(String como, String prova, String subtopico) {
 		String terceira = questaoComGabarito(subtopico, 3, "B");

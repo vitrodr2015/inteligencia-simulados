@@ -34,6 +34,10 @@ final class MarcadoresDaMatriz {
 
 	static final String PROVA_COMPLETA = "{provaCompletaId}";
 
+	static final String QUESTAO_PUBLICADA = "{questaoPublicadaId}";
+
+	static final String QUESTAO_EM_REVISAO = "{questaoEmRevisaoId}";
+
 	/** Qualquer {@code {nome}}. Um objeto JSON não casa: depois da chave vêm aspas ou a chave que fecha. */
 	private static final Pattern MARCADOR = Pattern.compile("\\{[A-Za-z][A-Za-z0-9_]*\\}");
 
@@ -55,6 +59,12 @@ final class MarcadoresDaMatriz {
 		/** Uma prova pronta para publicar: uma questão, com gabarito, num subtópico PRÓPRIO dentro da matéria dada. */
 		String provaCompleta(String materiaId);
 
+		/** Uma questão com versão publicada e SEM rascunho, numa prova publicada própria. */
+		String questaoPublicada(String materiaId);
+
+		/** Uma questão de prova publicada própria, com um rascunho novo aberto e pronto para publicar. */
+		String questaoEmRevisao(String materiaId);
+
 	}
 
 	private final Fabrica fabrica;
@@ -67,7 +77,8 @@ final class MarcadoresDaMatriz {
 
 	/** O contexto que as linhas recebem: os recursos são marcadores; o id inexistente e o sufixo são valores de verdade. */
 	static Ctx contexto(String idInexistente, String sufixo) {
-		return new Ctx(MATERIA, SUBTOPICO, MATERIA_VAZIA, PROVA, QUESTAO, PROVA_COMPLETA, idInexistente, sufixo);
+		return new Ctx(MATERIA, SUBTOPICO, MATERIA_VAZIA, PROVA, QUESTAO, PROVA_COMPLETA, QUESTAO_PUBLICADA, QUESTAO_EM_REVISAO,
+				idInexistente, sufixo);
 	}
 
 	/** Troca os marcadores do texto pelos ids, criando o que faltar; {@code null} continua {@code null} (linha sem corpo). */
@@ -76,7 +87,8 @@ final class MarcadoresDaMatriz {
 			return null;
 		}
 		String resolvido = texto;
-		for (String marcador : new String[] { MATERIA, SUBTOPICO, MATERIA_VAZIA, PROVA, QUESTAO, PROVA_COMPLETA }) {
+		for (String marcador : new String[] { MATERIA, SUBTOPICO, MATERIA_VAZIA, PROVA, QUESTAO, PROVA_COMPLETA, QUESTAO_PUBLICADA,
+				QUESTAO_EM_REVISAO }) {
 			if (resolvido.contains(marcador)) {
 				resolvido = resolvido.replace(marcador, valor(marcador));
 			}
@@ -106,6 +118,8 @@ final class MarcadoresDaMatriz {
 			case PROVA -> fabrica.prova();
 			case QUESTAO -> fabrica.questao(valor(PROVA), valor(MATERIA));
 			case PROVA_COMPLETA -> fabrica.provaCompleta(valor(MATERIA));
+			case QUESTAO_PUBLICADA -> fabrica.questaoPublicada(valor(MATERIA));
+			case QUESTAO_EM_REVISAO -> fabrica.questaoEmRevisao(valor(MATERIA));
 			default -> throw new IllegalStateException("Marcador não resolvido na linha da matriz: " + marcador + ".");
 		};
 		if (novo == null || novo.isBlank()) {

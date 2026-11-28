@@ -76,8 +76,8 @@ public class SecurityConfig {
 	static final String[] PROVA_LEITURA = { "/api/v1/provas", "/api/v1/provas/{id}" };
 
 	/**
-	 * Questões (Sprint 2, fatias 2b-i e 2b-ii): cadastro, leitura por id e listagem, só ADMIN. O DELETE, o PATCH, o POST de
-	 * versões, o publicar e o resto de /admin/** continuam negados (D121).
+	 * Questões (Sprint 2, fatias 2b-i e 2b-ii): cadastro, leitura por id e listagem, só ADMIN. O DELETE e o resto de /admin/**
+	 * continuam negados (D121).
 	 */
 	static final String[] QUESTAO_CRIACAO = { "/api/v1/admin/provas/{id}/questoes" };
 
@@ -89,6 +89,12 @@ public class SecurityConfig {
 
 	/** Publicar a prova, com as questões em cascata (fatia 4, passada 2a; D178). Só PATCH, só ADMIN. */
 	static final String[] PUBLICAR_PROVA = { "/api/v1/provas/{id}/publish" };
+
+	/** Nova versão de questão (fatia 4, passada 2b; D181): só POST, só ADMIN. */
+	static final String[] QUESTAO_NOVA_VERSAO = { "/api/v1/admin/questoes/{id}/versoes" };
+
+	/** Publicação avulsa de questão de prova publicada (D182): só PATCH, só ADMIN. */
+	static final String[] QUESTAO_PUBLICACAO = { "/api/v1/admin/questoes/{id}/publish" };
 
 	/** Importação em lote (fatia 3): uma rota, só POST, só ADMIN. */
 	static final String[] IMPORTACAO = { "/api/v1/admin/importacoes" };
@@ -153,6 +159,9 @@ public class SecurityConfig {
 					regras.requestMatchers(HttpMethod.PUT, EDICAO).hasAuthority(Authorities.ROLE_ADMIN);
 					// ----- só ADMIN (publicar a prova, D178) -----
 					regras.requestMatchers(HttpMethod.PATCH, PUBLICAR_PROVA).hasAuthority(Authorities.ROLE_ADMIN);
+					// ----- só ADMIN (nova versão e publicação avulsa de questão, D181 e D182) -----
+					regras.requestMatchers(HttpMethod.POST, QUESTAO_NOVA_VERSAO).hasAuthority(Authorities.ROLE_ADMIN);
+					regras.requestMatchers(HttpMethod.PATCH, QUESTAO_PUBLICACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					// ----- só ADMIN (importação em lote, fatia 3) -----
 					regras.requestMatchers(HttpMethod.POST, IMPORTACAO).hasAuthority(Authorities.ROLE_ADMIN);
 					// D113: o resto de /actuator e /error = 401 para anônimo e 403 para autenticado, nunca 404.
