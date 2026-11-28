@@ -33,10 +33,11 @@ import br.simulado.etec.shared.paginacao.CamposOrdenaveis;
 import br.simulado.etec.shared.paginacao.Filtros;
 import br.simulado.etec.shared.persistencia.Restricoes;
 import br.simulado.etec.shared.programa.Programa;
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 
 /**
- * Regras da prova (contrato, seção 4.3): criar (sempre em RASCUNHO), editar o rascunho (D170), publicar (D178), listar e buscar,
- * só para o ADMIN (D154).
+ * Regras da prova (contrato, seção 4.3): criar (sempre em RASCUNHO), editar o rascunho (D170), publicar (D178), listar e buscar
+ * (o aluno só enxerga as PUBLICADAS, D189 e D191).
  * Leituras em transação somente leitura.
  */
 @Service
@@ -192,15 +193,23 @@ public class ProvaService {
 		}
 	}
 
-	/** Lista com filtros opcionais: {@code ano}, {@code semestre} e {@code status} (nulo = todos). */
-	public Page<Prova> listar(Integer ano, Integer semestre, StatusProva status, Pageable paginacao) {
-		Specification<Prova> filtros = Specification.allOf(Filtros.<Prova>igual("ano", ano),
+	/**
+	 * Lista com filtros opcionais: {@code ano}, {@code semestre} e {@code status} (nulo = todos). Para o aluno a restrição às
+	 * PUBLICADAS entra na CONSULTA (D191), então a paginação e os totais contam só o que ele pode ver.
+	 */
+	public Page<Prova> listar(EscopoDeLeitura escopo, Integer ano, Integer semestre, StatusProva status, Pageable paginacao) {
+		Specification<Prova> visibilidade = escopo.veRascunhos() ? Filtros.<Prova>semFiltro()
+				: Filtros.<Prova>igual("status", StatusProva.PUBLICADA);
+		Specification<Prova> filtros = Specification.allOf(visibilidade, Filtros.<Prova>igual("ano", ano),
 				Filtros.<Prova>igual("semestre", semestre), Filtros.<Prova>igual("status", status));
 		return repositorio.findAll(filtros, paginacao);
 	}
 
-	public Prova buscar(UUID id) {
-		return repositorio.findByPublicId(id).orElseThrow(ProvaService::naoEncontrada);
+	/** Leitura por id: para o aluno, a prova em rascunho dá o MESMO 404 da inexistente (D191). */
+	public Prova buscar(UUID id, EscopoDeLeitura escopo) {
+		return repositorio.findByPublicId(id)
+				.filter(prova -> escopo.veRascunhos() || prova.getStatus() == StatusProva.PUBLICADA)
+				.orElseThrow(ProvaService::naoEncontrada);
 	}
 
 	private ProgramaDeProva programaEtec() {

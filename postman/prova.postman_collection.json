@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Prova — /api/v1/admin/provas e /api/v1/provas",
-    "description": "Rotas da Prova (Sprint 2, fatia 2a): POST /admin/provas, GET /provas e GET /provas/{id}, as três só do ADMIN (STUDENT e GUARDIAN levam 403 até a leitura do aluno, D154). Rode na ordem. Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). As provas criadas ficam no banco local, menos a da pasta \"DELETE\" (D185); o sufixo muda a cada rodada, então a coleção pode ser rodada de novo. Os PUT de prova (D170) entraram na fatia 4, passada 1. As recusas do publicar (D178) entraram na fatia 4, passada 2a. Depois de publicada, o que se corrige é a questão, por nova versão (D181 e D182): essas rotas estão na coleção de questão.",
+    "description": "Rotas da Prova (Sprint 2, fatia 2a): POST /admin/provas, GET /provas e GET /provas/{id}, a criação só do ADMIN; a leitura do ADMIN e do STUDENT (D189), que só vê as PUBLICADAS, num DTO próprio, e recebe 404 no rascunho e 400 se enviar status (D190, D191); o GUARDIAN segue com 403. A pasta \"Aluno\" cria a própria matéria, o subtópico e uma prova de uma questão, e a publica (publicar não tem volta: ela fica no banco local). Rode na ordem. Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). As provas criadas ficam no banco local, menos a da pasta \"DELETE\" (D185); o sufixo muda a cada rodada, então a coleção pode ser rodada de novo. Os PUT de prova (D170) entraram na fatia 4, passada 1. As recusas do publicar (D178) entraram na fatia 4, passada 2a. Depois de publicada, o que se corrige é a questão, por nova versão (D181 e D182): essas rotas estão na coleção de questão.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -63,6 +63,18 @@
     },
     {
       "key": "provaParaApagarId",
+      "value": ""
+    },
+    {
+      "key": "alunoMateriaId",
+      "value": ""
+    },
+    {
+      "key": "alunoSubtopicoId",
+      "value": ""
+    },
+    {
+      "key": "provaAlunoId",
       "value": ""
     }
   ],
@@ -1947,7 +1959,7 @@
           }
         },
         {
-          "name": "Filtrar por status PUBLICADA (nenhuma ainda)",
+          "name": "Filtrar por status PUBLICADA (ADMIN)",
           "event": [
             {
               "listen": "test",
@@ -3658,6 +3670,426 @@
       ]
     },
     {
+      "name": "Aluno — ler provas publicadas (D189 a D191)",
+      "item": [
+        {
+          "name": "201 — matéria da prova do aluno",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"alunoMateriaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\":\"Matéria do aluno {{sufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "201 — subtópico da prova do aluno",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"alunoSubtopicoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subtopicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "subtopicos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materiaId\":\"{{alunoMateriaId}}\",\"nome\":\"Subtópico do aluno {{sufixo}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "201 — prova de uma questão",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"provaAlunoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"titulo\":\"Prova do aluno {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "404 — STUDENT não vê o rascunho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo PROVA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_ENCONTRADA\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaAlunoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaAlunoId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "201 — questão com gabarito",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaAlunoId}}/questoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "provas",
+                "{{provaAlunoId}}",
+                "questoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\":1,\"subtopicoId\":\"{{alunoSubtopicoId}}\",\"enunciado\":\"Enunciado do aluno {{sufixo}}\",\"alternativas\":[{\"letra\":\"A\",\"texto\":\"Alternativa A\"},{\"letra\":\"B\",\"texto\":\"Alternativa B\"},{\"letra\":\"C\",\"texto\":\"Alternativa C\"},{\"letra\":\"D\",\"texto\":\"Alternativa D\"},{\"letra\":\"E\",\"texto\":\"Alternativa E\"}],\"gabarito\":\"A\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "200 — publica a prova",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaAlunoId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaAlunoId}}",
+                "publish"
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — STUDENT lista só publicadas, com os campos do aluno",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"cada item tem exatamente os campos do aluno\", function () { pm.response.json().conteudo.forEach(function (p) { pm.expect(Object.keys(p)).to.eql([\"id\",\"titulo\",\"banca\",\"ano\",\"semestre\",\"duracaoMinutos\",\"quantidadeQuestoes\",\"fonteUrl\",\"publicadaEm\"]); pm.expect(p.publicadaEm).to.not.be.null; }); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas?size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "50"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — STUDENT busca a publicada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"exatamente os campos do aluno\", function () { pm.expect(Object.keys(pm.response.json())).to.eql([\"id\",\"titulo\",\"banca\",\"ano\",\"semestre\",\"duracaoMinutos\",\"quantidadeQuestoes\",\"fonteUrl\",\"publicadaEm\"]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaAlunoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaAlunoId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "200 — ADMIN vê a mesma prova com a visão completa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"visão do ADMIN\", function () { pm.expect(pm.response.json()).to.include.keys(\"status\", \"criadoEm\", \"questoesCadastradas\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas/{{provaAlunoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas",
+                "{{provaAlunoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 — STUDENT não filtra por status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"codigo PARAMETRO_INVALIDO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PARAMETRO_INVALIDO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/provas?status=PUBLICADA",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "provas"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PUBLICADA"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Autorização",
       "item": [
         {
@@ -3831,15 +4263,15 @@
           }
         },
         {
-          "name": "403 — STUDENT não lista (adiamento temporário, D154)",
+          "name": "200 — STUDENT lista (só publicadas, D189)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
-                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"sem status na resposta\", function () { pm.response.json().conteudo.forEach(function (p) { pm.expect(p).to.not.have.property(\"status\"); }); });"
                 ]
               }
             }
@@ -3871,15 +4303,15 @@
           }
         },
         {
-          "name": "403 — STUDENT não busca (adiamento temporário, D154)",
+          "name": "404 — STUDENT não vê prova em rascunho (D191)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status 403\", function () { pm.response.to.have.status(403); });",
-                  "pm.test(\"codigo ACESSO_NEGADO\", function () { pm.expect(pm.response.json().codigo).to.eql(\"ACESSO_NEGADO\"); });"
+                  "pm.test(\"Status 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"codigo PROVA_NAO_ENCONTRADA\", function () { pm.expect(pm.response.json().codigo).to.eql(\"PROVA_NAO_ENCONTRADA\"); });"
                 ]
               }
             }
@@ -4054,7 +4486,7 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// Duas identidades: ADMIN (cria e lê provas) e STUDENT (só prova o 403). O ADMIN NÃO se cadastra pela API (ele nasce na subida,",
+          "// Duas identidades: ADMIN (cria e lê provas) e STUDENT (lê as publicadas e prova os 403). O ADMIN NÃO se cadastra pela API (ele nasce na subida,",
           "// pelo bootstrap do Módulo 12): informe adminEmail e adminSenha, os mesmos de ADMIN_EMAIL e ADMIN_SENHA (postman/README.md).",
           "const base = pm.collectionVariables.get(\"baseUrl\");",
           "const cab = { \"Content-Type\": \"application/json\" };",

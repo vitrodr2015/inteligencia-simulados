@@ -176,18 +176,26 @@ public final class MatrizDeAutorizacao {
 		linha("apagar subtópico inexistente", "DELETE", "/api/v1/subtopicos/{id}",
 				c -> "/api/v1/subtopicos/" + c.idInexistente(), null, 401, 403, 403, 404);
 
-		// ----- provas (Sprint 2, fatia 2a): as três rotas são só do ADMIN; STUDENT e GUARDIAN levam 403 (D154) -----
+		// ----- provas: criar é só do ADMIN; ler é do STUDENT e do ADMIN (D189); o aluno só enxerga as publicadas (D191) -----
 		linha("criar prova", "POST", "/api/v1/admin/provas", c -> "/api/v1/admin/provas",
 				c -> "{\"titulo\":\"Prova da matriz " + c.sufixo() + "\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}", 401,
 				403, 403, 201);
 		linha("criar prova com corpo inválido", "POST", "/api/v1/admin/provas", c -> "/api/v1/admin/provas", c -> "{}", 401,
 				403, 403, 400);
 		for (String metodo : new String[] { "GET", "HEAD" }) {
-			fixa(metodo, "/api/v1/provas", 401, 403, 403, 200);
-			linha("prova por id", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/" + c.provaId(), null, 401, 403, 403, 200);
+			fixa(metodo, "/api/v1/provas", 401, 403, 200, 200);
+			// o aluno não filtra por status, com valor nenhum (D28, D47)
+			for (String status : new String[] { "PUBLICADA", "RASCUNHO" }) {
+				linha("lista de provas com status " + status, metodo, "/api/v1/provas", c -> "/api/v1/provas?status=" + status,
+						null, 401, 403, 400, 200);
+			}
+			linha("prova publicada por id", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/" + c.provaPublicadaId(), null,
+					401, 403, 200, 200);
+			linha("prova em rascunho por id", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/" + c.provaId(), null, 401,
+					403, 404, 200);
 			linha("prova inexistente", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/" + c.idInexistente(), null, 401, 403,
-					403, 404);
-			linha("prova com id malformado", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/abc", null, 401, 403, 403, 400);
+					404, 404);
+			linha("prova com id malformado", metodo, "/api/v1/provas/{id}", c -> "/api/v1/provas/abc", null, 401, 403, 400, 400);
 		}
 		// apagar prova (D185): só em rascunho
 		linha("apagar prova em rascunho sem questão", "DELETE", "/api/v1/admin/provas/{id}",

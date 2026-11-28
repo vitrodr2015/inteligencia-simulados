@@ -394,6 +394,56 @@ class ProvaControllerTest {
 				.andExpect(jsonPath("$.conteudo[*].titulo").value(org.hamcrest.Matchers.contains("Nova", "Meio", "Velha")));
 	}
 
+	// ----- leitura do aluno (D189 a D191) -----
+
+	/** Publica direto pela entidade: a publicação pela API exige as questões, que são assunto de outro teste. */
+	private void publicarPeloRepositorio(String id) {
+		var prova = repositorio.findByPublicId(UUID.fromString(id)).orElseThrow();
+		prova.publicar(java.time.Instant.parse("2026-03-04T05:06:07.008Z"));
+		repositorio.saveAndFlush(prova);
+	}
+
+	@Test
+	@ComPrincipal(Papel.STUDENT)
+	void deve_devolver_ao_aluno_so_os_campos_do_aluno_na_ordem_do_contrato() throws Exception {
+		String id = criar(corpo("Publicada", null, null, null, 180, 50, null));
+		publicarPeloRepositorio(id);
+
+		String detalhe = mockMvc.perform(get(BASE + "/" + id)).andExpect(status().isOk())
+				.andExpect(jsonPath("$.publicadaEm").value("2026-03-04T05:06:07.008Z")).andReturn().getResponse()
+				.getContentAsString();
+		String lista = mockMvc.perform(get(BASE)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+		String[] campos = { "id", "titulo", "banca", "ano", "semestre", "duracaoMinutos", "quantidadeQuestoes", "fonteUrl",
+				"publicadaEm" };
+		java.util.Map<String, Object> noDetalhe = JsonPath.read(detalhe, "$");
+		java.util.Map<String, Object> naLista = JsonPath.read(lista, "$.conteudo[0]");
+		assertThat(noDetalhe.keySet()).containsExactly(campos);
+		assertThat(naLista.keySet()).containsExactly(campos);
+		assertThat(naLista).isEqualTo(noDetalhe);
+	}
+
+	@Test
+	@ComPrincipal(Papel.STUDENT)
+	void deve_esconder_o_rascunho_do_aluno_na_lista_e_no_detalhe() throws Exception {
+		String rascunho = criar(corpo("Rascunho", null, null, null, 180, 50, null));
+		String publicada = criar(corpo("Publicada", null, null, null, 180, 50, null));
+		publicarPeloRepositorio(publicada);
+
+		mockMvc.perform(get(BASE)).andExpect(jsonPath("$.totalElementos").value(1))
+				.andExpect(jsonPath("$.conteudo.length()").value(1))
+				.andExpect(jsonPath("$.conteudo[0].id").value(publicada));
+		verificarErro(mockMvc.perform(get(BASE + "/" + rascunho)), 404, "Not Found", CodigoErro.PROVA_NAO_ENCONTRADA);
+	}
+
+	@ParameterizedTest
+	@ComPrincipal(Papel.STUDENT)
+	@ValueSource(strings = { "status=PUBLICADA", "status=RASCUNHO", "status=rascunho", "status=OUTRO", "status=" })
+	void deve_devolver_400_parametro_invalido_quando_o_aluno_envia_status(String consulta) throws Exception {
+		verificarErro(mockMvc.perform(get(BASE + "?" + consulta)), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO)
+				.andExpect(jsonPath("$.mensagem").value("O filtro status não está disponível para o seu perfil."));
+	}
+
 	// ----- PUT (fatia 4, passada 1; D170). As regras que dependem de questões cadastradas estão em QuestaoControllerTest -----
 
 	private ResultActions editar(String id, String json) throws Exception {

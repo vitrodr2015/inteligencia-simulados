@@ -31,6 +31,7 @@ import br.simulado.etec.shared.exception.CodigoErro;
 import br.simulado.etec.shared.exception.ConflictException;
 import br.simulado.etec.shared.exception.ResourceNotFoundException;
 import br.simulado.etec.shared.programa.Programa;
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Instant;
@@ -164,7 +165,27 @@ class ProvaServiceTest {
 		Prova prova = new Prova(etec, "T", null, null, null, 60, 10, null);
 		when(repositorio.findByPublicId(id)).thenReturn(Optional.of(prova));
 
-		assertThat(servico.buscar(id)).isSameAs(prova);
+		assertThat(servico.buscar(id, EscopoDeLeitura.TUDO)).isSameAs(prova);
+	}
+
+	@Test
+	void deve_dar_404_prova_nao_encontrada_ao_aluno_quando_a_prova_esta_em_rascunho() {
+		UUID id = UUID.randomUUID();
+		when(repositorio.findByPublicId(id)).thenReturn(Optional.of(new Prova(etec, "T", null, null, null, 60, 10, null)));
+
+		assertThatThrownBy(() -> servico.buscar(id, EscopoDeLeitura.SO_ATIVOS)).isInstanceOf(ResourceNotFoundException.class)
+				.satisfies(e -> assertThat(((ResourceNotFoundException) e).getCodigo())
+						.isEqualTo(CodigoErro.PROVA_NAO_ENCONTRADA));
+	}
+
+	@Test
+	void deve_devolver_a_prova_publicada_ao_aluno() {
+		UUID id = UUID.randomUUID();
+		Prova prova = new Prova(etec, "T", null, null, null, 60, 10, null);
+		prova.publicar(Instant.parse("2026-01-01T00:00:00Z"));
+		when(repositorio.findByPublicId(id)).thenReturn(Optional.of(prova));
+
+		assertThat(servico.buscar(id, EscopoDeLeitura.SO_ATIVOS)).isSameAs(prova);
 	}
 
 	@Test
@@ -172,7 +193,7 @@ class ProvaServiceTest {
 		UUID id = UUID.randomUUID();
 		when(repositorio.findByPublicId(id)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> servico.buscar(id)).isInstanceOf(ResourceNotFoundException.class)
+		assertThatThrownBy(() -> servico.buscar(id, EscopoDeLeitura.TUDO)).isInstanceOf(ResourceNotFoundException.class)
 				.satisfies(e -> assertThat(((ResourceNotFoundException) e).getCodigo())
 						.isEqualTo(CodigoErro.PROVA_NAO_ENCONTRADA));
 	}

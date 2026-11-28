@@ -148,7 +148,14 @@ class SwaggerLigadoTest {
 				.andExpect(jsonPath("$.components.schemas.ProvaResponse.properties.programa").doesNotExist())
 				.andExpect(jsonPath("$.components.schemas.ProvaResponse.properties.quantidadeQuestoes").exists())
 				.andExpect(jsonPath("$.components.schemas.ProvaRequest").exists())
-				.andExpect(jsonPath("$.components.schemas.PaginaResponseProvaResponse").exists());
+				.andExpect(jsonPath("$.components.schemas.PaginaResponseProvaDeLeitura.properties.conteudo.items.$ref")
+						.value("#/components/schemas/ProvaDeLeitura"))
+				.andExpect(jsonPath("$.components.schemas.ProvaDeLeitura.oneOf[*].$ref").value(
+						org.hamcrest.Matchers.containsInAnyOrder("#/components/schemas/ProvaResponse",
+								"#/components/schemas/ProvaDoAlunoResponse")))
+				.andExpect(jsonPath("$.components.schemas.ProvaDoAlunoResponse.properties.keys()").value(
+						org.hamcrest.Matchers.containsInAnyOrder("id", "titulo", "banca", "ano", "semestre", "duracaoMinutos",
+								"quantidadeQuestoes", "fonteUrl", "publicadaEm")));
 	}
 
 	@Test

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.simulado.etec.catalogo.dto.ProvaDeLeitura;
 import br.simulado.etec.catalogo.dto.ProvaRequest;
 import br.simulado.etec.catalogo.dto.ProvaResponse;
 import br.simulado.etec.catalogo.mapper.ProvaMapper;
@@ -29,13 +30,14 @@ import br.simulado.etec.catalogo.service.ProvaService;
 import br.simulado.etec.shared.paginacao.ConversorDePaginacao;
 import br.simulado.etec.shared.paginacao.Filtros;
 import br.simulado.etec.shared.paginacao.PaginaResponse;
+import br.simulado.etec.shared.security.EscopoDeLeitura;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 /**
  * Só HTTP: valida a entrada, chama o service e monta a resposta. A documentação fica em {@link ProvaControllerDocs}. A criação
- * e a edição moram em {@code /admin/provas} (D149, D170); a leitura e o publicar (D178) em {@code /provas}. Tudo é só do ADMIN
- * por enquanto (D154).
+ * e a edição moram em {@code /admin/provas} (D149, D170); a leitura e o publicar (D178) em {@code /provas}. Só a leitura é também
+ * do STUDENT, que recebe um DTO próprio e só enxerga as publicadas (D189 a D191).
  */
 @RestController
 @RequestMapping(path = "/api/v1", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -77,26 +79,32 @@ public class ProvaController implements ProvaControllerDocs {
 
 	@Override
 	@GetMapping("/provas")
-	public ResponseEntity<PaginaResponse<ProvaResponse>> listar(@RequestParam(required = false) String ano,
+	public ResponseEntity<PaginaResponse<ProvaDeLeitura>> listar(@RequestParam(required = false) String ano,
 			@RequestParam(required = false) String semestre, @RequestParam(required = false) String status,
 			@RequestParam(required = false) String page, @RequestParam(required = false) String size,
-			HttpServletRequest requisicao) {
+			HttpServletRequest requisicao, EscopoDeLeitura escopo) {
 		// Parâmetros recebidos como texto de propósito: a validação é nossa e devolve 400 (ver MateriaController).
 		Pageable paginacao = ConversorDePaginacao.converterRequisicao(page, size, requisicao.getParameterValues("sort"),
 				ProvaService.CAMPOS_ORDENAVEIS);
 		Integer filtroAno = Filtros.inteiro("ano", ano, 2000, 2100);
 		Integer filtroSemestre = Filtros.inteiro("semestre", semestre, 1, 2);
+		// o aluno não filtra por status: com qualquer valor, 400, antes de o valor ser interpretado (D28, D47)
+		escopo.validarFiltroDeStatus(status);
 		StatusProva filtroStatus = Filtros.enumerado("status", status, StatusProva.class);
-		Page<Prova> pagina = servico.listar(filtroAno, filtroSemestre, filtroStatus, paginacao);
+		Page<Prova> pagina = servico.listar(escopo, filtroAno, filtroSemestre, filtroStatus, paginacao);
+		if (!escopo.veRascunhos()) {
+			return ResponseEntity.ok(PaginaResponse.<Prova, ProvaDeLeitura>de(pagina, ProvaMapper::paraRespostaDoAluno));
+		}
 		Map<Long, Long> cadastradas = servico.contarQuestoes(pagina.getContent());
-		return ResponseEntity.ok(PaginaResponse.de(pagina,
+		return ResponseEntity.ok(PaginaResponse.<Prova, ProvaDeLeitura>de(pagina,
 				prova -> ProvaMapper.paraResponse(prova, cadastradas.getOrDefault(prova.getId(), 0L))));
 	}
 
 	@Override
 	@GetMapping("/provas/{id}")
-	public ResponseEntity<ProvaResponse> buscar(@PathVariable UUID id) {
-		return ResponseEntity.ok(comContagem(servico.buscar(id)));
+	public ResponseEntity<ProvaDeLeitura> buscar(@PathVariable UUID id, EscopoDeLeitura escopo) {
+		Prova prova = servico.buscar(id, escopo);
+		return ResponseEntity.ok(escopo.veRascunhos() ? comContagem(prova) : ProvaMapper.paraRespostaDoAluno(prova));
 	}
 
 	private ProvaResponse comContagem(Prova prova) {
