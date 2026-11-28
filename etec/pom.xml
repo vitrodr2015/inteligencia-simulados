@@ -122,7 +122,7 @@
 			<groupId>io.rest-assured</groupId>
 			<artifactId>rest-assured</artifactId>
 			<!-- Não é gerido pela BOM do Boot 4.2.0. A série 6.x usa Groovy 5 e tem suporte ao Jackson 3. -->
-			<version>6.0.0</version>
+			<version>6.3.0</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
