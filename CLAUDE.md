@@ -171,5 +171,5 @@ Rodar de dentro de `etec/` (no PowerShell/cmd use `mvnw.cmd`):
 - A `main` é protegida (ruleset `proteger-main`): só entra por pull request com o check **Build e testes** verde.
 - Nunca commitar direto na `main`/`develop`; sempre por branch e PR.
 - Só fazer commit/push quando o usuário pedir.
-- CI: `.github/workflows/ci.yml` roda `./mvnw verify` em PRs e em push na `main`. Dependabot semanal (Maven e Actions).
+- CI: `.github/workflows/ci.yml` confere o fim de linha no índice (nenhum arquivo de texto com CRLF ou misto) e roda `./mvnw verify`, em PRs e em push na `develop` e na `main`. Dependabot semanal (Maven e Actions).
 - CD: ainda não definido (destino de deploy em aberto).
