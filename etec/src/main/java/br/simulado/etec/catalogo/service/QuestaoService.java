@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -176,11 +177,7 @@ public class QuestaoService {
 	 * PUT de uma questão (D171): substituição total do RASCUNHO ABERTO. Só o status da versão decide: sem rascunho aberto é 409
 	 * QUESTAO_SEM_RASCUNHO, e o status da prova não importa (editar a questão não altera a prova, D173). O hash nunca muda (D51).
 	 *
-	 * <p>Trava (D175): toda escrita trava a linha da PROVA, e a trava é a primeira leitura da transação de escrita. A rota traz
-	 * só o id da questão, então o id da prova é lido ANTES, numa transação própria e curta (a prova de uma questão nunca
-	 * muda). Depois da trava a questão é lida de novo: se sumiu enquanto esperava, 404. Ler qualquer coisa antes da trava dentro
-	 * da mesma transação fixaria o snapshot do REPEATABLE READ e esconderia o que a transação anterior gravou. Por isso
-	 * {@code NEVER}: este método não pode ser chamado de dentro de outra transação.
+	 * <p>Trava (D175): ver {@code comAProvaDaQuestaoTravada}.
 	 *
 	 * <p>Ordem (D79): 404 → 409 sem rascunho → 400 do subtópico e 409 SUBTOPICO_INATIVO (só se o subtópico for TROCADO, D172) →
 	 * 400 CAMPO_IMUTAVEL (numero ou provaId diferentes do atual, mesmo que o provaId enviado não exista).
@@ -188,14 +185,71 @@ public class QuestaoService {
 	@Transactional(propagation = Propagation.NEVER)
 	public QuestaoVersao atualizar(UUID questaoPublicId, QuestaoAtualizacaoRequest dados) {
 		exigirAlternativas(dados.alternativas());
-		UUID provaPublicId = questoes.buscarProvaDaQuestao(questaoPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
-		return transacao.execute(estado -> atualizarComAProvaTravada(provaPublicId, questaoPublicId, dados));
+		return comAProvaDaQuestaoTravada(questaoPublicId, (prova, questao) -> atualizarRascunho(prova, questao, dados));
 	}
 
-	private QuestaoVersao atualizarComAProvaTravada(UUID provaPublicId, UUID questaoPublicId, QuestaoAtualizacaoRequest dados) {
-		// PRIMEIRA leitura da transação.
-		Prova prova = provas.buscarComTrava(provaPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
-		Questao questao = questoes.findByPublicId(questaoPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
+	/**
+	 * Abre uma versão nova da questão (D181): cópia COMPLETA da publicada, em RASCUNHO, com a versão 1 acima da maior que existe.
+	 * O subtópico é copiado mesmo desativado (quem confere é a publicação). numero, prova e hash são da identidade e não mudam
+	 * (D48, D51). O status da prova não importa. Ordem: 404 → 409 QUESTAO_COM_RASCUNHO → 409 CONFLITO quando não há publicada
+	 * para copiar (defensivo: a API não deixa uma questão sem rascunho e sem publicada).
+	 */
+	@Transactional(propagation = Propagation.NEVER)
+	public QuestaoVersao criarVersao(UUID questaoPublicId) {
+		return comAProvaDaQuestaoTravada(questaoPublicId, (prova, questao) -> {
+			if (versoes.findByQuestaoAndStatus(questao, StatusQuestao.RASCUNHO).isPresent()) {
+				throw new ConflictException(CodigoErro.QUESTAO_COM_RASCUNHO,
+						"A questão já tem um rascunho aberto. Altere ou publique esse rascunho.");
+			}
+			QuestaoVersao publicada = versoes.findByQuestaoAndStatus(questao, StatusQuestao.PUBLICADA)
+					.orElseThrow(() -> new ConflictException("A questão não tem versão publicada para copiar."));
+			return gravar(QuestaoVersao.copiaDe(publicada, versoes.buscarMaiorVersao(questao) + 1));
+		});
+	}
+
+	/**
+	 * Publica UMA questão (D182). Só vale em prova PUBLICADA (numa prova em rascunho quem publica é a cascata) e só publica o
+	 * rascunho aberto; as conferências são as MESMAS da cascata. Ordem: 404 → 409 PROVA_NAO_PUBLICADA → 409
+	 * QUESTAO_SEM_RASCUNHO → 409 PROVA_COM_QUESTOES_PENDENTES. A publicada anterior vira ARQUIVADA na mesma transação. A prova
+	 * não muda (D173).
+	 */
+	@Transactional(propagation = Propagation.NEVER)
+	public QuestaoVersao publicar(UUID questaoPublicId) {
+		return comAProvaDaQuestaoTravada(questaoPublicId, (prova, questao) -> {
+			if (prova.getStatus() != StatusProva.PUBLICADA) {
+				throw new ConflictException(CodigoErro.PROVA_NAO_PUBLICADA,
+						"A prova ainda não foi publicada. Publique a prova, que publica as questões dela.");
+			}
+			QuestaoVersao rascunho = versoes.findByQuestaoAndStatus(questao, StatusQuestao.RASCUNHO)
+					.orElseThrow(QuestaoService::semRascunho);
+			List<Pendencia> pendencias = pendenciasDe(rascunho, prova);
+			if (!pendencias.isEmpty()) {
+				throw recusaPorPendencias("A questão não pode ser publicada: há pendências. Nada foi publicado.", pendencias);
+			}
+			List<QuestaoVersao> anteriores = versoes.findByQuestaoAndStatus(questao, StatusQuestao.PUBLICADA).stream().toList();
+			publicarNoLugarDas(anteriores, List.of(rascunho), relogio.instant().truncatedTo(ChronoUnit.MILLIS));
+			return rascunho;
+		});
+	}
+
+	/**
+	 * A escrita pelas rotas que trazem o id da QUESTÃO (D175). A prova de uma questão nunca muda, então o id dela é lido ANTES,
+	 * numa transação própria e curta; depois a transação de escrita trava a prova como PRIMEIRA leitura e lê a questão de novo
+	 * (se sumiu enquanto esperava, 404). Ler qualquer coisa antes da trava dentro da mesma transação fixaria o snapshot do
+	 * REPEATABLE READ e esconderia o que a transação anterior gravou; como o UPDATE grava todas as colunas, isso desfaria em
+	 * silêncio uma publicação. Quem chama é {@code NEVER}: não pode estar dentro de outra transação.
+	 */
+	private <T> T comAProvaDaQuestaoTravada(UUID questaoPublicId, BiFunction<Prova, Questao, T> escrita) {
+		UUID provaPublicId = questoes.buscarProvaDaQuestao(questaoPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
+		return transacao.execute(estado -> {
+			// PRIMEIRA leitura da transação.
+			Prova prova = provas.buscarComTrava(provaPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
+			Questao questao = questoes.findByPublicId(questaoPublicId).orElseThrow(QuestaoService::questaoNaoEncontrada);
+			return escrita.apply(prova, questao);
+		});
+	}
+
+	private QuestaoVersao atualizarRascunho(Prova prova, Questao questao, QuestaoAtualizacaoRequest dados) {
 		QuestaoVersao rascunho = versoes.findByQuestaoAndStatus(questao, StatusQuestao.RASCUNHO)
 				.orElseThrow(QuestaoService::semRascunho);
 		Subtopico subtopico = rascunho.getSubtopico();
@@ -244,7 +298,7 @@ public class QuestaoService {
 	 * numero, sem gravar nada; havendo alguma, devolve a lista. Sem nenhuma, publica todos os rascunhos com o mesmo
 	 * {@code momento} e devolve a lista vazia.
 	 *
-	 * <p>Se uma questão já tiver versão publicada além do rascunho (a API ainda não produz isso numa prova em rascunho), a
+	 * <p>Se uma questão já tiver versão publicada além do rascunho (a API não produz isso numa prova em rascunho), a
 	 * publicada é arquivada e isso vai ao banco ANTES de o rascunho ser publicado: o índice único de "uma publicada por questão"
 	 * é conferido a cada instrução, e o JPA não garante a ordem das instruções sem o flush.
 	 */
@@ -269,19 +323,38 @@ public class QuestaoService {
 				pendencias.add(new Pendencia(numero, MotivoDePendencia.QUESTAO_SEM_RASCUNHO));
 				continue;
 			}
-			for (MotivoDePendencia motivo : impedimentos(rascunho, provaTravada)) {
-				pendencias.add(new Pendencia(numero, motivo));
-			}
+			pendencias.addAll(pendenciasDe(rascunho, provaTravada));
 			aPublicar.add(rascunho);
 		}
 		if (!pendencias.isEmpty()) {
 			return pendencias;
 		}
-		aPublicar.stream().map(rascunho -> publicadas.get(rascunho.getQuestao().getNumero())).filter(Objects::nonNull)
-				.forEach(QuestaoVersao::arquivar);
-		versoes.flush();
-		aPublicar.forEach(rascunho -> rascunho.publicar(momento));
+		publicarNoLugarDas(aPublicar.stream().map(rascunho -> publicadas.get(rascunho.getQuestao().getNumero()))
+				.filter(Objects::nonNull).toList(), aPublicar, momento);
 		return List.of();
+	}
+
+	/**
+	 * A troca da publicada, num ponto só para a cascata e a publicação avulsa: arquiva as anteriores, manda isso ao banco e só
+	 * então publica os rascunhos. O índice único de "uma publicada por questão" é conferido a cada instrução, e o JPA não
+	 * garante a ordem das instruções sem o flush. Tudo na transação de quem chama: se publicar falhar, o arquivamento se desfaz.
+	 */
+	private void publicarNoLugarDas(List<QuestaoVersao> anteriores, List<QuestaoVersao> rascunhos, Instant momento) {
+		anteriores.forEach(QuestaoVersao::arquivar);
+		versoes.flush();
+		rascunhos.forEach(rascunho -> rascunho.publicar(momento));
+	}
+
+	/** As pendências de UM rascunho, as mesmas na cascata e na publicação avulsa: o único lugar da regra do que publica. */
+	private List<Pendencia> pendenciasDe(QuestaoVersao rascunho, Prova prova) {
+		int numero = rascunho.getQuestao().getNumero();
+		return impedimentos(rascunho, prova).stream().map(motivo -> new Pendencia(numero, motivo)).toList();
+	}
+
+	/** O 409 de publicação recusada, com o mesmo formato nas duas rotas: detalhes.questoesPendentes = {numero, motivo}. */
+	static ConflictException recusaPorPendencias(String mensagem, List<Pendencia> pendencias) {
+		return new ConflictException(CodigoErro.PROVA_COM_QUESTOES_PENDENTES, mensagem,
+				Map.of("questoesPendentes", pendencias));
 	}
 
 	/** Tudo o que impede ESTE rascunho de ser publicado, na ordem dos motivos. */

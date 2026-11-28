@@ -24,8 +24,7 @@ import io.restassured.response.Response;
 
 /**
  * Ajudantes da edição (fatia 4, passada 1) contra MySQL real. As provas criadas por {@link #novaProva(int)}, com tudo o que há
- * nelas (inclusive as versões publicadas montadas por JDBC, que a API ainda não sabe produzir), são apagadas no fim de cada
- * teste.
+ * nelas (inclusive as versões montadas por JDBC), são apagadas no fim de cada teste.
  */
 public abstract class AbstractEdicaoIntegrationTest extends AbstractQuestaoIntegrationTest {
 
@@ -91,13 +90,13 @@ public abstract class AbstractEdicaoIntegrationTest extends AbstractQuestaoInteg
 
 	// ----- banco direto -----
 
-	/** Publica o rascunho direto no banco: a API ainda não publica (passada 2). */
+	/** Publica o rascunho direto no banco: monta estados que a API não produz (publicada em prova em rascunho). */
 	protected void publicarNoBanco(String questao) {
 		assertThat(jdbc.update("UPDATE questao_versao SET status = 'PUBLICADA', publicada_em = UTC_TIMESTAMP(3) "
 				+ "WHERE questao_id = ? AND status = 'RASCUNHO'", idInternoDaQuestao(questao))).isEqualTo(1);
 	}
 
-	/** Abre a versão 2 em RASCUNHO, cópia da publicada (o que o POST /versoes fará na passada 2). */
+	/** Abre, direto no banco, a versão seguinte em RASCUNHO, cópia da publicada: para os estados montados à mão. */
 	protected void abrirRascunhoNoBanco(String questao) {
 		long id = idInternoDaQuestao(questao);
 		jdbc.update("INSERT INTO questao_versao (questao_id, versao, status, subtopico_id, texto_apoio, grupo_apoio, enunciado, "
@@ -213,6 +212,26 @@ public abstract class AbstractEdicaoIntegrationTest extends AbstractQuestaoInteg
 			comando.executeQuery("SELECT a.id FROM alternativa a JOIN questao_versao v ON v.id = a.questao_versao_id "
 					+ "WHERE v.questao_id IN (" + ids + ") FOR UPDATE NOWAIT").close();
 			terceira.rollback();
+		}
+	}
+
+	/**
+	 * Outra conexão segura a trava, os dois pedidos entram na fila um depois do outro e só então a trava é solta: quem chegou
+	 * primeiro passa primeiro. Assim cada desfecho da corrida é provado, e não só o que o acaso produzir.
+	 */
+	protected List<Response> naOrdemDaFila(String prova, Callable<Response> primeiro, Callable<Response> segundo) throws Exception {
+		ExecutorService pool = Executors.newFixedThreadPool(2);
+		try (Connection outra = outraTransacao()) {
+			travarProva(outra, prova);
+			Future<Response> umLugar = pool.submit(primeiro);
+			esperarNaFilaDaTrava(1);
+			Future<Response> doisLugar = pool.submit(segundo);
+			esperarNaFilaDaTrava(2);
+			outra.rollback();
+			return List.of(umLugar.get(60, TimeUnit.SECONDS), doisLugar.get(60, TimeUnit.SECONDS));
+		}
+		finally {
+			pool.shutdownNow();
 		}
 	}
 

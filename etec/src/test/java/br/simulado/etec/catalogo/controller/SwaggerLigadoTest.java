@@ -271,4 +271,28 @@ class SwaggerLigadoTest {
 				.andExpect(jsonPath("$.paths['/api/v1/subtopicos/{id}'].delete.responses.409").exists());
 	}
 
+	@Test
+	void deve_documentar_a_nova_versao_e_a_publicacao_avulsa_sem_corpo_com_os_codigos_de_recusa() throws Exception {
+		String versoes = "$.paths['/api/v1/admin/questoes/{id}/versoes'].post";
+		String publicar = "$.paths['/api/v1/admin/questoes/{id}/publish'].patch";
+		var documento = mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+		for (String codigo : new String[] { "201", "400", "404", "409" }) {
+			documento.andExpect(jsonPath(versoes + ".responses." + codigo).exists());
+		}
+		for (String codigo : new String[] { "200", "400", "404", "409" }) {
+			documento.andExpect(jsonPath(publicar + ".responses." + codigo).exists());
+		}
+		for (String rota : new String[] { versoes, publicar }) {
+			documento.andExpect(jsonPath(rota + ".responses.401").doesNotExist())
+					.andExpect(jsonPath(rota + ".requestBody").doesNotExist());
+		}
+		documento.andExpect(jsonPath(versoes + ".responses.200").doesNotExist())
+				.andExpect(jsonPath(versoes + ".responses.409.description")
+						.value(org.hamcrest.Matchers.containsString("QUESTAO_COM_RASCUNHO")));
+		for (String codigo : new String[] { "PROVA_NAO_PUBLICADA", "QUESTAO_SEM_RASCUNHO", "PROVA_COM_QUESTOES_PENDENTES" }) {
+			documento.andExpect(jsonPath(publicar + ".responses.409.description")
+					.value(org.hamcrest.Matchers.containsString(codigo)));
+		}
+	}
+
 }

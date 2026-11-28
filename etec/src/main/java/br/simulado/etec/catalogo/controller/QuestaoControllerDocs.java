@@ -19,7 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 /** Documentação OpenAPI da questão (ADMIN). Só o que o código devolve hoje: 200, 201, 400, 404 e 409. */
-@Tag(name = "Questões (admin)", description = "Cadastro unitário, edição do rascunho e leitura de questão. Só ADMIN.")
+@Tag(name = "Questões (admin)", description = "Cadastro unitário, edição do rascunho, versões, publicação e leitura de questão. Só ADMIN.")
 public interface QuestaoControllerDocs {
 
 	@Operation(summary = "Cadastra uma questão numa prova (só ADMIN)",
@@ -49,6 +49,30 @@ public interface QuestaoControllerDocs {
 			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
 	ResponseEntity<QuestaoResponse> atualizar(@Parameter(description = "Id público da questão (UUID).") UUID id,
 			QuestaoAtualizacaoRequest dados);
+
+	@Operation(summary = "Abre uma versão nova da questão (só ADMIN)",
+			description = "Sem corpo. Cria um RASCUNHO com cópia completa da versão publicada: texto de apoio, grupo, enunciado, imagem, subtópico (mesmo que esteja desativado), alternativas, gabarito, dificuldade e explicação. O número da versão é o maior que existe mais 1. numero, provaId e a identidade da questão não mudam. A questão precisa ter versão publicada e nenhum rascunho aberto. A versão publicada continua valendo até o rascunho ser publicado.")
+	@ApiResponse(responseCode = "201", description = "Versão criada. O Location aponta para GET /admin/questoes/{id}, que passa a mostrar o rascunho.",
+			content = @Content(schema = @Schema(implementation = QuestaoResponse.class)))
+	@ApiResponse(responseCode = "400", description = "Id malformado.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "404", description = "Questão não encontrada (QUESTAO_NAO_ENCONTRADA).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "QUESTAO_COM_RASCUNHO (já há rascunho aberto) ou CONFLITO (não há versão publicada para copiar).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<QuestaoResponse> criarVersao(@Parameter(description = "Id público da questão (UUID).") UUID id);
+
+	@Operation(summary = "Publica o rascunho de uma questão de prova publicada (só ADMIN)",
+			description = "Sem corpo. Só vale em prova PUBLICADA (numa prova em rascunho, publicar a prova é que publica as questões). Publica o rascunho aberto, com as mesmas conferências da publicação da prova: gabarito, subtópico ativo (de matéria ativa) do programa da prova e imagem de um host permitido hoje. Com problema, nada muda, e detalhes.questoesPendentes traz todos como {numero, motivo}. Sem problema, a versão publicada anterior vira ARQUIVADA na mesma transação; ela continua legível por ?versao=n e nunca mais muda. Publicar não tem volta e não é idempotente: sem rascunho aberto, 409.")
+	@ApiResponse(responseCode = "200", description = "Questão publicada.",
+			content = @Content(schema = @Schema(implementation = QuestaoResponse.class)))
+	@ApiResponse(responseCode = "400", description = "Id malformado.",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "404", description = "Questão não encontrada (QUESTAO_NAO_ENCONTRADA).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	@ApiResponse(responseCode = "409", description = "PROVA_NAO_PUBLICADA, QUESTAO_SEM_RASCUNHO ou PROVA_COM_QUESTOES_PENDENTES (detalhes.questoesPendentes).",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+	ResponseEntity<QuestaoResponse> publicar(@Parameter(description = "Id público da questão (UUID).") UUID id);
 
 	@Operation(summary = "Lista as questões (só ADMIN)",
 			description = "Lista paginada. De cada questão vem só a versão mais recente: o rascunho aberto, se houver, senão a última publicada. Os filtros são opcionais e agem sobre essa versão. Um provaId ou subtopicoId que não existe não é erro: devolve a lista vazia. Ordem fixa por numero crescente. Página além do fim devolve 200 com a lista vazia.")

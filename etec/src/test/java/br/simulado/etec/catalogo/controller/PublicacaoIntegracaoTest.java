@@ -232,4 +232,23 @@ class PublicacaoIntegracaoTest extends AbstractPublicacaoIntegrationTest {
 				.body("status", equalTo("ARQUIVADA"));
 	}
 
+	/**
+	 * A cascata percorre só os numeros de 1 a N. Um numero acima de N a API não deixa existir (o cadastro e o PUT da prova
+	 * impedem); montado por SQL, a cascata o IGNORA: não confere (ele não tem gabarito nem alternativas), não publica e não toca.
+	 */
+	@Test
+	void deve_ignorar_na_cascata_a_questao_com_numero_acima_da_quantidade_da_prova() {
+		String prova = novaProva(1);
+		String subtopico = criarSubtopico();
+		importarProntas(prova, subtopico, 1, 1);
+		long deFora = inserirQuestao(idInternoDaProva(prova), 2);
+		inserirVersao(deFora, 1, "RASCUNHO", idInternoDoSubtopico(subtopico), "Fora de 1..N");
+		Map<String, Object> antes = jdbc.queryForMap("SELECT * FROM questao_versao WHERE questao_id = ?", deFora);
+
+		publicar(prova).then().statusCode(200);
+
+		assertThat(jdbc.queryForMap("SELECT * FROM questao_versao WHERE questao_id = ?", deFora)).isEqualTo(antes);
+		assertThat(versoesPorStatus(prova)).containsExactly("PUBLICADA=1", "RASCUNHO=1");
+	}
+
 }

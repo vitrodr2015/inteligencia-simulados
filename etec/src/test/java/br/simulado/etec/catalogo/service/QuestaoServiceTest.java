@@ -988,4 +988,190 @@ class QuestaoServiceTest {
 		assertThatThrownBy(() -> prova.publicar(MOMENTO)).isInstanceOf(IllegalStateException.class);
 	}
 
+	// ----- nova versão (D181) e publicação avulsa (D182). A troca no banco, a atomicidade e a concorrência estão no MySQL real -----
+
+	/** A questão 3 com a versão 1 já publicada. */
+	private QuestaoVersao publicadaExistente() {
+		QuestaoVersao publicada = rascunhoExistente();
+		publicada.publicar(MOMENTO.minusSeconds(60));
+		return publicada;
+	}
+
+	/** O rascunho que sucede a publicada, completo, no subtópico da prova. */
+	private QuestaoVersao sucessora(QuestaoVersao publicada, String gabarito, String imagemUrl) {
+		return new QuestaoVersao(publicada.getQuestao(), subtopico, null, null, "Corrigida", imagemUrl,
+				Map.of("A", "1", "B", "2", "C", "3", "D", "4", "E", "5"), gabarito, null, null);
+	}
+
+	private void aQuestaoExiste(Questao questao) {
+		when(questoes.buscarProvaDaQuestao(questao.getPublicId())).thenReturn(Optional.of(prova.getPublicId()));
+		when(provas.buscarComTrava(prova.getPublicId())).thenReturn(Optional.of(prova));
+		when(questoes.findByPublicId(questao.getPublicId())).thenReturn(Optional.of(questao));
+	}
+
+	private void aVersaoNoStatus(Questao questao, StatusQuestao status, QuestaoVersao versao) {
+		when(versoes.findByQuestaoAndStatus(questao, status)).thenReturn(Optional.ofNullable(versao));
+	}
+
+	@Test
+	void deve_abrir_um_rascunho_com_copia_completa_da_publicada_e_a_maior_versao_mais_1() {
+		QuestaoVersao publicada = publicadaExistente();
+		Questao questao = publicada.getQuestao();
+		subtopico.desativar();
+		aQuestaoExiste(questao);
+		aVersaoNoStatus(questao, StatusQuestao.RASCUNHO, null);
+		aVersaoNoStatus(questao, StatusQuestao.PUBLICADA, publicada);
+		when(versoes.buscarMaiorVersao(questao)).thenReturn(4);
+		when(versoes.saveAndFlush(any(QuestaoVersao.class))).thenAnswer(c -> c.getArgument(0));
+
+		QuestaoVersao nova = servico.criarVersao(questao.getPublicId());
+
+		assertThat(nova).isNotSameAs(publicada);
+		assertThat(nova.getVersao()).isEqualTo(5);
+		assertThat(nova.getStatus()).isEqualTo(StatusQuestao.RASCUNHO);
+		assertThat(nova.getPublicadaEm()).isNull();
+		assertThat(nova.getQuestao()).isSameAs(questao);
+		assertThat(nova.getSubtopico()).as("mesmo desativado").isSameAs(subtopico);
+		assertThat(List.of(nova.getTextoApoio(), nova.getGrupoApoio(), nova.getEnunciado(), nova.getGabarito(),
+				nova.getDificuldade(), nova.getExplicacao()))
+				.containsExactly("Apoio", 1, "Original", "C", br.simulado.etec.catalogo.model.Dificuldade.FACIL, "Porque sim");
+		assertThat(nova.getImagemUrl()).isNull();
+		assertThat(nova.getAlternativas()).extracting(a -> a.getLetra() + " " + a.getTexto())
+				.containsExactly("A um", "B dois", "C três", "D quatro", "E cinco");
+		assertThat(nova.getAlternativas()).as("alternativas novas, não as da publicada")
+				.allMatch(a -> publicada.getAlternativas().stream().noneMatch(original -> original == a));
+		assertThat(publicada.getStatus()).isEqualTo(StatusQuestao.PUBLICADA);
+		assertThat(publicada.getAlternativas()).hasSize(5);
+		InOrder ordem = inOrder(questoes, transacoes, provas, versoes);
+		ordem.verify(questoes).buscarProvaDaQuestao(questao.getPublicId());
+		ordem.verify(transacoes).getTransaction(any());
+		ordem.verify(provas).buscarComTrava(prova.getPublicId());
+		ordem.verify(questoes).findByPublicId(questao.getPublicId());
+		ordem.verify(versoes).findByQuestaoAndStatus(questao, StatusQuestao.RASCUNHO);
+		ordem.verify(versoes).saveAndFlush(nova);
+		ordem.verify(transacoes).commit(any());
+	}
+
+	@Test
+	void deve_recusar_a_nova_versao_quando_ja_ha_rascunho_sem_gravar_nada() {
+		QuestaoVersao rascunho = rascunhoExistente();
+		aQuestaoExiste(rascunho.getQuestao());
+		aVersaoNoStatus(rascunho.getQuestao(), StatusQuestao.RASCUNHO, rascunho);
+
+		assertThatThrownBy(() -> servico.criarVersao(rascunho.getQuestao().getPublicId()))
+				.isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_COM_RASCUNHO"));
+
+		verify(versoes, never()).saveAndFlush(any(QuestaoVersao.class));
+		verify(versoes, never()).buscarMaiorVersao(any());
+	}
+
+	@Test
+	void deve_dar_conflito_na_nova_versao_quando_nao_ha_publicada_para_copiar() {
+		Questao questao = rascunhoExistente().getQuestao();
+		aQuestaoExiste(questao);
+		aVersaoNoStatus(questao, StatusQuestao.RASCUNHO, null);
+		aVersaoNoStatus(questao, StatusQuestao.PUBLICADA, null);
+
+		assertThatThrownBy(() -> servico.criarVersao(questao.getPublicId())).isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("CONFLITO"));
+
+		verify(versoes, never()).saveAndFlush(any(QuestaoVersao.class));
+	}
+
+	@Test
+	void deve_recusar_a_publicacao_avulsa_em_prova_em_rascunho_antes_de_olhar_as_versoes() {
+		Questao questao = rascunhoExistente().getQuestao();
+		aQuestaoExiste(questao);
+
+		assertThatThrownBy(() -> servico.publicar(questao.getPublicId())).isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("PROVA_NAO_PUBLICADA"));
+
+		verify(versoes, never()).findByQuestaoAndStatus(any(), any());
+		verify(versoes, never()).flush();
+	}
+
+	@Test
+	void deve_recusar_a_publicacao_avulsa_quando_nao_ha_rascunho_aberto() {
+		Questao questao = rascunhoExistente().getQuestao();
+		prova.publicar(MOMENTO);
+		aQuestaoExiste(questao);
+		aVersaoNoStatus(questao, StatusQuestao.RASCUNHO, null);
+
+		assertThatThrownBy(() -> servico.publicar(questao.getPublicId())).isInstanceOf(ConflictException.class)
+				.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_SEM_RASCUNHO"));
+
+		verify(versoes, never()).flush();
+	}
+
+	@Test
+	void deve_recusar_a_publicacao_avulsa_com_todas_as_pendencias_sem_arquivar_a_publicada() {
+		QuestaoVersao publicada = publicadaExistente();
+		QuestaoVersao rascunho = sucessora(publicada, null, "https://fora.exemplo.invalid/a.png");
+		prova.publicar(MOMENTO);
+		subtopico.desativar();
+		aQuestaoExiste(publicada.getQuestao());
+		aVersaoNoStatus(publicada.getQuestao(), StatusQuestao.RASCUNHO, rascunho);
+
+		assertThatThrownBy(() -> servico.publicar(publicada.getQuestao().getPublicId()))
+				.isInstanceOfSatisfying(ConflictException.class, e -> {
+					assertThat(codigoDe(e)).isEqualTo("PROVA_COM_QUESTOES_PENDENTES");
+					assertThat(e.getDetalhes()).containsEntry("questoesPendentes",
+							List.of(new Pendencia(3, MotivoDePendencia.SEM_GABARITO),
+									new Pendencia(3, MotivoDePendencia.SUBTOPICO_INATIVO),
+									new Pendencia(3, MotivoDePendencia.IMAGEM_NAO_PERMITIDA)))
+							.hasSize(1);
+				});
+
+		assertThat(publicada.getStatus()).isEqualTo(StatusQuestao.PUBLICADA);
+		assertThat(rascunho.getStatus()).isEqualTo(StatusQuestao.RASCUNHO);
+		verify(versoes, never()).flush();
+	}
+
+	@Test
+	void deve_arquivar_e_mandar_ao_banco_antes_de_publicar_na_publicacao_avulsa() {
+		QuestaoVersao publicada = publicadaExistente();
+		QuestaoVersao rascunho = sucessora(publicada, "B", null);
+		Questao questao = publicada.getQuestao();
+		prova.publicar(MOMENTO);
+		aQuestaoExiste(questao);
+		aVersaoNoStatus(questao, StatusQuestao.RASCUNHO, rascunho);
+		aVersaoNoStatus(questao, StatusQuestao.PUBLICADA, publicada);
+		when(relogio.instant()).thenReturn(MOMENTO.plusNanos(123_456_789));
+		Map<String, StatusQuestao> noFlush = new HashMap<>();
+		org.mockito.Mockito.doAnswer(chamada -> {
+			noFlush.put("publicada", publicada.getStatus());
+			noFlush.put("rascunho", rascunho.getStatus());
+			return null;
+		}).when(versoes).flush();
+
+		assertThat(servico.publicar(questao.getPublicId())).isSameAs(rascunho);
+
+		assertThat(noFlush).containsEntry("publicada", StatusQuestao.ARQUIVADA).containsEntry("rascunho", StatusQuestao.RASCUNHO);
+		assertThat(rascunho.getStatus()).isEqualTo(StatusQuestao.PUBLICADA);
+		assertThat(rascunho.getPublicadaEm()).as("em milissegundos").isEqualTo(MOMENTO.plusMillis(123));
+		assertThat(publicada.getPublicadaEm()).isEqualTo(MOMENTO.minusSeconds(60));
+		InOrder ordem = inOrder(questoes, transacoes, provas, versoes);
+		ordem.verify(questoes).buscarProvaDaQuestao(questao.getPublicId());
+		ordem.verify(transacoes).getTransaction(any());
+		ordem.verify(provas).buscarComTrava(prova.getPublicId());
+		ordem.verify(questoes).findByPublicId(questao.getPublicId());
+		ordem.verify(versoes).flush();
+		ordem.verify(transacoes).commit(any());
+	}
+
+	@Test
+	void deve_dar_404_nas_rotas_de_versao_sem_abrir_transacao_quando_a_questao_nao_existe() {
+		UUID id = UUID.randomUUID();
+		when(questoes.buscarProvaDaQuestao(id)).thenReturn(Optional.empty());
+
+		for (org.assertj.core.api.ThrowableAssert.ThrowingCallable chamada : List
+				.<org.assertj.core.api.ThrowableAssert.ThrowingCallable>of(() -> servico.criarVersao(id), () -> servico.publicar(id))) {
+			assertThatThrownBy(chamada).isInstanceOf(ResourceNotFoundException.class)
+					.satisfies(e -> assertThat(codigoDe(e)).isEqualTo("QUESTAO_NAO_ENCONTRADA"));
+		}
+
+		verify(transacoes, never()).getTransaction(any());
+	}
+
 }

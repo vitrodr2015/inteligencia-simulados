@@ -81,6 +81,21 @@ class AutorizacaoIntegracaoTest extends AbstractIntegrationTest {
 			}
 
 			@Override
+			public String questaoPublicada(String materiaId) {
+				String prova = provaCompleta(materiaId);
+				requisicaoComo(Papel.ADMIN).patch("/api/v1/provas/" + prova + "/publish").then().statusCode(200);
+				return requisicaoComo(Papel.ADMIN).get("/api/v1/admin/questoes?provaId=" + prova).then().statusCode(200).extract()
+						.path("conteudo[0].id");
+			}
+
+			@Override
+			public String questaoEmRevisao(String materiaId) {
+				String questao = questaoPublicada(materiaId);
+				requisicaoComo(Papel.ADMIN).post("/api/v1/admin/questoes/" + questao + "/versoes").then().statusCode(201);
+				return questao;
+			}
+
+			@Override
 			public String questao(String provaId, String materiaId) {
 				// a questão fica num subtópico PRÓPRIO: um subtópico com questão não pode ser apagado (409), e a matriz apaga o
 				// subtopicoId

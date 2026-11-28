@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Prova — /api/v1/admin/provas e /api/v1/provas",
-    "description": "Rotas da Prova (Sprint 2, fatia 2a): POST /admin/provas, GET /provas e GET /provas/{id}, as três só do ADMIN (STUDENT e GUARDIAN levam 403 até a leitura do aluno, D154). Rode na ordem. Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). As provas criadas ficam no banco local (ainda não há DELETE de prova); o sufixo muda a cada rodada, então a coleção pode ser rodada de novo. Os PUT de prova (D170) entraram na fatia 4, passada 1. As recusas do publicar (D178) entraram na fatia 4, passada 2a.",
+    "description": "Rotas da Prova (Sprint 2, fatia 2a): POST /admin/provas, GET /provas e GET /provas/{id}, as três só do ADMIN (STUDENT e GUARDIAN levam 403 até a leitura do aluno, D154). Rode na ordem. Exige autenticação com DUAS identidades: o ADMIN (variáveis adminEmail e adminSenha, VAZIAS no arquivo; os mesmos de ADMIN_EMAIL e ADMIN_SENHA da subida, passo a passo no postman/README.md) e um STUDENT descartável (cadastrado por script, e-mail postman.*@exemplo.invalid). As provas criadas ficam no banco local (ainda não há DELETE de prova); o sufixo muda a cada rodada, então a coleção pode ser rodada de novo. Os PUT de prova (D170) entraram na fatia 4, passada 1. As recusas do publicar (D178) entraram na fatia 4, passada 2a. Depois de publicada, o que se corrige é a questão, por nova versão (D181 e D182): essas rotas estão na coleção de questão.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -3655,7 +3655,7 @@
           }
         },
         {
-          "name": "403 — PUT em /admin/provas/{id} ainda não existe (negado até para o ADMIN, D121)",
+          "name": "403 — PATCH em /admin/provas/{id} não existe (negado até para o ADMIN, D121)",
           "event": [
             {
               "listen": "test",
@@ -3669,7 +3669,7 @@
             }
           ],
           "request": {
-            "method": "PUT",
+            "method": "PATCH",
             "header": [
               {
                 "key": "Content-Type",
@@ -3691,7 +3691,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\"titulo\":\"Prova do Postman {{sufixo}}\",\"duracaoMinutos\":180,\"quantidadeQuestoes\":50}",
+              "raw": "{}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3733,7 +3733,7 @@
           }
         },
         {
-          "name": "403 — PATCH em /provas/{id}/publish ainda não existe",
+          "name": "403 — PATCH em /admin/provas/{id}/publish não existe (publicar é em /provas/{id}/publish)",
           "event": [
             {
               "listen": "test",
@@ -3748,19 +3748,34 @@
           ],
           "request": {
             "method": "PATCH",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/provas/{{provaId}}/publish",
+              "raw": "{{baseUrl}}/api/v1/admin/provas/{{provaId}}/publish",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
+                "admin",
                 "provas",
                 "{{provaId}}",
                 "publish"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         }

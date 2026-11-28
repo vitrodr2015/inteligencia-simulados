@@ -28,7 +28,7 @@ public final class MatrizDeAutorizacao {
 
 	/** Recursos criados (por um ADMIN) para cada execução de uma linha. */
 	public record Ctx(String materiaId, String subtopicoId, String materiaVaziaId, String provaId, String questaoId,
-			String provaCompletaId, String idInexistente, String sufixo) {
+			String provaCompletaId, String questaoPublicadaId, String questaoEmRevisaoId, String idInexistente, String sufixo) {
 	}
 
 	/**
@@ -321,17 +321,31 @@ public final class MatrizDeAutorizacao {
 				c -> "/api/v1/admin/provas/" + c.provaId() + "/questoes", null, 401, 403, 403, 403);
 		linha("POST em /admin/questoes (o cadastro é em /admin/provas/{id}/questoes)", "POST", null, c -> "/api/v1/admin/questoes",
 				c -> "{}", 401, 403, 403, 403);
-		linha("POST /versoes da questão (ainda não existe)", "POST", null,
-				c -> "/api/v1/admin/questoes/" + c.questaoId() + "/versoes", c -> "{}", 401, 403, 403, 403);
-		linha("publicar questão (ainda não existe)", "PATCH", null, c -> "/api/v1/admin/questoes/" + c.questaoId() + "/publish", null,
-				401, 403, 403, 403);
+		linha("abrir versão de questão publicada", "POST", "/api/v1/admin/questoes/{id}/versoes",
+				c -> "/api/v1/admin/questoes/" + c.questaoPublicadaId() + "/versoes", null, 401, 403, 403, 201);
+		linha("abrir versão com rascunho aberto", "POST", "/api/v1/admin/questoes/{id}/versoes",
+				c -> "/api/v1/admin/questoes/" + c.questaoId() + "/versoes", null, 401, 403, 403, 409);
+		linha("abrir versão de questão inexistente", "POST", "/api/v1/admin/questoes/{id}/versoes",
+				c -> "/api/v1/admin/questoes/" + c.idInexistente() + "/versoes", null, 401, 403, 403, 404);
+		linha("abrir versão com id malformado", "POST", "/api/v1/admin/questoes/{id}/versoes",
+				c -> "/api/v1/admin/questoes/abc/versoes", null, 401, 403, 403, 400);
+		linha("publicar questão em revisão", "PATCH", "/api/v1/admin/questoes/{id}/publish",
+				c -> "/api/v1/admin/questoes/" + c.questaoEmRevisaoId() + "/publish", null, 401, 403, 403, 200);
+		linha("publicar questão sem rascunho aberto", "PATCH", "/api/v1/admin/questoes/{id}/publish",
+				c -> "/api/v1/admin/questoes/" + c.questaoPublicadaId() + "/publish", null, 401, 403, 403, 409);
+		linha("publicar questão de prova em rascunho", "PATCH", "/api/v1/admin/questoes/{id}/publish",
+				c -> "/api/v1/admin/questoes/" + c.questaoId() + "/publish", null, 401, 403, 403, 409);
+		linha("publicar questão inexistente", "PATCH", "/api/v1/admin/questoes/{id}/publish",
+				c -> "/api/v1/admin/questoes/" + c.idInexistente() + "/publish", null, 401, 403, 403, 404);
+		linha("publicar questão com id malformado", "PATCH", "/api/v1/admin/questoes/{id}/publish",
+				c -> "/api/v1/admin/questoes/abc/publish", null, 401, 403, 403, 400);
 		for (String metodo : new String[] { "GET", "POST", "PUT", "DELETE" }) {
-			linha(metodo + " em /admin/questoes/{id}/publish (ainda não existe)", metodo, null,
+			linha(metodo + " em /admin/questoes/{id}/publish (não existe)", metodo, null,
 					c -> "/api/v1/admin/questoes/" + c.questaoId() + "/publish",
 					metodo.equals("POST") || metodo.equals("PUT") ? c -> "{}" : null, 401, 403, 403, 403);
 		}
 		for (String metodo : new String[] { "PUT", "PATCH", "DELETE" }) {
-			linha(metodo + " em /admin/questoes/{id}/versoes (ainda não existe)", metodo, null,
+			linha(metodo + " em /admin/questoes/{id}/versoes (não existe)", metodo, null,
 					c -> "/api/v1/admin/questoes/" + c.questaoId() + "/versoes",
 					metodo.equals("DELETE") ? null : c -> "{}", 401, 403, 403, 403);
 		}

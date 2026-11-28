@@ -964,4 +964,74 @@ class QuestaoControllerTest {
 		verificarErro(publicar(UUID_CURTO), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
 	}
 
+	// ----- nova versão (D181) e publicação avulsa (D182). O índice único, a atomicidade e a concorrência estão no MySQL real -----
+
+	private ResultActions novaVersao(String questao) throws Exception {
+		return mockMvc.perform(post("/api/v1/admin/questoes/" + questao + "/versoes"));
+	}
+
+	private ResultActions publicarQuestao(String questao) throws Exception {
+		return mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+				.patch("/api/v1/admin/questoes/" + questao + "/publish"));
+	}
+
+	/** Uma questão com a versão 1 publicada pela publicação da prova. */
+	private String questaoDeProvaPublicada() throws Exception {
+		String uma = criarProva(1);
+		String questao = cadastrarNaProva(uma, 1, "\"gabarito\":\"A\"");
+		publicar(uma).andExpect(status().isOk());
+		return questao;
+	}
+
+	@Test
+	void deve_devolver_201_com_location_e_a_versao_2_em_rascunho_e_200_ao_publica_la() throws Exception {
+		String questao = questaoDeProvaPublicada();
+
+		novaVersao(questao).andExpect(status().isCreated())
+				.andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/api/v1/admin/questoes/" + questao)))
+				.andExpect(jsonPath("$.id").value(questao))
+				.andExpect(jsonPath("$.versao").value(2))
+				.andExpect(jsonPath("$.status").value("RASCUNHO"))
+				.andExpect(jsonPath("$.gabarito").value("A"))
+				.andExpect(jsonPath("$.alternativas.length()").value(5));
+		verificarErro(novaVersao(questao), 409, "Conflict", CodigoErro.QUESTAO_COM_RASCUNHO);
+		mockMvc.perform(get("/api/v1/admin/questoes/" + questao)).andExpect(jsonPath("$.versao").value(2));
+
+		publicarQuestao(questao).andExpect(status().isOk())
+				.andExpect(jsonPath("$.versao").value(2))
+				.andExpect(jsonPath("$.status").value("PUBLICADA"))
+				.andExpect(jsonPath("$.alternativas.length()").value(5));
+		verificarErro(publicarQuestao(questao), 409, "Conflict", CodigoErro.QUESTAO_SEM_RASCUNHO);
+		mockMvc.perform(get("/api/v1/admin/questoes/" + questao + "?versao=1"))
+				.andExpect(jsonPath("$.status").value("ARQUIVADA"));
+	}
+
+	@Test
+	void deve_devolver_409_prova_nao_publicada_e_as_pendencias_na_publicacao_avulsa() throws Exception {
+		String emRascunho = cadastrarEObterId(1);
+		verificarErro(publicarQuestao(emRascunho), 409, "Conflict", CodigoErro.PROVA_NAO_PUBLICADA);
+
+		String questao = questaoDeProvaPublicada();
+		novaVersao(questao).andExpect(status().isCreated());
+		editarQuestao(questao, corpoDoPut("Sem gabarito", "")).andExpect(status().isOk());
+
+		verificarErro(publicarQuestao(questao), 409, "Conflict", CodigoErro.PROVA_COM_QUESTOES_PENDENTES)
+				.andExpect(jsonPath("$.detalhes.questoesPendentes.length()").value(1))
+				.andExpect(jsonPath("$.detalhes.questoesPendentes[0].numero").value(1))
+				.andExpect(jsonPath("$.detalhes.questoesPendentes[0].motivo").value("SEM_GABARITO"));
+		mockMvc.perform(get("/api/v1/admin/questoes/" + questao + "?versao=1"))
+				.andExpect(jsonPath("$.status").value("PUBLICADA"));
+	}
+
+	@Test
+	void deve_devolver_404_e_400_nas_rotas_de_versao_com_id_inexistente_ou_malformado() throws Exception {
+		String inexistente = java.util.UUID.randomUUID().toString();
+		verificarErro(novaVersao(inexistente), 404, "Not Found", CodigoErro.QUESTAO_NAO_ENCONTRADA);
+		verificarErro(publicarQuestao(inexistente), 404, "Not Found", CodigoErro.QUESTAO_NAO_ENCONTRADA);
+		for (String id : new String[] { "abc", UUID_CURTO }) {
+			verificarErro(novaVersao(id), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+			verificarErro(publicarQuestao(id), 400, "Bad Request", CodigoErro.PARAMETRO_INVALIDO);
+		}
+	}
+
 }

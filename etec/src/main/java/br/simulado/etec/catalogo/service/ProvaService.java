@@ -85,9 +85,8 @@ public class ProvaService {
 		Instant momento = relogio.instant().truncatedTo(ChronoUnit.MILLIS);
 		List<Pendencia> pendencias = servicoDeQuestoes.publicarQuestoesDaProva(prova, momento);
 		if (!pendencias.isEmpty()) {
-			throw new ConflictException(CodigoErro.PROVA_COM_QUESTOES_PENDENTES,
-					"A prova não pode ser publicada: há questões pendentes. Nada foi publicado.",
-					Map.of("questoesPendentes", pendencias));
+			throw QuestaoService.recusaPorPendencias("A prova não pode ser publicada: há questões pendentes. Nada foi publicado.",
+					pendencias);
 		}
 		prova.publicar(momento);
 		return repositorio.saveAndFlush(prova);

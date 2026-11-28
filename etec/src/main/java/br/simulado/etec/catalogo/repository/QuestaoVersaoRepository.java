@@ -23,6 +23,10 @@ public interface QuestaoVersaoRepository extends JpaRepository<QuestaoVersao, Lo
 	/** No máximo uma versão RASCUNHO e uma PUBLICADA por questão (índices únicos das colunas geradas, V10). */
 	Optional<QuestaoVersao> findByQuestaoAndStatus(Questao questao, StatusQuestao status);
 
+	/** O maior numero de versão da questão, contando as arquivadas. A questão sempre tem ao menos uma versão. */
+	@Query("select max(v.versao) from QuestaoVersao v where v.questao = :questao")
+	int buscarMaiorVersao(@Param("questao") Questao questao);
+
 	/**
 	 * Só a condição "esta é a versão EXIBIDA da questão" (D19, D56): o rascunho aberto, se houver, senão a publicada. Uma ARQUIVADA
 	 * nunca é exibida. Os filtros opcionais (nulo = todos) agem sobre ESSA versão, depois da escolha: o subtópico é o dela (D146).

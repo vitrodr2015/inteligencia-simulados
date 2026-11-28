@@ -192,8 +192,17 @@ Plano aprovado em 2026-11-24 (respostas às dúvidas H1 a H11). Marcação: ✅ 
 - **Cascata:** confere TUDO antes de gravar qualquer coisa. O arquivamento de uma publicada anterior (defensivo) vai ao banco com `flush` ANTES de o rascunho ser publicado, por causa do índice único de publicada vigente.
 - **Depois de publicada:** PUT de questão dá `QUESTAO_SEM_RASCUNHO` (D171, decidido pela versão); as demais escritas dão `PROVA_NAO_EDITAVEL`.
 - **Infra de teste:** o auxiliar `inserirVersaoCompleta` passou a preencher `publicada_em` quando o status não é RASCUNHO (V11); `comAProvaTravada` e `esperarNaFilaDaTrava(n)` ficam na `AbstractEdicaoIntegrationTest` (com 2 na fila, a ordem de chegada fixa o desfecho da corrida); `MigracaoV11IntegracaoTest` usa schema próprio no contêiner compartilhado; a matriz tem o marcador `{provaCompletaId}`.
-- **Falta (passada 2b):** publicar questão avulsa (só em prova publicada) e nova versão. Até lá não há como corrigir uma prova publicada.
+- ✅ **Passada 2b feita** (seção seguinte): publicar questão avulsa e nova versão.
 - **Primeiro deploy:** a V11 falha se houver versão publicada ou arquivada sem `publicada_em` (só possível com SQL manual).
+
+### Fatia 4, passada 2b (nova versão e publicar questão avulsa), branch `feature/s4-2b-versoes`
+
+- ✅ **Implementado:** `POST /admin/questoes/{id}/versoes` (`QuestaoService.criarVersao` + `QuestaoVersao.copiaDe`) e `PATCH /admin/questoes/{id}/publish` (`QuestaoService.publicar`); regra na SecurityConfig, matriz, Swagger, Postman. Sem migration.
+- **Decisões:** D181, D182 e D183. Códigos novos: `QUESTAO_COM_RASCUNHO` e `PROVA_NAO_PUBLICADA`.
+- **Pontos únicos (não duplicar):** `comAProvaDaQuestaoTravada` (a trava das rotas por id de questão: PUT, nova versão e publicar, todas `Propagation.NEVER`); `pendenciasDe` (o que impede publicar, usado pela cascata e pela avulsa); `publicarNoLugarDas` (arquiva, `flush`, publica); `recusaPorPendencias` (o 409).
+- **Cascata e numero acima de N:** a cascata só percorre 1..N e ignora o resto (há teste por SQL).
+- **Pendente:** até a passada 3 (apagar), rascunho aberto não se descarta. **Fechamento da Sprint 2:** rodar as coleções do Postman contra a aplicação local e gravar o relatório em `etec/docs/` (a regra está sem cumprir desde a fatia 3).
+- **Infra de teste:** `naOrdemDaFila` subiu para a `AbstractEdicaoIntegrationTest`; os auxiliares de versão ficam na `AbstractPublicacaoIntegrationTest`; a matriz tem os marcadores `{questaoPublicadaId}` e `{questaoEmRevisaoId}`. Comparar linhas de `prova` e `questao` pede `usingRecursiveComparison` (o `public_id` vem como `byte[]`). Rodar teste dirigido com `clean`: o IDE grava em `target/` classes com "Unresolved compilation".
 
 Reservada (aprovada, NÃO implementada): ⏳ D147 (`ScoringStrategy` com uma implementação, a da ETEC, e a configuração da prova em dados, ambas na fatia da Tentativa, para não nascer código sem chamador). D145 (tipo da questão interno, só `MULTIPLA_ESCOLHA`) e D146 (item 4) foram implementados na fatia 2b-i; D152, D153, D155 e D156 viraram decisões na 2b-i.
 
