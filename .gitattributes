@@ -1,0 +1,5 @@
+# Fim de linha: no repositório tudo é LF; os scripts do Maven Wrapper saem do checkout no formato que cada shell exige.
+# O etec/.gitattributes, mais específico, repete as regras do wrapper e continua valendo.
+* text=auto
+mvnw text eol=lf
+mvnw.cmd text eol=crlf
