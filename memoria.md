@@ -21,7 +21,7 @@ Nunca colocar valor sensível aqui; usar marcadores (`<senha>`, `<IP>`).
 - Repositório **público** (necessário para as regras de proteção valerem na conta gratuita).
 - Aprovação: o responsável único é o dono do projeto (projeto individual, 0 aprovações exigidas no PR).
 - Arquitetura: monólito modular; pacote base `br.simulado.etec`; camadas por domínio: `controller`, `service`, `repository`, `model`, `dto`, `mapper`; `shared`: `config`, `exception`, `security`.
-- CI: GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw -B -ntp verify` em PR e em push na `main`, Java 25.
+- CI: GitHub Actions (`.github/workflows/ci.yml`) confere o fim de linha no índice (`git ls-files --eol`, coluna `i/`; falha com CRLF ou misto, ignora binários) e depois roda `./mvnw -B -ntp verify`, em PR e em push na `develop` e na `main`, Java 25.
 - Dependabot semanal para Maven (`/etec`) e GitHub Actions.
 - Proteção da `main` (ruleset `proteger-main`, ativo): PR obrigatório, check **Build e testes** obrigatório com a branch atualizada, sem force push, sem deleção. Confirmado por push direto recusado.
 - Merge de PR: squash.
