@@ -218,6 +218,13 @@ Reservada (aprovada, NÃO implementada): ⏳ D147 (`ScoringStrategy` com uma imp
 
 Ordem das fatias: (1) programa e ganchos de dados ✅; (2) modelo de Prova e Questão + Importação + leitura do admin; (3) edição (PUT, versões, gabarito em lote, publicar, apagar); (4) leitura do aluno junto da Tentativa, com o DTO sem gabarito (D75) e a `ScoringStrategy`.
 
+### Chore de fechamento das lacunas do inventário, branch `chore/regras-lacunas`
+
+- Só testes e documentação, sem decisão nova (registro na seção 10 do contrato): D139 (a troca de senha conta toda tentativa sem sucesso que chega ao serviço), D159 (corpo = `CORPO_ILEGIVEL`), saúde só com o actuator, logout e auditoria na seção 11.
+- Testes novos: `LimiteNoSigninIntegracaoTest` (LIM-11 e LIM-16) e `AgendamentoDasLimpezasIntegracaoTest` (AUT-25 e LIM-17), no contexto compartilhado.
+- **LIM-11:** login sem e-mail não conta no limite do signin, mas **conta** no limite geral de POST em `/auth/*` (D128), que roda antes de ler o corpo.
+- Exclusão de prova com 300 questões e 1500 alternativas: 2295 ms numa única medição local (teste temporário, não commitado).
+
 ## Pendências
 
 - **EXPOSTO até o Módulo 17 (rodar só em localhost, aviso no `README.md`):** não há HTTPS nem HSTS, nem proxy confiável atrás de balanceador, nem deploy. O Módulo 13A fechou o limite de tentativas e o 13B fechou o refresh (guardado e rotacionado), o logout e a troca de senha. O Módulo 11 fechou: a escrita do catálogo é só ADMIN, o STUDENT só vê ativos, GUARDIAN não faz nada, rota nova nasce negada e o CORS é por lista. O admin nasce no bootstrap (Módulo 12).

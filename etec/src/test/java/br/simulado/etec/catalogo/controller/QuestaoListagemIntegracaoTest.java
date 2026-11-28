@@ -20,9 +20,10 @@ import jakarta.persistence.EntityManagerFactory;
 
 /**
  * A listagem de questões do ADMIN e o contador {@code questoesCadastradas} contra MySQL REAL. As versões ARQUIVADA, PUBLICADA e o
- * rascunho são inseridas por SQL direto (ainda não existe rota que publique ou crie versão), em cada teste, e TUDO o que o teste
- * insere é apagado no fim ({@link #apagarOQueOTesteCriou()}). Como o banco é compartilhado, as listas sem filtro são conferidas
- * pela sequência inteira ou só pelos itens do próprio teste.
+ * rascunho são inseridas por SQL direto, em cada teste, para montar qualquer combinação de versões sem depender das rotas de
+ * publicação e de nova versão (inclusive combinações que elas não produzem), e TUDO o que o teste insere é apagado no fim
+ * ({@link #apagarOQueOTesteCriou()}). Como o banco é compartilhado, as listas sem filtro são conferidas pela sequência inteira
+ * ou só pelos itens do próprio teste.
  */
 class QuestaoListagemIntegracaoTest extends AbstractQuestaoIntegrationTest {
 
